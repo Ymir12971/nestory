@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/JZ/.claude/**)",
+      "Bash(claude mcp *)",
+      "WebSearch",
+      "WebFetch(domain:help.figma.com)",
+      "WebFetch(domain:developers.figma.com)",
+      "PowerShell(Get-Command claude -ErrorAction SilentlyContinue)",
+      "PowerShell(npm root -g 2>$null)",
+      "PowerShell(npm config get prefix 2>$null)",
+      "Read(//c/Users/JZ/**)",
+      "Bash(node -e \"const c = require\\('C:/Users/JZ/.claude.json'\\); console.log\\('Top-level keys:', Object.keys\\(c\\)\\); console.log\\('mcpServers:', JSON.stringify\\(c.mcpServers || 'MISSING', null, 2\\)\\);\")",
+      "Bash(node -e \"const c=require\\('C:/Users/JZ/.claude.json'\\); const s=JSON.stringify\\(c,null,2\\); const i=s.indexOf\\('\\\\\"mcpServers\\\\\"'\\); console.log\\(s.substring\\(i, i+400\\)\\);\")",
+      "Bash(node -e ' *)",
+      "mcp__figma__whoami",
+      "mcp__figma__get_metadata",
+      "mcp__figma__get_variable_defs",
+      "mcp__figma__get_design_context"
+    ]
+  }
+}
