@@ -1,6 +1,6 @@
 # Nestory — 换机器交接说明
 
-**生成日期**：2026-04-29
+**生成日期**：2026-04-30
 **用途**：在另一台机器上恢复 Claude Code 协作上下文
 
 ---
@@ -100,40 +100,117 @@ claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
 
 ---
 
-## 4. 当前进度（截至 2026-04-29）
+## 4. 当前进度（截至 2026-04-30）
 
 ### 4.1 已完成
 
+#### 基础设施
+
 | 模块 | 文件 | 状态 |
 |---|---|---|
-| 文档 | `docs/dev/03_2_Nestory_目录结构_v3.0.md` | ✅ 单产品 monorepo + features-based + modules-based 已定 |
-| 文档 | `docs/dev/08-Nestory_DesignTokens0429.json` | ✅ 设计 token（包括 SemiBold-600 / 拆 ButtonLabel-M/S 等修复）|
-| 文档 | `docs/09-Nestory_FigmaTokenAudit_v1.0.md` | ✅ Figma 对账报告（设计师已修完） |
-| Monorepo 骨架 | `package.json` / `pnpm-workspace.yaml` / `turbo.json` / `tsconfig.base.json` / `.npmrc` | ✅ pnpm install + typecheck 全绿 |
+| 文档 | `docs/dev/03_2_Nestory_目录结构_v3.0.md` | ✅ 单产品 monorepo + features-based |
+| 文档 | `docs/dev/10-Nestory_FigmaScreenInventory_v1.0.md` | ✅ 41 个 frame 全清单 + node ID |
+| Monorepo 骨架 | `package.json` / `pnpm-workspace.yaml` / `turbo.json` / `.npmrc` | ✅ pnpm install + typecheck 全绿 |
 | `packages/types` | subscription / permission / story / asset 类型 | ✅ 跨 app 共享类型已建 |
-| `apps/nestory-api` | Fastify 5 + Prisma 6 + Zod env loader + `/health` 路由 | ✅ 入口可跑（数据库未接） |
-| `apps/nestory-web` | Next.js 15 + App Router + `/` `/story/[id]` `/share/[token]` 占位页 | ✅ typecheck 通过 |
-| `apps/nestory-mobile` | Expo SDK 52 + Expo Router + features/{auth,home,stories,highlights}/ + shared/{theme,ui}/ | ✅ Expo Web bundling 通过 |
-| Theme 层 | `apps/nestory-mobile/shared/theme/{colors,typography,spacing,radius,primitives,index}.ts` | ✅ 完整对齐 0429 token JSON |
-| **第一个屏** | `apps/nestory-mobile/features/auth/screens/SignInScreen.tsx` | ✅ Welcome/Sign In 屏，绿底 + 双社交按钮，可在 Expo Web 跑通 |
+| `apps/nestory-api` | Fastify 5 + Prisma 6 + `/health` | ✅ 入口可跑（数据库未接） |
+| `apps/nestory-web` | Next.js 15 + App Router 占位页 | ✅ typecheck 通过 |
+| Theme 层 | `shared/theme/{primitives,colors,typography,spacing,radius,index}.ts` | ✅ 完整对齐 0429 token JSON |
+
+#### 共享组件
+
+| 组件 | 文件 | 说明 |
+|---|---|---|
+| `TopNotify` | `shared/components/TopNotify.tsx` | 6 种状态：S-01（stories_trial/premium_ended）+ HL-01（hl_free_at_limit / ended × 3 级） |
+| `PaywallModal` | `shared/components/PaywallModal.tsx` | A/B/C/D 四 variant，各自独立标题 + 权益列表，琥珀渐变 CTA |
+
+#### Onboarding
+
+| 屏 | 文件 | Figma node |
+|---|---|---|
+| O-02 Sign In | `features/auth/screens/SignInScreen.tsx` | `58:57` |
+| O-06 Terms of Service | `features/onboarding/screens/TermsScreen.tsx` + `app/onboarding/terms.tsx` | `64:330` |
+| O-07 Privacy Policy | `features/onboarding/screens/PrivacyScreen.tsx` + `app/onboarding/privacy.tsx` | `64:361` |
+
+#### Home & Memory
+
+| 屏 | 文件 | Figma node |
+|---|---|---|
+| H-02 Add Memory | `features/memories/screens/AddMemoryScreen.tsx` + `app/memory/add.tsx` | `96:384` |
+| H-04 Memory Detail | `features/memories/screens/MemoryDetailScreen.tsx` + `app/memory/[id]/index.tsx` | `102:531` |
+| H-04 Memory Edit Mode | `features/memories/screens/MemoryEditScreen.tsx` + `app/memory/[id]/edit.tsx` | `102:618` |
+
+> ⚠️ 路由已由 `app/memory/[id].tsx` 拆分为 `app/memory/[id]/index.tsx` + `app/memory/[id]/edit.tsx`
+
+#### Stories
+
+| 屏 | 文件 | Figma node |
+|---|---|---|
+| S-01 Stories List | `features/stories/screens/StoriesScreen.tsx` + `app/(tabs)/stories.tsx` | `157:1391` |
+
+包含全部卡片变体：Collecting / Generating / Locked（Paywall A）+ Historical Generated / NotGenerated；TopNotify（stories_trial/premium_ended）接 Paywall A。
+
+#### Highlights
+
+| 屏 | 文件 | Figma node |
+|---|---|---|
+| HL-01 Highlights Gallery | `features/highlights/screens/HighlightsScreen.tsx` | `157:2206` |
+| HL-02 Highlight Detail | `features/highlights/screens/HighlightDetailScreen.tsx` | `157:2225` |
+
+HL-01 实现了 4 场景 topNotify（优先级 ④>③>②>①，接 Paywall B）。HL-02 包含 Edit Title Sheet + Remove Confirm Sheet。
+
+#### Settings
+
+| 屏 | 文件 | Figma node |
+|---|---|---|
+| ST-05 About | `features/settings/screens/AboutScreen.tsx` + `app/settings/about.tsx` | `167:924` |
+
+---
 
 ### 4.2 临时 hack（待后续修）
 
-- `apps/nestory-mobile/app/(tabs)/index.tsx` 临时 export `SignInScreen`（应是 HomeScreen）—— 等 auth flow 接通后改回，加 Redirect 逻辑
-- SignIn 屏 Apple/Google 图标用 unicode  和字母 G 占位 —— 后续接 brand SVG
-- 字体没加载 —— RN/Web 走系统字体 fallback；后续 expo-font 加载 Manrope/Inter
+- `app/(tabs)/index.tsx` 临时 export `SignInScreen`（应是 HomeScreen）—— 等 auth flow 接通后改回
+- SignIn 屏 Apple/Google 图标用 unicode 占位 —— 后续接 brand SVG
+- 字体通过 `expo-font` + `useFonts` 在 `_layout.tsx` 加载，但未做 SplashScreen 保持
+- 所有屏均使用 `MOCK_*` 常量，**未接真实 API**
+- H-02 / H-04 Edit Mode 用 `expo-image-picker` TODO 占位，photo strip 当前只显示占位色块
+
+---
 
 ### 4.3 未做（按优先级）
 
-1. **Figma 02 Main UI 页扫一遍** —— 4 个主页面（02 Main UI / 03 States / 04 Overlays）的 frame 清单 + 按 MCP 精校 Welcome 屏像素
-2. **Home 屏 (H-01)** —— avatarRow + highlightRow + StoryCard
-3. **Stories 屏 (S-01)** —— monthCard 列表 + filter
-4. **Subscription Paywall** —— Modal/Paywall A/B/C/D × year/month
-5. **Auth flow 接 Supabase** —— Apple/Google sign-in 真实接通
-6. **Prisma schema 落 [docs/dev/04_Nestory_数据库设计v1.7.md](04_Nestory_数据库设计v1.7.md)**
-7. **API 路由实现** —— `/assets`, `/stories`, `/highlights`, `/children`, `/subscriptions`, `/shares`
-8. **AI Pipeline 实现** —— Planner / Brief / Generator / Validator
-9. **Story H5 渲染层（Next.js）** —— StoryRenderer + sections + OG meta
+#### 前端（Mobile）
+
+| 优先级 | 项目 | Figma node | 备注 |
+|---|---|---|---|
+| 🔴 高 | H-01 Home | `94:349` | avatarRow + highlightRow + StoryCard，需先看 `269:800` avatarRow Variants |
+| 🔴 高 | O-03 a/b/c Child Profile | `62:42` ~ `63:282` | 三步 onboarding 表单（起名 / 生日 / 身高体重） |
+| 🔴 高 | O-04 Notifications | `64:142` | 通知授权页 |
+| 🔴 高 | O-05 Plan (Yearly/Monthly) | `64:170` + `64:250` | Paywall 上线前入口 |
+| 🟠 中 | H-03 Memory List | `98:452` | memory 列表页 |
+| 🟠 中 | S-02 Story Detail | `157:1446` | WebView 壳，载入 nestory-web |
+| 🟠 中 | ST-01 Settings | `162:856` | 设置主页（长滚），含 subscriptionEntry `403:880` |
+| 🟠 中 | ST-02A/B Subscription | `162:944` + `181:967` | 免费 / 付费态 |
+| 🟠 中 | ST-03 Child Profile List + Edit | `164:884` + `164:924` | 孩子档案管理 |
+| 🟡 低 | ST-04 Data & Privacy | `164:991` | 数据隐私页 |
+| 🟡 低 | ST-06 Feedback | `167:956` | 反馈页 |
+| 🟡 低 | ST-07 Account | `167:980` | 账号页 |
+| 🟡 低 | O-01 Welcome 精校 | `58:38` | 当前 SignInScreen 混入了 Welcome 内容，需拆分 |
+
+#### 前端（其他）
+
+- **字体 SplashScreen 保持**：expo-font 加载期间保持 SplashScreen，防止 FOUT
+- **expo-image-picker 接入**：H-02 / H-04 Edit 的 photo strip（见 `docs/dev/PENDING_INTEGRATION_TODOS.md`）
+- **S-02 WebView**：nestory-web 的 `/story/[id]` 页面还是 Next.js 占位页
+
+#### 后端
+
+- **Prisma schema** → `docs/dev/04_Nestory_数据库设计v1.7.md`
+- **API 路由实现** → `/assets`, `/stories`, `/highlights`, `/children`, `/subscriptions`, `/shares`
+- **Auth flow 接 Supabase** → Apple/Google sign-in 真实接通
+- **AI Pipeline** → Planner / Brief / Generator / Validator
+- **RevenueCat 接入** → 订阅购买 + Webhook
+
+---
 
 ### 4.4 已知小坑（修过的，避免再踩）
 

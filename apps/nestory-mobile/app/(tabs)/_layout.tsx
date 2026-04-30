@@ -1,11 +1,53 @@
 import { Tabs } from 'expo-router';
+import RemixIcon from 'react-native-remix-icon';
+import { theme } from '@/shared/theme';
 
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="stories" options={{ title: 'Stories' }} />
-      <Tabs.Screen name="highlights" options={{ title: 'Highlights' }} />
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: theme.surface.default,
+          borderTopColor: theme.border.default,
+          borderTopWidth: 1,
+        },
+        tabBarActiveTintColor: theme.text.brand,
+        tabBarInactiveTintColor: theme.text.secondary,
+        tabBarLabelStyle: {
+          fontFamily: 'Inter_500Medium',
+          fontSize: 12,
+          lineHeight: 16,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <RemixIcon name={focused ? 'home-3-fill' : 'home-3-line'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="stories"
+        options={{
+          title: 'Stories',
+          tabBarIcon: ({ color, focused }) => (
+            <RemixIcon name={focused ? 'book-open-fill' : 'book-open-line'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="highlights"
+        options={{
+          title: 'Highlights',
+          tabBarIcon: ({ color, focused }) => (
+            <RemixIcon name={focused ? 'star-fill' : 'star-line'} size={24} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

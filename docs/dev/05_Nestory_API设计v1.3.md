@@ -320,7 +320,9 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
       "is_last_free_story": false,
       // Paywall A 触发依据，前端从 S-02 返回时检查
       "watermark_enabled": true,
-      "generated_at": "2026-04-01T00:05:32Z"
+      "generated_at": "2026-04-01T00:05:32Z",
+      "memory_count": 14
+      // 生成该 Story 时使用的 Memory 数量；S-01 Generated card footer 展示用
     },
     {
       "id": null,
@@ -331,7 +333,8 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
       "title": "February",
       "is_last_free_story": false,
       "watermark_enabled": null,
-      "generated_at": null
+      "generated_at": null,
+      "memory_count": null
     }
   ],
   "current_month": {
@@ -508,6 +511,10 @@ Free/降级：
       "id": "uuid",
       "asset_id": "uuid",
       "cover_file_id": "uuid",
+      "cover_orientation": "portrait",
+      // "portrait" | "landscape"；由服务端按 cover_file 的 width_px/height_px 计算写入
+      // width >= height → "landscape"；width < height → "portrait"
+      // HL-01 卡片高度依赖此字段（portrait=228px / landscape=128px）
       "title": "First steps in the park",
       // AI 提取或用户覆写；null 表示尚未生成
       "card_type": "playtime",
