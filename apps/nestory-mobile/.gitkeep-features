@@ -1,0 +1,12 @@
+features 子目录骨架（避免空文件夹被 git 忽略）：
+- home/{api,hooks,components,screens,types.ts}
+- stories/{api,hooks,components,screens,types.ts}
+- highlights/{api,hooks,components,screens,types.ts}
+- memories/{api,hooks,components,screens,types.ts}
+- subscription/{api,hooks,components,screens,types.ts}
+- auth/{api,hooks,components,screens,types.ts}
+- children/{api,hooks,components,screens,types.ts}
+- profile/{api,hooks,components,screens,types.ts}
+- onboarding/{api,hooks,components,screens,types.ts}
+
+详见 docs/dev/03_2_Nestory_目录结构_v3.0.md

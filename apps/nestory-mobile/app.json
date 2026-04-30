@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Nestory",
+    "slug": "nestory",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "nestory",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.blakard.nestory"
+    },
+    "android": {
+      "package": "com.blakard.nestory"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

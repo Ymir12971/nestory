@@ -16,7 +16,17 @@
       "mcp__figma__whoami",
       "mcp__figma__get_metadata",
       "mcp__figma__get_variable_defs",
-      "mcp__figma__get_design_context"
+      "mcp__figma__get_design_context",
+      "PowerShell(Get-Command pnpm -ErrorAction SilentlyContinue)",
+      "PowerShell($node = Get-Command node -ErrorAction SilentlyContinue; if \\($node\\) { Write-Output \"Node: $\\($node.Source\\) \\($\\(node --version\\)\\)\" } else { Write-Output \"Node: NOT INSTALLED\" }; $npm = Get-Command npm -ErrorAction SilentlyContinue; if \\($npm\\) { Write-Output \"npm: $\\(npm --version\\)\" } else { Write-Output \"npm: NOT INSTALLED\" }; $corepack = Get-Command corepack -ErrorAction SilentlyContinue; if \\($corepack\\) { Write-Output \"corepack: available\" } else { Write-Output \"corepack: NOT INSTALLED\" })",
+      "PowerShell(corepack enable pnpm)",
+      "PowerShell(pnpm --version)",
+      "PowerShell(npm install -g pnpm@10.10.0 2>&1)",
+      "PowerShell(pnpm install 2>&1)",
+      "PowerShell(pnpm typecheck 2>&1)",
+      "PowerShell(pnpm --filter @nestory/web why @types/react 2>&1)",
+      "PowerShell(pnpm --filter @nestory/web typecheck 2>&1)",
+      "PowerShell(pnpm why -r @types/react 2>&1)"
     ]
   }
 }
