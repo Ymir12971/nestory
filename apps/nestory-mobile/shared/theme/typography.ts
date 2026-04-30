@@ -7,7 +7,7 @@
  * NOTE: lineHeight values come from Figma directly (not in JSON yet — see audit doc §3).
  */
 import type { TextStyle } from 'react-native';
-import { fontFamily, fontSize, fontWeight } from './primitives.js';
+import { fontFamily, fontSize, fontWeight } from './primitives';
 
 const manrope = fontFamily.primary;
 const inter = fontFamily.secondary;

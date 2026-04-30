@@ -8,20 +8,20 @@
  *
  *   import { typography, spacing } from '@/shared/theme';
  */
-export { palette, fontFamily, fontSize, fontWeight } from './primitives.js';
-export type { FontWeight } from './primitives.js';
-export { text, surface, border, overlay } from './colors.js';
-export { typography } from './typography.js';
-export type { TypographyVariant } from './typography.js';
-export { spacing } from './spacing.js';
-export type { SpacingToken } from './spacing.js';
-export { radius } from './radius.js';
-export type { RadiusToken } from './radius.js';
+export { palette, fontFamily, fontSize, fontWeight } from './primitives';
+export type { FontWeight } from './primitives';
+export { text, surface, border, overlay } from './colors';
+export { typography } from './typography';
+export type { TypographyVariant } from './typography';
+export { spacing } from './spacing';
+export type { SpacingToken } from './spacing';
+export { radius } from './radius';
+export type { RadiusToken } from './radius';
 
-import { text, surface, border, overlay } from './colors.js';
-import { typography } from './typography.js';
-import { spacing } from './spacing.js';
-import { radius } from './radius.js';
+import { text, surface, border, overlay } from './colors';
+import { typography } from './typography';
+import { spacing } from './spacing';
+import { radius } from './radius';
 
 /**
  * Aggregated theme object. Use this for ergonomic access in components.

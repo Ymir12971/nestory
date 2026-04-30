@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
-import { loadEnv } from './config/env.js';
+import { loadEnv } from './config/env';
 
 const env = loadEnv();
 const app = Fastify({

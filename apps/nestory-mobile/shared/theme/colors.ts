@@ -4,7 +4,7 @@
  *
  * Source: docs/dev/08-Nestory_DesignTokens0429.json
  */
-import { palette } from './primitives.js';
+import { palette } from './primitives';
 
 export const text = {
   primary:   palette.neutral[900],     // #1a1a1a

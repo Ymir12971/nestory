@@ -26,7 +26,10 @@
       "PowerShell(pnpm typecheck 2>&1)",
       "PowerShell(pnpm --filter @nestory/web why @types/react 2>&1)",
       "PowerShell(pnpm --filter @nestory/web typecheck 2>&1)",
-      "PowerShell(pnpm why -r @types/react 2>&1)"
+      "PowerShell(pnpm why -r @types/react 2>&1)",
+      "PowerShell(pnpm --filter @nestory/mobile typecheck 2>&1)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} in %{time_total}s\\\\n\" http://localhost:8081/)",
+      "Bash(curl -s -o /dev/null -w \"First request HTTP %{http_code} in %{time_total}s\\\\n\" http://localhost:8081/)"
     ]
   }
 }

@@ -13,6 +13,6 @@ export type PermissionRule =
 
 export interface PermissionContext {
   userId: string;
-  subscriptionStatus: import('./subscription.js').SubscriptionStatus;
+  subscriptionStatus: import('./subscription').SubscriptionStatus;
   storyQuota: number;
 }
