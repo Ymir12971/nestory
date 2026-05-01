@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
@@ -57,8 +58,10 @@ function UnitInput({
 export function ChildProfileEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const pickPhoto = usePhotoPicker();
 
   // In production: fetch from GET /children/:id
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [name,    setName]    = useState(MOCK_PROFILE.name);
   const [gender,  setGender]  = useState<Gender>(MOCK_PROFILE.gender);
   const [height,  setHeight]  = useState(MOCK_PROFILE.heightCm);
@@ -89,11 +92,17 @@ export function ChildProfileEditScreen() {
       >
         {/* Photo area */}
         <View style={styles.photoArea}>
-          {/* TODO: replace with <Image> once avatar upload is wired */}
           <View style={styles.avatarCircle}>
-            <RemixIcon name="user-5-line" size={60} color={theme.text.onColor} />
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <RemixIcon name="user-5-line" size={60} color={theme.text.onColor} />
+            )}
           </View>
-          <Pressable onPress={() => { /* TODO: image picker */ }}>
+          <Pressable onPress={async () => {
+            const picked = await pickPhoto();
+            const first = picked[0]; if (first) setAvatarUri(first.uri);
+          }}>
             <Text style={styles.tapToChange}>Tap to change</Text>
           </Pressable>
         </View>
@@ -213,6 +222,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
   },
   tapToChange: {
     ...theme.typography.buttonLabelM,

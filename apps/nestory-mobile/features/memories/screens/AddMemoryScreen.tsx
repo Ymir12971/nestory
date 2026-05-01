@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
+import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
 
 type SaveState = 'both_empty' | 'need_photos' | 'need_note' | 'active';
 
@@ -38,6 +39,7 @@ function getHlCaption(sub: HlSubStatus, count: number, limit: number): string {
 
 export function AddMemoryScreen() {
   const router = useRouter();
+  const pickPhotos = usePhotoPicker({ multiple: true });
   const [noteText, setNoteText]       = useState('');
   const [isHighlight, setIsHighlight] = useState(false);
   const [photos, setPhotos]           = useState<string[]>([]);
@@ -56,10 +58,9 @@ export function AddMemoryScreen() {
     router.back();
   };
 
-  const handleAddPhoto = () => {
-    // TODO(expo-image-picker): replace with real picker
-    // See docs/dev/PENDING_INTEGRATION_TODOS.md
-    setPhotos(prev => [...prev, `placeholder_${Date.now()}`]);
+  const handleAddPhoto = async () => {
+    const picked = await pickPhotos();
+    if (picked.length > 0) setPhotos(prev => [...prev, ...picked.map(p => p.uri)]);
   };
 
   const handleRemovePhoto = (index: number) => {
@@ -89,10 +90,9 @@ export function AddMemoryScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.photoStrip}
         >
-          {photos.map((_, i) => (
-            <View key={i} style={styles.photoThumbWrap}>
-              {/* TODO: replace with <Image source={...}> when picker is wired */}
-              <View style={styles.photoThumbImg} />
+          {photos.map((uri, i) => (
+            <View key={uri} style={styles.photoThumbWrap}>
+              <Image source={{ uri }} style={styles.photoThumbImg} />
               <Pressable
                 style={styles.deleteBadge}
                 hitSlop={6}

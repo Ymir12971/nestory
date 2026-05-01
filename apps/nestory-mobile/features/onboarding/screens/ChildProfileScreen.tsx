@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
+  Image,
   View,
   Text,
   TextInput,
@@ -9,6 +10,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -285,9 +287,11 @@ type Gender = 'Girl' | 'Boy' | 'Prefer not to say' | null;
 
 export function ChildProfileScreen() {
   const router = useRouter();
+  const pickPhoto = usePhotoPicker();
   const [step, setStep] = useState<Step>(0);
 
   const [name, setName] = useState('');
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   const [monthIdx, setMonthIdx] = useState(2);
   const [dayIdx, setDayIdx] = useState(14);
@@ -323,11 +327,16 @@ export function ChildProfileScreen() {
           <View style={styles.photoArea}>
             <Pressable
               style={styles.avatarWrap}
-              onPress={() => {
-                // TODO: features/onboarding/api/photoPicker.ts → expo-image-picker (needs approval)
+              onPress={async () => {
+                const picked = await pickPhoto();
+                const first = picked[0]; if (first) setAvatarUri(first.uri);
               }}
             >
-              <View style={styles.photoCircle} />
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.photoCircle} />
+              ) : (
+                <View style={styles.photoCircle} />
+              )}
               <View style={styles.cameraBadge}>
                 <RemixIcon name="camera-line" size={20} color={theme.text.onColor} />
               </View>

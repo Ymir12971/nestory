@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
+import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
 
 // TODO: derive from GET /assets/:id — pre-fill real data
 const MOCK_EDIT_DATA = {
@@ -18,14 +19,15 @@ const MOCK_EDIT_DATA = {
 export function MemoryEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const pickPhotos = usePhotoPicker({ multiple: true });
 
   const [noteText, setNoteText]       = useState(MOCK_EDIT_DATA.noteText);
   const [isHighlight, setIsHighlight] = useState(MOCK_EDIT_DATA.isHighlight);
   const [photos, setPhotos]           = useState<string[]>(MOCK_EDIT_DATA.photos);
 
-  const handleAddPhoto = () => {
-    // TODO(expo-image-picker): replace with real picker
-    setPhotos(prev => [...prev, `placeholder_${Date.now()}`]);
+  const handleAddPhoto = async () => {
+    const picked = await pickPhotos();
+    if (picked.length > 0) setPhotos(prev => [...prev, ...picked.map(p => p.uri)]);
   };
 
   const handleRemovePhoto = (index: number) => {
@@ -65,10 +67,9 @@ export function MemoryEditScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.photoStrip}
         >
-          {photos.map((_, i) => (
-            <View key={i} style={styles.photoThumbWrap}>
-              {/* TODO: replace with <Image source={...}> when picker is wired */}
-              <View style={styles.photoThumbImg} />
+          {photos.map((uri, i) => (
+            <View key={uri} style={styles.photoThumbWrap}>
+              <Image source={{ uri }} style={styles.photoThumbImg} />
               <Pressable
                 style={styles.deleteBadge}
                 hitSlop={6}
