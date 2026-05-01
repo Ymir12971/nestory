@@ -19,10 +19,10 @@ export const text = {
   warning:   palette.notify.warning.strong, // #92400e
   info:      palette.notify.info.strong,    // #1e40af
   // PENDING vicol: subtitle/body text on brand-green background (O-02, elsewhere on Surface.Brand)
-  // Figma uses Color.Primary.100 (#d1f5de) — no semantic alias exists yet. See PENDING_DESIGN_QUESTIONS.md Q1.
+  // Figma uses Color.Primary.100 (#d1f5de) — no semantic alias exists yet. See docs/sync-to-vicol.md Q1.
   onBrandSubtle: palette.primary[100],  // #d1f5de — TEMP, awaiting vicol token definition
   // PENDING vicol: link/semibold text on brand-green background (O-02 footer links)
-  // Figma uses Color.Primary.50 (#edfbf2). See PENDING_DESIGN_QUESTIONS.md Q1.
+  // Figma uses Color.Primary.50 (#edfbf2). See docs/sync-to-vicol.md Q1.
   onBrandEmphasis: palette.primary[50], // #edfbf2 — TEMP, awaiting vicol token definition
 } as const;
 
