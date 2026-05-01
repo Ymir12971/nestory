@@ -3,10 +3,55 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, Vie
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
-import type { SubscriptionStatus } from '@nestory/types';
+import type { Child, Subscription, SubscriptionStatus, User } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { useMe, useSubscription, useChildren } from '@/api';
+
+// DEMO: flip to false once backend is reachable. While true, mock data is used
+// instead of the API responses so the screen renders without a server.
+const DEMO_MODE = true;
+
+const DEMO_ME: User = {
+  id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  email: 'justin@blakard.com',
+  name: 'Justin',
+  timezone: 'Asia/Shanghai',
+  linkedProviders: [],
+  createdAt: '2026-01-01T00:00:00.000Z',
+};
+
+const DEMO_SUB: Subscription = {
+  planType: 'free',
+  subscriptionStatus: 'never_paid',
+  status: 'expired',
+  billingCycle: null,
+  storyQuotaRemaining: 1,
+  expiresAt: null,
+  benefits: [],
+  highlightCount: 2,
+  highlightLimit: 10,
+  activeChildId: 'child-demo-1',
+};
+
+const DEMO_CHILDREN: Child[] = [
+  {
+    id: 'child-demo-1',
+    name: 'Emma',
+    birthDate: '2024-12-01',
+    gender: 'girl',
+    avatarUrl: null,
+    ageMonths: 17,
+    heightValue: 78,
+    heightUnit: 'cm',
+    heightRecordedAt: '2026-04-01T00:00:00.000Z',
+    weightValue: 10,
+    weightUnit: 'kg',
+    weightRecordedAt: '2026-04-01T00:00:00.000Z',
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+];
 
 // ---------- Subscription entry derivation ----------
 
@@ -114,8 +159,8 @@ export function SettingsScreen() {
   const [location, setLocation]         = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
 
-  const isLoading = meQ.isLoading || subQ.isLoading || childrenQ.isLoading;
-  const hasError  = meQ.isError || subQ.isError || childrenQ.isError;
+  const isLoading = !DEMO_MODE && (meQ.isLoading || subQ.isLoading || childrenQ.isLoading);
+  const hasError  = !DEMO_MODE && (meQ.isError || subQ.isError || childrenQ.isError);
 
   if (isLoading) {
     return (
@@ -125,7 +170,7 @@ export function SettingsScreen() {
     );
   }
 
-  if (hasError || !meQ.data || !subQ.data) {
+  if (!DEMO_MODE && (hasError || !meQ.data || !subQ.data)) {
     return (
       <SafeAreaView style={[styles.container, styles.center]} edges={['top']}>
         <Text style={styles.errorText}>Failed to load settings.</Text>
@@ -136,9 +181,10 @@ export function SettingsScreen() {
     );
   }
 
-  const me  = meQ.data;
-  const sub = subQ.data;
-  const activeChild = childrenQ.data?.find(c => c.isActive) ?? childrenQ.data?.[0];
+  const me  = DEMO_MODE ? DEMO_ME  : meQ.data!;
+  const sub = DEMO_MODE ? DEMO_SUB : subQ.data!;
+  const childrenList = DEMO_MODE ? DEMO_CHILDREN : childrenQ.data;
+  const activeChild  = childrenList?.find(c => c.isActive) ?? childrenList?.[0];
 
   const subEntry = getSubEntry(sub.subscriptionStatus, sub.expiresAt);
 
