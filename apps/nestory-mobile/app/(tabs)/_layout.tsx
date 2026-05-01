@@ -1,8 +1,10 @@
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { theme } from '@/shared/theme';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
@@ -11,6 +13,9 @@ export default function TabsLayout() {
           backgroundColor: theme.surface.default,
           borderTopColor: theme.border.default,
           borderTopWidth: 1,
+          height: 56 + insets.bottom,
+          paddingTop: 6,
+          paddingBottom: insets.bottom + 6,
         },
         tabBarActiveTintColor: theme.text.brand,
         tabBarInactiveTintColor: theme.text.secondary,
