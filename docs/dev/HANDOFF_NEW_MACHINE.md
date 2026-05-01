@@ -242,6 +242,7 @@ claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
 - **mobile 12 个屏仍用 MOCK_***（除 SettingsScreen 已转 API），下个 sprint 按表格逐屏迁移
 - **Apple/Google 图标用 RemixIcon 通用图标**（不是 brand SVG）——可接受
 - **`POST /assets` 走 JSON metadata 路径**（不是 multipart）：mobile 必须先把照片传 Supabase Storage 拿 URL，再 POST 到 API。Storage signed URL 流程未做
+- **`assets/images/home-hero-bg.png` 是占位图**：原始资源是 74 字节 404 JSON 被当 PNG 存了，`24109d7` 已用 sharp 生成 750x500 纯色 #262A38 PNG 兜底（让 RN bundling + Anthropic API 不再崩）。需要从 Figma O-01 / H-01 hero 区域导出真图替换
 
 #### Backend
 
