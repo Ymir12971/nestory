@@ -237,9 +237,11 @@ claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
 
 #### Mobile
 
-- **`shared/hooks/useSession.ts` 是 stub**（永远返回 null session），导致 `app/index.tsx` 永远跳 `/onboarding/welcome`。等 Supabase Auth 接通后实装
+- **`features/auth/hooks/useSession.ts` 是 stub** — 用 module-level `_devSession` + `setDevSession()` listener 模式，初始 null（`app/index.tsx` 跳 `/onboarding/welcome`）；SignInScreen 按钮调 `setDevSession({ userId: DEMO_USER_ID })` 假装登录。接 Supabase Auth 时整个文件改成 supabase.auth.onAuthStateChange()
+- **`SignInScreen.tsx` 的 Apple/Google 按钮是 demo bypass** — `handleSignIn` 直接 `setDevSession + router.replace('/(tabs)')`，跳过真实 OAuth。接 Supabase 时换成 `signInWithApple` / `signInWithGoogle`
+- **`SettingsScreen.tsx` 有 `DEMO_MODE = true` flag** — true 时 me/sub/children 全用本地 mock 常量（never_paid 状态），跳过 useMe/useSubscription/useChildren 的 isLoading/isError 分支。后端起来后翻 false 即恢复 API 模式
 - **API client dev token 写死 UUID**：`api/client.ts` 里 `_devUserId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'`；`setDevUserId(id)` 可切换。生产环境必须接 Supabase getSession()
-- **mobile 12 个屏仍用 MOCK_***（除 SettingsScreen 已转 API），下个 sprint 按表格逐屏迁移
+- **mobile 12 个屏仍用 MOCK_***，下个 sprint 按表格逐屏迁移（SettingsScreen 已写好 API 调用但 DEMO_MODE 暂时屏蔽）
 - **Apple/Google 图标用 RemixIcon 通用图标**（不是 brand SVG）——可接受
 - **`POST /assets` 走 JSON metadata 路径**（不是 multipart）：mobile 必须先把照片传 Supabase Storage 拿 URL，再 POST 到 API。Storage signed URL 流程未做
 
