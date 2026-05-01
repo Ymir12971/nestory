@@ -9,6 +9,7 @@
   },
   "scripts": {
     "strip-icc": "node scripts/strip-icc.mjs",
+    "demo": "node scripts/start-demo.mjs",
     "dev": "turbo run dev --filter='./apps/nestory-api' --filter='./apps/nestory-web'",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
