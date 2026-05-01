@@ -57,7 +57,7 @@ export function MemoryListScreen() {
       {/* NavBar */}
       <View style={styles.navBar}>
         <Pressable hitSlop={8} onPress={() => router.back()}>
-          <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
+          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Memories</Text>
         <View style={styles.navSpacer} />
@@ -67,8 +67,10 @@ export function MemoryListScreen() {
       <View style={styles.filterBar}>
         <Pressable style={styles.yearSelector} onPress={() => { /* TODO: year picker sheet */ }}>
           <Text style={styles.yearText}>{selectedYear}</Text>
-          <RemixIcon name="arrow-down-s-line" size={18} color={theme.text.primary} />
+          <RemixIcon name="arrow-down-s-line" size={24} color={theme.text.primary} />
         </Pressable>
+
+        <View style={styles.filterDivider} />
 
         <ScrollView
           horizontal
@@ -177,10 +179,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: theme.spacing.xl,
-    paddingBottom: theme.spacing.s,
+    paddingVertical: 4,
     gap: theme.spacing.m,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border.default,
+  },
+  filterDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: theme.border.default,
   },
   yearSelector: {
     flexDirection: 'row',
@@ -238,7 +243,7 @@ const styles = StyleSheet.create({
   dateBadge: {
     width: DATE_BADGE_W,
     paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.s,
+    borderRadius: theme.radius.m,
     backgroundColor: theme.surface.brandSubtle,
     alignItems: 'center',
   },
@@ -270,7 +275,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.card,
     borderWidth: 1,
     borderColor: theme.border.default,
-    borderRadius: theme.radius.l,
+    borderRadius: theme.radius.m,
     paddingHorizontal: theme.spacing.m,
     gap: theme.spacing.m,
   },
@@ -280,7 +285,7 @@ const styles = StyleSheet.create({
   cardPhotoWrap: {
     width: CARD_PHOTO,
     height: CARD_PHOTO,
-    borderRadius: theme.radius.s,
+    borderRadius: theme.radius.m,
     overflow: 'hidden',
   },
   cardPhotoPlaceholder: {
@@ -301,7 +306,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   photoBadgeCount: {
-    ...theme.typography.tagBadge,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 9,
+    lineHeight: 12,
     color: theme.text.onColor,
   },
   cardBody: {

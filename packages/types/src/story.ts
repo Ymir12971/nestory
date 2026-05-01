@@ -29,6 +29,7 @@ export interface StoryListItem {
   watermarkEnabled: boolean | null;     // null when no story
   generatedAt: string | null;
   memoryCount: number | null;           // null when no story; count of memories used to generate
+}
 
 // GET /stories — current_month object
 export interface CurrentMonthStatus {
