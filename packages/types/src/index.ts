@@ -8,3 +8,4 @@ export * from './tag';
 export * from './story';
 export * from './subscription';
 export * from './permission';
+export * from './topNotify';

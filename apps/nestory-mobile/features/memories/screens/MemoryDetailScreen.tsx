@@ -102,15 +102,17 @@ export function MemoryDetailScreen() {
           {MOCK_MEMORY.isHighlight && (
             <Pressable
               style={styles.highlightCard}
-              onPress={() => router.push('/highlights/1')}
+              onPress={() => router.push('/highlight/1')}
             >
               {/* Cover photo thumbnail */}
               <View style={styles.highlightPhoto} />
 
               {/* Right content */}
               <View style={styles.highlightBody}>
-                <RemixIcon name="star-fill" size={20} color={theme.text.brand} />
-                <Text style={styles.highlightHeading}>Marked as a highlight</Text>
+                <View style={styles.highlightHeadingRow}>
+                  <RemixIcon name="star-fill" size={20} color={theme.text.brand} />
+                  <Text style={styles.highlightHeading}>Marked as a highlight</Text>
+                </View>
                 {MOCK_MEMORY.highlightTitle ? (
                   <Text style={styles.highlightTitle} numberOfLines={2}>
                     {MOCK_MEMORY.highlightTitle}
@@ -248,13 +250,18 @@ const styles = StyleSheet.create({
   highlightPhoto: {
     width: 72,
     height: 72,
-    borderRadius: theme.radius.s,
+    borderRadius: theme.radius.m,
     backgroundColor: theme.border.brand,
     flexShrink: 0,
   },
   highlightBody: {
     flex: 1,
-    gap: 2,
+    gap: 4,
+  },
+  highlightHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
   },
   highlightHeading: {
     ...theme.typography.h4,

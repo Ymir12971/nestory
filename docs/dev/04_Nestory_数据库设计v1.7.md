@@ -1,11 +1,27 @@
 # Nestory — 数据库设计文档
 
-**版本：** v1.7
-**日期：** 2026-04-26
-**上一版本：** v1.2（2026-04-25）
+**版本：** v1.8
+**日期：** 2026-05-01
+**上一版本：** v1.7（2026-04-26）
 **来源：** 从技术架构文档 v1.3 §5 拆出
 **依赖文档：** PRD v1.7 · PageStructure v1.6 · SubscriptionRules v1.3 · 技术架构 v1.3
 **编写者：** Justin
+**对应实现：** `apps/nestory-api/prisma/schema.prisma`
+
+### v1.8 变更记录（与 ADR `ARCH-DECISIONS-API-DB-20260501.md` 对齐）
+
+- **`users` 表新增 `updated_at`**（v1.7 遗漏）：与其他表对齐，timezone / active_child_id / name 字段可变更需要审计
+- **`users` 表新增 `name VARCHAR(100)`**：mobile 多处使用（SettingsScreen / FeedbackScreen），types/user.ts 已加
+- **新增 `linked_providers` 表**：Apple/Google OAuth 绑定列表（取代之前 mobile 用 MOCK_LINKED 的需求）
+- **决策 5 双层删除策略落地**：
+  - `children` / `raw_assets` / `highlights` 新增 `deleted_at TIMESTAMPTZ`（之前仅 users 有）
+  - 30 天 cron 物理清除范围扩大到上述表
+  - `audit_log` / `abuse_log` 的 `user_id` 改为 `ON DELETE SET NULL`（永不删，但用户被 hard purge 后变孤儿）
+- **`raw_assets.user_id` 补 ON DELETE CASCADE**（v1.7 遗漏 ON DELETE 子句）
+- **`stories.status` 增加 `'queued'` 状态**：对齐决策 4 的 BullMQ 状态机 `pending → queued → generating → generated | failed`
+- **Highlight 唯一性**：`highlights.asset_id` 加 UNIQUE（一条 Memory 最多一个 Highlight，原文档隐含但无显式约束）
+- **API 命名约定**：决策 1 — DB 列名仍 snake_case，TS/JSON 全 camelCase（通过 Prisma `@map`）
+- **Subscription `subscription_status`**：决策 2 — 5 态枚举为唯一权威字段，前端不再用 `'free'` 简化别名
 
 ### v1.7 变更记录
 
@@ -102,6 +118,8 @@ CREATE TABLE users (
   id                       UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   email                    VARCHAR(255) NOT NULL UNIQUE,
   -- 与 Supabase Auth 同步，DB 层强约束兜底
+  name                     VARCHAR(100) NOT NULL,
+  -- 用户显示名（来自 OAuth profile 或用户编辑）；mobile Settings/Feedback 页使用
   timezone                 VARCHAR(50)  NOT NULL DEFAULT 'UTC',
   -- 业务关键字段，用于：
   --   · Story 生成调度（次月 1 日本地时区触发）
@@ -122,7 +140,8 @@ CREATE TABLE users (
   -- 滥用锁定时间戳（NULL = 未锁定）
   -- 触发：客服 admin tool 手动锁定，或自动检测（24h 上传 > 1000 张）
   -- auth middleware：locked_at IS NOT NULL → 403 ACCOUNT_LOCKED（不区分原因）
-  created_at               TIMESTAMPTZ  NOT NULL DEFAULT now()
+  created_at               TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  updated_at               TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 -- 初始化方式：PostgreSQL trigger on_auth_user_created（见技术架构文档 §5）
@@ -150,6 +169,7 @@ CREATE TABLE children (
   weight_recorded_at TIMESTAMPTZ,             -- 该次体重的记录时间
   -- 注：MVP 只保留最新一次测量值；历史记录如需保留，v1.1 加 child_measurements 子表
   -- 单位由客户端传入，后端原样存储；AI 上下文拼接时按 unit 字段选对应描述
+  deleted_at         TIMESTAMPTZ,             -- v1.8：误删恢复 30 天窗口（决策 5）
   created_at         TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
@@ -167,7 +187,7 @@ CREATE INDEX idx_children_user ON children(user_id);
 CREATE TABLE raw_assets (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   child_id       UUID        NOT NULL REFERENCES children(id) ON DELETE CASCADE,
-  user_id        UUID        NOT NULL REFERENCES users(id),
+  user_id        UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- v1.8 补 ON DELETE
   asset_type     VARCHAR(10) NOT NULL,   -- 'photo' | 'text' | 'mixed'
                                          -- mixed：同时含照片与文字（最常见场景）
   text_note      TEXT,                   -- 文字备注，上限 500 字符
@@ -184,6 +204,7 @@ CREATE TABLE raw_assets (
   -- 预设 Tag 和自定义 Tag 混合存储，不依赖任何关联表或外键
   -- 删除 user_tag_library 中的 custom tag 不影响此字段（orphan chip 语义）
   is_highlight   BOOLEAN     DEFAULT FALSE,
+  deleted_at     TIMESTAMPTZ,                   -- v1.8："最近删除"30 天（决策 5）
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
   -- 服务端 UTC 时间，仅用于系统审计，不用于业务判断
 );
@@ -258,9 +279,9 @@ CREATE INDEX idx_user_tag_library_user ON user_tag_library(user_id);
 ```sql
 CREATE TABLE highlights (
   id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id            UUID         NOT NULL REFERENCES users(id),
-  child_id           UUID         NOT NULL REFERENCES children(id),
-  asset_id           UUID         NOT NULL REFERENCES raw_assets(id) ON DELETE CASCADE,
+  user_id            UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- v1.8 补
+  child_id           UUID         NOT NULL REFERENCES children(id) ON DELETE CASCADE, -- v1.8 补
+  asset_id           UUID         NOT NULL UNIQUE REFERENCES raw_assets(id) ON DELETE CASCADE, -- v1.8: 加 UNIQUE
   cover_file_id      UUID         REFERENCES asset_files(id) ON DELETE SET NULL,
   -- 用户选定的封面照片（引用 asset_files 某一行）
   -- 单张照片时默认该张；多张时由 "Select Highlight Cover" Sheet 选定
@@ -270,6 +291,7 @@ CREATE TABLE highlights (
   -- 生成前为 null，前端展示占位态
   card_type          VARCHAR(50),          -- 卡片模板类型，按 Tag 匹配
   rendered_image_url VARCHAR(500),         -- 渲染为图片后的 URL，用于分享
+  deleted_at         TIMESTAMPTZ,          -- v1.8：取消 highlight 软删（决策 5）
   created_at         TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
@@ -303,7 +325,8 @@ CREATE TABLE stories (
   month_key            VARCHAR(7)  NOT NULL,
   -- 格式："2026-03"（用户本地时区月份，不是 UTC）
   status               VARCHAR(30) NOT NULL DEFAULT 'pending',
-  -- 'pending' | 'generating' | 'completed' | 'failed' | 'fallback_generated'
+  -- v1.8（决策 4 BullMQ 状态机）：
+  -- 'pending' | 'queued' | 'generating' | 'generated' | 'failed' | 'fallback_generated'
 
   -- 可索引显式列（高频查询/统计，冗余自 JSONB）
   quality_level        VARCHAR(10),          -- 'low' | 'medium' | 'rich'
@@ -439,13 +462,36 @@ CREATE TABLE subscriptions (
 
 ---
 
+### linked_providers (v1.8 新增)
+
+```sql
+CREATE TABLE linked_providers (
+  id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider          VARCHAR(20)  NOT NULL,    -- 'apple' | 'google'
+  provider_user_id  VARCHAR(255) NOT NULL,    -- OAuth provider 返回的 sub/sub_id
+  provider_email    VARCHAR(255),             -- NULL = 用户撤销 email 共享（如 Apple Hide My Email）
+  connected_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  UNIQUE(provider, provider_user_id)
+);
+
+CREATE INDEX idx_linked_providers_user ON linked_providers(user_id);
+```
+
+**用途说明：**
+- 一个 user 可绑定多个 provider（typical：Apple + Google）
+- mobile Settings · Account 屏读此表生成"已连接"列表
+- 解绑只删 row；最后一个 provider 不允许解绑（应用层校验）
+
+---
+
 ### audit_log
 
 ```sql
 CREATE TABLE audit_log (
   id          BIGSERIAL    PRIMARY KEY,
   user_id     UUID         REFERENCES users(id) ON DELETE SET NULL,
-  -- NULL 表示系统操作（webhook / cron）
+  -- NULL 表示系统操作（webhook / cron）；或用户被 hard purge 后由 v1.8 决策 5 SET NULL 留快照
   actor_type  VARCHAR(20)  NOT NULL,
   -- 'user' | 'system' | 'webhook'
   action      VARCHAR(50)  NOT NULL,

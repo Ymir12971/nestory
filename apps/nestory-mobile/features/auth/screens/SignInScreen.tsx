@@ -2,9 +2,11 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
+import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 
 export function SignInScreen() {
+  const router = useRouter();
   return (
     <LinearGradient
       colors={[palette.primary[600], palette.primary[400]]}
@@ -62,9 +64,19 @@ export function SignInScreen() {
         <View style={styles.footer}>
           <Text style={styles.footerText}>By continuing, you agree to our</Text>
           <Text style={styles.footerText}>
-            <Text style={styles.footerLink}>Terms of Service</Text>
+            <Text
+              style={styles.footerLink}
+              onPress={() => router.push('/onboarding/terms')}
+            >
+              Terms of Service
+            </Text>
             {' and '}
-            <Text style={styles.footerLink}>Privacy Policy</Text>
+            <Text
+              style={styles.footerLink}
+              onPress={() => router.push('/onboarding/privacy')}
+            >
+              Privacy Policy
+            </Text>
           </Text>
         </View>
       </SafeAreaView>

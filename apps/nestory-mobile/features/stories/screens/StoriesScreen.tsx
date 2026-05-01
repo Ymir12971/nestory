@@ -200,6 +200,12 @@ export function StoriesScreen() {
   const router = useRouter();
   const [selectedYear, setSelectedYear] = useState(2026);
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [paywallVariant, setPaywallVariant] = useState<'A' | 'C'>('A');
+
+  const openPaywall = (variant: 'A' | 'C') => {
+    setPaywallVariant(variant);
+    setPaywallVisible(true);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -235,7 +241,7 @@ export function StoriesScreen() {
           <TopNotify
             type={MOCK_SUBSCRIPTION_STATUS}
             kind={MOCK_SUBSCRIPTION_KIND}
-            onPress={() => setPaywallVisible(true)}
+            onPress={() => openPaywall('C')}
           />
         </View>
       )}
@@ -254,7 +260,7 @@ export function StoriesScreen() {
         )}
         {MOCK_CURRENT.listItemState === 'current_in_progress' && <GeneratingCard monthKey={MOCK_CURRENT.monthKey} />}
         {MOCK_CURRENT.listItemState === 'current_quota_exhausted' && (
-          <LockedCard onUpgrade={() => setPaywallVisible(true)} />
+          <LockedCard onUpgrade={() => openPaywall('A')} />
         )}
 
         {MOCK_STORIES.map(item =>
@@ -272,7 +278,7 @@ export function StoriesScreen() {
 
       <PaywallModal
         visible={paywallVisible}
-        variant="A"
+        variant={paywallVariant}
         onSubscribe={() => setPaywallVisible(false)}
         onDismiss={() => setPaywallVisible(false)}
       />

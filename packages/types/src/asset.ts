@@ -22,8 +22,10 @@ export interface Memory {
   textNote: string | null;
   tags: string[];           // value snapshot, e.g. ["Playtime", "第一次独站"]
   isHighlight: boolean;
+  linkedHighlight: { id: string; title: string | null } | null; // M-04 detail page surfaces title
   capturedAt: string;       // ISO 8601, client local time (used for month grouping)
   isEditable: boolean;      // true = current month; false = historical read-only (R-08)
+  deletedAt?: string;       // ISO 8601; only present in GET /assets/trash responses
 }
 
 // POST /assets — multipart/form-data (types are illustrative; actual upload uses FormData)

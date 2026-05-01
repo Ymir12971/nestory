@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { theme, palette } from '@/shared/theme';
 
 const TOTAL_STEPS = 5;
@@ -47,8 +48,8 @@ export function NotificationsScreen() {
       <View style={styles.cta}>
         <Pressable
           style={({ pressed }) => [styles.buttonWrap, pressed && { opacity: 0.85 }]}
-          onPress={() => {
-            // TODO: expo-notifications requestPermissionsAsync() — pending vicol approval
+          onPress={async () => {
+            await Notifications.requestPermissionsAsync();
             router.push('/onboarding/plan');
           }}
         >

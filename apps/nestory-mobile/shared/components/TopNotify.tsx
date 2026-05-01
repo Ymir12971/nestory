@@ -2,15 +2,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import RemixIcon from 'react-native-remix-icon';
 import { theme } from '@/shared/theme';
 
-// S-01 stories statuses
-// HL-01 highlights statuses (scenarios 2-4 use `kind` to swap Trial/Premium prefix)
-export type TopNotifyStatus =
-  | 'stories_trial_ended'
-  | 'stories_premium_ended'
-  | 'hl_free_at_limit'
-  | 'hl_ended_under_limit'
-  | 'hl_ended_at_limit'
-  | 'hl_ended_over_limit';
+// Re-export from @nestory/types so existing imports continue to work
+export type { TopNotifyStatus, TopNotifyKind } from '@nestory/types';
+import type { TopNotifyStatus } from '@nestory/types';
 
 function getMessage(
   type: TopNotifyStatus,

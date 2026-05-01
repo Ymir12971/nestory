@@ -437,9 +437,7 @@ export function ChildProfileScreen() {
 
             <Pressable
               style={styles.addChildBtn}
-              onPress={() => {
-                // TODO: multi-child onboarding flow (O-03a Second Child, 63:196)
-              }}
+              onPress={() => router.push('/onboarding/second-child')}
             >
               <Text style={styles.addChildLabel}>Add Another Child</Text>
             </Pressable>

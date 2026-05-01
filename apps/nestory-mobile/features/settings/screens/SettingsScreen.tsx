@@ -1,34 +1,31 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import type { SubscriptionStatus } from '@nestory/types';
 import { theme } from '@/shared/theme';
+import { PaywallModal } from '@/shared/components/PaywallModal';
+import { useMe, useSubscription, useChildren } from '@/api';
 
-// ---------- Mock data — replace with real auth/subscription context ----------
+// ---------- Subscription entry derivation ----------
 
-const MOCK_USER = { name: 'Sarah Johnson', email: 'sarah.j@gmail.com' };
-const MOCK_CHILD = { name: 'Emma', avatarColor: theme.surface.brand };
-
-// TODO: derive from GET /subscriptions/me
-type SubStatus = 'free' | 'trial' | 'premium' | 'trial_ended' | 'premium_ended';
-const MOCK_SUB_STATUS: SubStatus = 'free';
-const MOCK_RENEW_DATE = 'Jan 15, 2026'; // TODO: from API
-
-function getSubEntry(sub: SubStatus): {
+function getSubEntry(sub: SubscriptionStatus, expiresAt: string | null): {
   label: string;
   subtitle: string;
   badge: string;
   badgeVariant: 'upgrade' | 'active' | 'renew';
-  route: '/settings/subscription';
 } {
-  if (sub === 'premium' || sub === 'trial') {
-    return { label: 'Premium', subtitle: `Renews ${MOCK_RENEW_DATE}`, badge: 'Active', badgeVariant: 'active', route: '/settings/subscription' };
+  const dateStr = expiresAt
+    ? new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
+  if (sub === 'premium_active' || sub === 'trial_active') {
+    return { label: 'Premium', subtitle: `Renews ${dateStr}`, badge: 'Active', badgeVariant: 'active' };
   }
   if (sub === 'trial_ended' || sub === 'premium_ended') {
-    return { label: 'Premium', subtitle: `Expired ${MOCK_RENEW_DATE}`, badge: 'Renew', badgeVariant: 'renew', route: '/settings/subscription' };
+    return { label: 'Premium', subtitle: `Expired ${dateStr}`, badge: 'Renew', badgeVariant: 'renew' };
   }
-  return { label: 'Free Plan', subtitle: '2 Stories remaining', badge: 'Upgrade', badgeVariant: 'upgrade', route: '/settings/subscription' };
+  return { label: 'Free Plan', subtitle: 'Tap to upgrade', badge: 'Upgrade', badgeVariant: 'upgrade' };
 }
 
 // ---------- Sub-components ----------
@@ -108,10 +105,50 @@ function ToggleRow({
 
 export function SettingsScreen() {
   const router = useRouter();
-  const [storyNotif, setStoryNotif] = useState(true);
+  const meQ        = useMe();
+  const subQ       = useSubscription();
+  const childrenQ  = useChildren();
+
+  const [storyNotif, setStoryNotif]     = useState(true);
   const [uploadRemind, setUploadRemind] = useState(false);
-  const [location, setLocation] = useState(false);
-  const subEntry = getSubEntry(MOCK_SUB_STATUS);
+  const [location, setLocation]         = useState(false);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+
+  const isLoading = meQ.isLoading || subQ.isLoading || childrenQ.isLoading;
+  const hasError  = meQ.isError || subQ.isError || childrenQ.isError;
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.center]} edges={['top']}>
+        <ActivityIndicator color={theme.text.brand} />
+      </SafeAreaView>
+    );
+  }
+
+  if (hasError || !meQ.data || !subQ.data) {
+    return (
+      <SafeAreaView style={[styles.container, styles.center]} edges={['top']}>
+        <Text style={styles.errorText}>Failed to load settings.</Text>
+        <Pressable onPress={() => { meQ.refetch(); subQ.refetch(); childrenQ.refetch(); }}>
+          <Text style={styles.retryText}>Tap to retry</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
+
+  const me  = meQ.data;
+  const sub = subQ.data;
+  const activeChild = childrenQ.data?.find(c => c.isActive) ?? childrenQ.data?.[0];
+
+  const subEntry = getSubEntry(sub.subscriptionStatus, sub.expiresAt);
+
+  const handleSubEntryPress = () => {
+    if (sub.subscriptionStatus === 'trial_ended' || sub.subscriptionStatus === 'premium_ended') {
+      setPaywallVisible(true);
+    } else {
+      router.push('/settings/subscription');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -134,26 +171,28 @@ export function SettingsScreen() {
           <SectionLabel label="ACCOUNT" />
           <Card>
             <NavRow
-              label={MOCK_USER.name}
-              subtitle={MOCK_USER.email}
+              label={me.name}
+              subtitle={me.email}
               onPress={() => router.push('/settings/account')}
             />
           </Card>
         </View>
 
         {/* CHILD PROFILE */}
-        <View style={styles.group}>
-          <SectionLabel label="CHILD PROFILE" />
-          <Card>
-            <Pressable style={styles.row} onPress={() => router.push('/settings/profiles')}>
-              <View style={[styles.avatar, { backgroundColor: MOCK_CHILD.avatarColor }]} />
-              <View style={styles.rowCol}>
-                <Text style={styles.rowLabel}>{MOCK_CHILD.name}</Text>
-              </View>
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-            </Pressable>
-          </Card>
-        </View>
+        {activeChild && (
+          <View style={styles.group}>
+            <SectionLabel label="CHILD PROFILE" />
+            <Card>
+              <Pressable style={styles.row} onPress={() => router.push('/settings/profiles')}>
+                <View style={[styles.avatar, { backgroundColor: theme.surface.brand }]} />
+                <View style={styles.rowCol}>
+                  <Text style={styles.rowLabel}>{activeChild.name}</Text>
+                </View>
+                <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+              </Pressable>
+            </Card>
+          </View>
+        )}
 
         {/* SUBSCRIPTION — 3 states: Upgrade / Active / Renew */}
         <View style={styles.group}>
@@ -162,7 +201,7 @@ export function SettingsScreen() {
             <NavRow
               label={subEntry.label}
               subtitle={subEntry.subtitle}
-              onPress={() => router.push(subEntry.route)}
+              onPress={handleSubEntryPress}
               right={
                 <View style={subEntry.badgeVariant === 'active' ? styles.activeBadge : styles.upgradeBadge}>
                   <Text style={subEntry.badgeVariant === 'active' ? styles.activeBadgeLabel : styles.upgradeBadgeLabel}>
@@ -220,6 +259,13 @@ export function SettingsScreen() {
           </Card>
         </View>
       </ScrollView>
+
+      <PaywallModal
+        visible={paywallVisible}
+        variant="C"
+        onSubscribe={() => setPaywallVisible(false)}
+        onDismiss={() => setPaywallVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -230,6 +276,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.surface.default,
+  },
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
   },
   navBar: {
     height: 56,

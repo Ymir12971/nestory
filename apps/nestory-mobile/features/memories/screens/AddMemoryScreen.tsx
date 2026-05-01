@@ -3,7 +3,8 @@ import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
-import { theme } from '@/shared/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
 
@@ -27,10 +28,10 @@ const SAVE_LABELS: Record<SaveState, string> = {
 const MOCK_HL_COUNT = 7;
 const MOCK_HL_LIMIT: number | null = 10; // null = Premium unlimited
 // TODO: derive from GET /subscriptions/me
-type HlSubStatus = 'free' | 'trial_ended' | 'premium_ended' | 'premium';
-const MOCK_HL_SUB: HlSubStatus = 'free';
+import type { SubscriptionStatus } from '@nestory/types';
+const MOCK_HL_SUB: SubscriptionStatus = 'never_paid';
 
-function getHlCaption(sub: HlSubStatus, count: number, limit: number): string {
+function getHlCaption(sub: SubscriptionStatus, count: number, limit: number): string {
   const K = sub === 'trial_ended' ? 'Trial' : 'Premium';
   return (sub === 'trial_ended' || sub === 'premium_ended')
     ? `${K} ended · ${count} / ${limit} Highlights used`
@@ -187,13 +188,26 @@ export function AddMemoryScreen() {
       {/* Save CTA */}
       <View style={styles.cta}>
         <Pressable
-          style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
+          style={({ pressed }) => [styles.saveBtnWrap, pressed && canSave && { opacity: 0.85 }]}
           onPress={handleSave}
           disabled={!canSave}
         >
-          <Text style={[styles.saveLabel, !canSave && styles.saveLabelDisabled]}>
-            {SAVE_LABELS[saveState]}
-          </Text>
+          {canSave ? (
+            <LinearGradient
+              colors={[palette.primary[500], palette.primary[400]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.saveButton}
+            >
+              <Text style={styles.saveLabel}>{SAVE_LABELS[saveState]}</Text>
+            </LinearGradient>
+          ) : (
+            <View style={[styles.saveButton, styles.saveButtonDisabled]}>
+              <Text style={[styles.saveLabel, styles.saveLabelDisabled]}>
+                {SAVE_LABELS[saveState]}
+              </Text>
+            </View>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -244,7 +258,7 @@ const styles = StyleSheet.create({
   photoThumbImg: {
     width: THUMB,
     height: THUMB,
-    borderRadius: theme.radius.s,
+    borderRadius: theme.radius.m,
     backgroundColor: theme.border.strong,
   },
   deleteBadge: {
@@ -261,7 +275,7 @@ const styles = StyleSheet.create({
   photoAdd: {
     width: THUMB,
     height: THUMB,
-    borderRadius: theme.radius.s,
+    borderRadius: theme.radius.m,
     borderWidth: 1.5,
     borderColor: theme.border.default,
     borderStyle: 'dashed',
@@ -336,10 +350,15 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.m,
     paddingBottom: theme.spacing.safeBtm,
   },
+  saveBtnWrap: {
+    width: '100%',
+    borderRadius: theme.radius.full,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: theme.surface.brandSubtle,
+  },
   saveButton: {
     height: 52,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.brand,
     alignItems: 'center',
     justifyContent: 'center',
   },

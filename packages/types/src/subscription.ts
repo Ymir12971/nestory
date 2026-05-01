@@ -14,14 +14,19 @@ export type PlanType = 'free' | 'premium';
 // RevenueCat contract status
 export type SubscriptionContractStatus = 'active' | 'cancelled' | 'expired';
 
+export type BillingCycle = 'yearly' | 'monthly';
+
 // GET /subscriptions/me response
 export interface Subscription {
   planType: PlanType;
-  status: SubscriptionContractStatus;
-  storyQuota: number | null;      // null for Premium users (no quota)
+  subscriptionStatus: SubscriptionStatus;       // five-state authoritative field
+  status: SubscriptionContractStatus;            // RevenueCat contract status
+  billingCycle: BillingCycle | null;             // null for Free users
+  storyQuotaRemaining: number | null;            // current month's remaining; null = unlimited (Premium)
   expiresAt: string | null;
+  benefits: string[];                            // ST-02B billing details list
   highlightCount: number;
-  highlightLimit: number | null;  // null for Premium users
+  highlightLimit: number | null;                 // null for Premium users
   activeChildId: string | null;
 }
 

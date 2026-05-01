@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   photoThumbImg: {
     width: THUMB,
     height: THUMB,
-    borderRadius: theme.radius.s,
+    borderRadius: theme.radius.m,
     backgroundColor: theme.border.strong,
   },
   deleteBadge: {
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   photoAdd: {
     width: THUMB,
     height: THUMB,
-    borderRadius: theme.radius.s,
+    borderRadius: theme.radius.m,
     borderWidth: 1.5,
     borderColor: theme.border.default,
     borderStyle: 'dashed',

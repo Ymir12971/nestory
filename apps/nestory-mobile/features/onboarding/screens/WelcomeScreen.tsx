@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   },
   brand: {
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: 6,
     paddingTop: theme.spacing.xl,
     paddingBottom: theme.spacing.l,
   },

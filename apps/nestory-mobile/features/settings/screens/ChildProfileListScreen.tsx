@@ -38,40 +38,52 @@ export function ChildProfileListScreen() {
         <View style={styles.navSpacer} />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.body}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Warning notify — Free plan multi-profile restriction */}
-        <View style={styles.notify}>
-          <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
-          <Text style={styles.notifyText}>
-            Free plan supports one active profile. You can add more, but switching requires Premium.
+      {MOCK_PROFILES.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <View style={styles.emptyIcon}>
+            <RemixIcon name="user-add-line" size={32} color={theme.text.brand} />
+          </View>
+          <Text style={styles.emptyTitle}>No child profiles yet</Text>
+          <Text style={styles.emptyBody}>
+            Add a child to start capturing memories.
           </Text>
         </View>
+      ) : (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Warning notify — Free plan multi-profile restriction */}
+          <View style={styles.notify}>
+            <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
+            <Text style={styles.notifyText}>
+              Free plan supports one active profile. You can add more, but switching requires Premium.
+            </Text>
+          </View>
 
-        {/* Profile cards */}
-        {MOCK_PROFILES.map((profile, i) => (
-          <Pressable
-            key={profile.id}
-            style={styles.card}
-            onPress={() => router.push(`/settings/profiles/${profile.id}`)}
-          >
-            <View style={[styles.avatar, { backgroundColor: profile.avatarColor }]} />
-            <View style={styles.col}>
-              <Text style={styles.profileName}>{profile.name}</Text>
-              <Text style={styles.profileDob}>{profile.dob}</Text>
-            </View>
-            {profile.isActive && (
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeLabel}>Active</Text>
+          {/* Profile cards */}
+          {MOCK_PROFILES.map((profile) => (
+            <Pressable
+              key={profile.id}
+              style={styles.card}
+              onPress={() => router.push(`/settings/profiles/${profile.id}`)}
+            >
+              <View style={[styles.avatar, { backgroundColor: profile.avatarColor }]} />
+              <View style={styles.col}>
+                <Text style={styles.profileName}>{profile.name}</Text>
+                <Text style={styles.profileDob}>{profile.dob}</Text>
               </View>
-            )}
-            <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-          </Pressable>
-        ))}
-      </ScrollView>
+              {profile.isActive && (
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeBadgeLabel}>Active</Text>
+                </View>
+              )}
+              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
 
       {/* CTA — Add Child */}
       <View style={styles.cta}>
@@ -182,5 +194,33 @@ const styles = StyleSheet.create({
   addBtnLabel: {
     ...theme.typography.buttonLabelM,
     color: theme.text.onColor,
+  },
+
+  // Empty state
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.xxl,
+    gap: theme.spacing.s,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.surface.brandSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.s,
+  },
+  emptyTitle: {
+    ...theme.typography.h2,
+    color: theme.text.primary,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    textAlign: 'center',
   },
 });

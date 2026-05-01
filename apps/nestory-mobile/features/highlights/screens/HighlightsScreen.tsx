@@ -32,25 +32,25 @@ const MOCK_HIGHLIGHT_COUNT = 7;
 const MOCK_HIGHLIGHT_LIMIT: number | null = 10; // null for Premium users
 
 // TODO: derive from GET /subscriptions/me — subscriptionStatus + kind
-type SubStatus = 'free' | 'trial_ended' | 'premium_ended' | 'premium';
-const MOCK_SUB_STATUS: SubStatus = 'free';
-const MOCK_SUB_KIND: 'trial' | 'premium' = 'premium';
+import type { SubscriptionStatus, TopNotifyKind } from '@nestory/types';
+const MOCK_SUB_STATUS: SubscriptionStatus = 'never_paid';
+const MOCK_SUB_KIND: TopNotifyKind = 'premium';
 
 // Compute the correct HL-01 topNotify scenario
 // Priority: ④ > ③ > ② > ① per StateMatrix §2.7.4
 function getHlNotifyStatus(
-  sub: SubStatus,
+  sub: SubscriptionStatus,
   count: number,
   limit: number | null,
 ): TopNotifyStatus | null {
-  if (sub === 'premium' || limit == null) return null;
+  if (sub === 'premium_active' || sub === 'trial_active' || limit == null) return null;
   const isEnded = sub === 'trial_ended' || sub === 'premium_ended';
   if (isEnded) {
     if (count > limit)  return 'hl_ended_over_limit';
     if (count >= limit) return 'hl_ended_at_limit';
     return 'hl_ended_under_limit';
   }
-  if (sub === 'free' && count >= limit) return 'hl_free_at_limit';
+  if (sub === 'never_paid' && count >= limit) return 'hl_free_at_limit';
   return null;
 }
 
@@ -136,35 +136,47 @@ export function HighlightsScreen() {
         </View>
       )}
 
-      {/* Waterfall grid */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.gridWrap}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.grid}>
-          {/* Left column */}
-          <View style={styles.col}>
-            {leftItems.map(item => (
-              <HighlightCard
-                key={item.id}
-                item={item}
-                onPress={() => router.push(`/highlight/${item.id}`)}
-              />
-            ))}
+      {/* Waterfall grid OR empty state */}
+      {MOCK_HIGHLIGHTS.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <View style={styles.emptyIcon}>
+            <Text style={styles.emptyIconChar}>★</Text>
           </View>
-          {/* Right column */}
-          <View style={styles.col}>
-            {rightItems.map(item => (
-              <HighlightCard
-                key={item.id}
-                item={item}
-                onPress={() => router.push(`/highlight/${item.id}`)}
-              />
-            ))}
-          </View>
+          <Text style={styles.emptyTitle}>No highlights yet</Text>
+          <Text style={styles.emptyBody}>
+            Mark a memory as a highlight to start your favorites collection.
+          </Text>
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.gridWrap}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.grid}>
+            {/* Left column */}
+            <View style={styles.col}>
+              {leftItems.map(item => (
+                <HighlightCard
+                  key={item.id}
+                  item={item}
+                  onPress={() => router.push(`/highlight/${item.id}`)}
+                />
+              ))}
+            </View>
+            {/* Right column */}
+            <View style={styles.col}>
+              {rightItems.map(item => (
+                <HighlightCard
+                  key={item.id}
+                  item={item}
+                  onPress={() => router.push(`/highlight/${item.id}`)}
+                />
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      )}
 
       <PaywallModal
         visible={paywallVisible}
@@ -220,6 +232,37 @@ const styles = StyleSheet.create({
   col: {
     flex: 1,
     gap: theme.spacing.m,
+  },
+
+  // Empty state
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.xxl,
+    gap: theme.spacing.m,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.surface.brandSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyIconChar: {
+    fontSize: 32,
+    color: theme.text.brand,
+  },
+  emptyTitle: {
+    ...theme.typography.h2,
+    color: theme.text.primary,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    textAlign: 'center',
   },
 
   // Card — rounded-10, border default, surface.card, overflow-clip
