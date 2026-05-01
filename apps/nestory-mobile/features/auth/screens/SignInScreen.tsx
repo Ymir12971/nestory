@@ -4,6 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
+import { setDevSession } from '@/features/auth/hooks/useSession';
+
+// Demo userId until Supabase Auth ships; matches the dev token in api/client.ts.
+const DEMO_USER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
 export function SignInScreen() {
   const router = useRouter();
@@ -42,7 +46,9 @@ export function SignInScreen() {
           <Pressable
             style={({ pressed }) => [styles.socialButton, pressed && styles.pressed]}
             onPress={() => {
-              // TODO: features/auth/api/authApi.ts → signInWithApple
+              // DEMO: bypass OAuth until Supabase Auth is wired up. TODO: signInWithApple
+              setDevSession({ userId: DEMO_USER_ID });
+              router.replace('/(tabs)');
             }}
           >
             <RemixIcon name="apple-fill" size={22} color={theme.text.brand} />
@@ -52,7 +58,9 @@ export function SignInScreen() {
           <Pressable
             style={({ pressed }) => [styles.socialButton, pressed && styles.pressed]}
             onPress={() => {
-              // TODO: features/auth/api/authApi.ts → signInWithGoogle
+              // DEMO: bypass OAuth until Supabase Auth is wired up. TODO: signInWithGoogle
+              setDevSession({ userId: DEMO_USER_ID });
+              router.replace('/(tabs)');
             }}
           >
             <RemixIcon name="google-fill" size={20} color={theme.text.brand} />
