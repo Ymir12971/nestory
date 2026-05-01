@@ -9,7 +9,27 @@ import { theme } from '@/shared/theme';
 
 const MOCK_USER = { name: 'Sarah Johnson', email: 'sarah.j@gmail.com' };
 const MOCK_CHILD = { name: 'Emma', avatarColor: theme.surface.brand };
-const MOCK_PLAN = { label: 'Free Plan', subtitle: '2 Stories remaining', isPremium: false };
+
+// TODO: derive from GET /subscriptions/me
+type SubStatus = 'free' | 'trial' | 'premium' | 'trial_ended' | 'premium_ended';
+const MOCK_SUB_STATUS: SubStatus = 'free';
+const MOCK_RENEW_DATE = 'Jan 15, 2026'; // TODO: from API
+
+function getSubEntry(sub: SubStatus): {
+  label: string;
+  subtitle: string;
+  badge: string;
+  badgeVariant: 'upgrade' | 'active' | 'renew';
+  route: '/settings/subscription';
+} {
+  if (sub === 'premium' || sub === 'trial') {
+    return { label: 'Premium', subtitle: `Renews ${MOCK_RENEW_DATE}`, badge: 'Active', badgeVariant: 'active', route: '/settings/subscription' };
+  }
+  if (sub === 'trial_ended' || sub === 'premium_ended') {
+    return { label: 'Premium', subtitle: `Expired ${MOCK_RENEW_DATE}`, badge: 'Renew', badgeVariant: 'renew', route: '/settings/subscription' };
+  }
+  return { label: 'Free Plan', subtitle: '2 Stories remaining', badge: 'Upgrade', badgeVariant: 'upgrade', route: '/settings/subscription' };
+}
 
 // ---------- Sub-components ----------
 
@@ -91,6 +111,7 @@ export function SettingsScreen() {
   const [storyNotif, setStoryNotif] = useState(true);
   const [uploadRemind, setUploadRemind] = useState(false);
   const [location, setLocation] = useState(false);
+  const subEntry = getSubEntry(MOCK_SUB_STATUS);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -134,20 +155,20 @@ export function SettingsScreen() {
           </Card>
         </View>
 
-        {/* SUBSCRIPTION */}
+        {/* SUBSCRIPTION — 3 states: Upgrade / Active / Renew */}
         <View style={styles.group}>
           <SectionLabel label="SUBSCRIPTION" />
           <Card>
             <NavRow
-              label={MOCK_PLAN.label}
-              subtitle={MOCK_PLAN.subtitle}
-              onPress={() => router.push('/settings/subscription')}
+              label={subEntry.label}
+              subtitle={subEntry.subtitle}
+              onPress={() => router.push(subEntry.route)}
               right={
-                !MOCK_PLAN.isPremium ? (
-                  <View style={styles.upgradeBadge}>
-                    <Text style={styles.upgradeBadgeLabel}>Upgrade</Text>
-                  </View>
-                ) : undefined
+                <View style={subEntry.badgeVariant === 'active' ? styles.activeBadge : styles.upgradeBadge}>
+                  <Text style={subEntry.badgeVariant === 'active' ? styles.activeBadgeLabel : styles.upgradeBadgeLabel}>
+                    {subEntry.badge}
+                  </Text>
+                </View>
               }
             />
           </Card>
@@ -282,7 +303,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
 
-  // Upgrade badge — premiumSubtle bg, text.premium
+  // Subscription badges
   upgradeBadge: {
     backgroundColor: theme.surface.premiumSubtle,
     paddingHorizontal: theme.spacing.m,
@@ -292,6 +313,16 @@ const styles = StyleSheet.create({
   upgradeBadgeLabel: {
     ...theme.typography.tagBadge,
     color: theme.text.premium,
+  },
+  activeBadge: {
+    backgroundColor: theme.surface.successSubtle,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.full,
+  },
+  activeBadgeLabel: {
+    ...theme.typography.tagBadge,
+    color: theme.text.success,
   },
 
   // Toggle

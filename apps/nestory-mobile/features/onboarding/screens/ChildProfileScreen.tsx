@@ -322,12 +322,15 @@ export function ChildProfileScreen() {
 
           <View style={styles.photoArea}>
             <Pressable
-              style={styles.photoCircle}
+              style={styles.avatarWrap}
               onPress={() => {
                 // TODO: features/onboarding/api/photoPicker.ts → expo-image-picker (needs approval)
               }}
             >
-              <RemixIcon name="camera-line" size={32} color={theme.text.brand} />
+              <View style={styles.photoCircle} />
+              <View style={styles.cameraBadge}>
+                <RemixIcon name="camera-line" size={20} color={theme.text.onColor} />
+              </View>
             </Pressable>
             <Text style={styles.photoLabel}>Tap to add a photo</Text>
           </View>
@@ -479,11 +482,24 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xxl,
     paddingBottom: theme.spacing.l,
   },
+  avatarWrap: {
+    width: 128,
+    height: 128,
+  },
   photoCircle: {
     width: 128,
     height: 128,
     borderRadius: 64,
     backgroundColor: theme.surface.brandSubtle,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.surface.brand,
     alignItems: 'center',
     justifyContent: 'center',
   },
