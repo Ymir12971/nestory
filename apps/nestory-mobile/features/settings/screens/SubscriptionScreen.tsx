@@ -110,9 +110,9 @@ function FreePlanContent({ router }: { router: ReturnType<typeof useRouter> }) {
 
         {/* Plan selector */}
         <View style={styles.planSelectorRow}>
-          {/* Yearly — selected */}
+          {/* Yearly — flex:1 per Figma */}
           <Pressable
-            style={[styles.planCard, styles.planCardSelected]}
+            style={[styles.planCard, styles.planCardYearly, cycle === 'yearly' ? styles.planCardSelected : styles.planCardUnselected]}
             onPress={() => setCycle('yearly')}
           >
             <View style={styles.planCardHeader}>
@@ -132,9 +132,9 @@ function FreePlanContent({ router }: { router: ReturnType<typeof useRouter> }) {
             <Text style={styles.planCardPromo}>First month free</Text>
           </Pressable>
 
-          {/* Monthly */}
+          {/* Monthly — fixed w-156 per Figma */}
           <Pressable
-            style={[styles.planCard, styles.planCardUnselected]}
+            style={[styles.planCard, styles.planCardMonthly, cycle === 'monthly' ? styles.planCardSelected : styles.planCardUnselected]}
             onPress={() => setCycle('monthly')}
           >
             <View style={styles.planCardHeader}>
@@ -347,21 +347,16 @@ const styles = StyleSheet.create({
     gap: theme.spacing.s,
   },
   planCard: {
-    flex: 1,
     backgroundColor: theme.surface.premiumSubtle,
     borderRadius: theme.radius.m,
     paddingHorizontal: theme.spacing.l,
     paddingVertical: 14,
     gap: theme.spacing.s,
   },
-  planCardSelected: {
-    borderWidth: 2,
-    borderColor: theme.border.premium,
-  },
-  planCardUnselected: {
-    borderWidth: 1,
-    borderColor: theme.border.default,
-  },
+  planCardYearly:   { flex: 1 },
+  planCardMonthly:  { width: 156, alignSelf: 'stretch' },
+  planCardSelected: { borderWidth: 2, borderColor: theme.border.premium  },
+  planCardUnselected: { borderWidth: 1, borderColor: theme.border.default },
   planCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
