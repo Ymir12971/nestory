@@ -11,6 +11,17 @@ const DEMO_USER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
 export function SignInScreen() {
   const router = useRouter();
+
+  const handleSignIn = () => {
+    // Blur the focused button so React Navigation doesn't apply aria-hidden
+    // to an ancestor of a still-focused element (web a11y warning).
+    if (typeof document !== 'undefined') {
+      (document.activeElement as HTMLElement | null)?.blur();
+    }
+    setDevSession({ userId: DEMO_USER_ID });
+    router.replace('/(tabs)');
+  };
+
   return (
     <LinearGradient
       colors={[palette.primary[600], palette.primary[400]]}
@@ -45,11 +56,7 @@ export function SignInScreen() {
         <View style={styles.buttonGroup}>
           <Pressable
             style={({ pressed }) => [styles.socialButton, pressed && styles.pressed]}
-            onPress={() => {
-              // DEMO: bypass OAuth until Supabase Auth is wired up. TODO: signInWithApple
-              setDevSession({ userId: DEMO_USER_ID });
-              router.replace('/(tabs)');
-            }}
+            onPress={handleSignIn}
           >
             <RemixIcon name="apple-fill" size={22} color={theme.text.brand} />
             <Text style={styles.socialButtonLabel}>Continue with Apple</Text>
@@ -57,11 +64,7 @@ export function SignInScreen() {
 
           <Pressable
             style={({ pressed }) => [styles.socialButton, pressed && styles.pressed]}
-            onPress={() => {
-              // DEMO: bypass OAuth until Supabase Auth is wired up. TODO: signInWithGoogle
-              setDevSession({ userId: DEMO_USER_ID });
-              router.replace('/(tabs)');
-            }}
+            onPress={handleSignIn}
           >
             <RemixIcon name="google-fill" size={20} color={theme.text.brand} />
             <Text style={styles.socialButtonLabel}>Continue with Google</Text>
