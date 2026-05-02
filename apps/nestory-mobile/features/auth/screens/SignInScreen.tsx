@@ -19,7 +19,7 @@ export function SignInScreen() {
       (document.activeElement as HTMLElement | null)?.blur();
     }
     setDevSession({ userId: DEMO_USER_ID });
-    router.replace('/(tabs)');
+    router.replace('/onboarding/profile');
   };
 
   return (

@@ -29,7 +29,7 @@ export interface ChildCreate {
   heightUnit?: HeightUnit; // required when heightValue is present
   weightValue?: number;
   weightUnit?: WeightUnit; // required when weightValue is present
-  avatarBase64?: string;
+  avatarUrl?: string;      // upload to storage first; ≤ 500 chars
 }
 
 // PATCH /children/:id body — all fields optional

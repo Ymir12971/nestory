@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   planCard: {
-    flex: 1,
+    flex: 3,
     backgroundColor: theme.surface.premiumSubtle,
     borderRadius: theme.radius.m,
     paddingHorizontal: 16,
@@ -268,8 +268,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   planCardMonthly: {
-    flex: 0,
-    width: 156,
+    flex: 2,
   },
   cardSelected: {
     borderWidth: 2,

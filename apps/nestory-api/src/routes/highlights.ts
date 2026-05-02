@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { Highlight, HighlightAsset } from '@nestory/types';
+import type { Highlight, HighlightAsset, HighlightMeta } from '@nestory/types';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { Errors } from '../lib/errors';
 import { parseBody, parseParams, parseQuery, uuidParam, cursorPagination } from '../lib/validation';
@@ -100,13 +100,23 @@ export async function highlightsRoutes(app: FastifyInstance) {
       isPremium:   premium,
     });
 
-    const highlight = await prisma.highlight.findUniqueOrThrow({
-      where:   { id: highlightId },
-      include: { rawAsset: { include: { files: { orderBy: { displayOrder: 'asc' } } } } },
-    });
+    const [highlight, highlightCount] = await Promise.all([
+      prisma.highlight.findUniqueOrThrow({
+        where:   { id: highlightId },
+        include: { rawAsset: { include: { files: { orderBy: { displayOrder: 'asc' } } } } },
+      }),
+      prisma.highlight.count({
+        where: { ...whereNotDeleted, userId: req.userId },
+      }),
+    ]);
+
+    const meta: HighlightMeta = {
+      highlightCount,
+      highlightLimit: premium ? null : 10,
+    };
 
     reply.code(201);
-    return { data: serializeHighlight(highlight) };
+    return { data: serializeHighlight(highlight), meta };
   });
 
   // GET /highlights — 列表（cursor 分页 + 可选 childId 过滤）
@@ -173,7 +183,7 @@ export async function highlightsRoutes(app: FastifyInstance) {
     return { data: serializeHighlight(updated) };
   });
 
-  // DELETE /highlights/:id — 软删（取消 highlight 标记，memory 不删除）
+  // DELETE /highlights/:id — 硬删 highlight 行，同步清除 raw_assets.is_highlight 标记
   app.delete('/:id', async (req) => {
     const { id } = parseParams(uuidParam, req);
 
@@ -184,16 +194,13 @@ export async function highlightsRoutes(app: FastifyInstance) {
     if (!existing) throw Errors.notFound('Highlight', id);
 
     await prisma.$transaction([
-      prisma.highlight.update({
-        where: { id },
-        data:  { deletedAt: new Date() },
-      }),
+      prisma.highlight.delete({ where: { id } }),
       prisma.rawAsset.update({
         where: { id: existing.assetId },
         data:  { isHighlight: false },
       }),
     ]);
 
-    return { data: { deletedAt: new Date().toISOString() } };
+    return { data: { deleted: true } };
   });
 }

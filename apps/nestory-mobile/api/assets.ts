@@ -73,7 +73,7 @@ export async function updateAsset(id: string, body: MemoryPatchInput): Promise<M
   return res.data;
 }
 
-export async function deleteAsset(id: string, hard = false): Promise<void> {
+export async function deleteAsset(id: string, hard = true): Promise<void> {
   await apiFetch(`/assets/${id}`, {
     method: 'DELETE',
     query:  hard ? { hard: 'true' } : undefined,

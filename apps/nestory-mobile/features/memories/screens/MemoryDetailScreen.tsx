@@ -36,7 +36,7 @@ export function MemoryDetailScreen() {
       {/* Status bar spacer */}
       <View style={{ height: insets.top, backgroundColor: theme.surface.default }} />
 
-      {/* NavBar — "Memory" title + absolute Edit button */}
+      {/* NavBar — "Memory" title + conditional Edit button */}
       <View style={styles.navBar}>
         <Pressable hitSlop={8} onPress={() => router.back()}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
@@ -50,6 +50,18 @@ export function MemoryDetailScreen() {
           <View style={styles.navSpacer} />
         )}
       </View>
+
+      {/* Read-Only Banner — historical months only (R-08) */}
+      {!MOCK_MEMORY.isEditable && (
+        <View style={styles.bannerWrap}>
+          <View style={styles.banner}>
+            <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
+            <Text style={styles.bannerText}>
+              This memory was used to create a Story. We keep it as-is to preserve the authenticity of your stories.
+            </Text>
+          </View>
+        </View>
+      )}
 
       <ScrollView
         style={styles.scroll}
@@ -161,6 +173,27 @@ const styles = StyleSheet.create({
     color: theme.text.brand,
   },
   navSpacer: { width: 40 },
+
+  // Read-Only Banner
+  bannerWrap: {
+    paddingHorizontal: theme.spacing.xl,
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+    backgroundColor: theme.surface.warningSubtle,
+    borderRadius: theme.radius.s,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.s,
+  },
+  bannerText: {
+    flex: 1,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    lineHeight: 16,
+    color: theme.text.warning,
+  },
 
   // Carousel
   carouselScroll: {

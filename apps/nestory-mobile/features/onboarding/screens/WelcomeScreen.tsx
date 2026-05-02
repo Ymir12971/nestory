@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   },
   ellipse: {
     position: 'absolute',
-    left: 126,
+    alignSelf: 'center',
     top: 140,
     width: 140,
     height: 160,

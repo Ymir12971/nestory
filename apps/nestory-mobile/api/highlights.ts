@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Highlight, HighlightCreate, PaginatedResponse } from '@nestory/types';
+import type { Highlight, HighlightCreate, HighlightMeta, PaginatedResponse } from '@nestory/types';
 import { apiFetch } from './client';
 import { queryKeys } from './queryClient';
 
@@ -23,9 +23,14 @@ export async function getHighlight(id: string): Promise<Highlight> {
   return res.data;
 }
 
-export async function createHighlight(body: HighlightCreate): Promise<Highlight> {
-  const res = await apiFetch<{ data: Highlight }>('/highlights', { method: 'POST', body });
-  return res.data;
+export async function createHighlight(
+  body: HighlightCreate,
+): Promise<{ highlight: Highlight; meta: HighlightMeta }> {
+  const res = await apiFetch<{ data: Highlight; meta: HighlightMeta }>('/highlights', {
+    method: 'POST',
+    body,
+  });
+  return { highlight: res.data, meta: res.meta };
 }
 
 export async function updateHighlight(id: string, body: HighlightPatchInput): Promise<Highlight> {

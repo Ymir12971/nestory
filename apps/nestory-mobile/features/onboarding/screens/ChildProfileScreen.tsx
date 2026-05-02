@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Image,
+  Modal,
   View,
   Text,
   TextInput,
@@ -133,45 +134,60 @@ function WheelColumn({
   );
 
   return (
-    <ScrollView
-      ref={ref}
-      style={wheelStyles.col}
-      contentContainerStyle={wheelStyles.content}
-      snapToInterval={ITEM_H}
-      decelerationRate="fast"
-      showsVerticalScrollIndicator={false}
-      onMomentumScrollEnd={snap}
-      onScrollEndDrag={snap}
-    >
-      {items.map((item, i) => {
-        const dist = Math.abs(i - selectedIndex);
-        return (
-          <View key={item} style={wheelStyles.item}>
-            <Text
-              style={
-                dist === 0
-                  ? wheelStyles.selected
-                  : dist === 1
-                  ? wheelStyles.adjacent
-                  : wheelStyles.outer
-              }
-            >
-              {item}
-            </Text>
-          </View>
-        );
-      })}
-    </ScrollView>
+    <View style={wheelStyles.col}>
+      <ScrollView
+        ref={ref}
+        style={wheelStyles.scroll}
+        contentContainerStyle={wheelStyles.content}
+        snapToInterval={ITEM_H}
+        decelerationRate="fast"
+        showsVerticalScrollIndicator={false}
+        onMomentumScrollEnd={snap}
+        onScrollEndDrag={snap}
+      >
+        {items.map((item, i) => {
+          const dist = Math.abs(i - selectedIndex);
+          return (
+            <View key={item} style={wheelStyles.item}>
+              <Text
+                style={
+                  dist === 0
+                    ? wheelStyles.selected
+                    : dist === 1
+                    ? wheelStyles.adjacent
+                    : wheelStyles.outer
+                }
+              >
+                {item}
+              </Text>
+            </View>
+          );
+        })}
+      </ScrollView>
+      {/* Selection indicator — two lines framing the middle row */}
+      <View pointerEvents="none" style={wheelStyles.selectionBand} />
+    </View>
   );
 }
 
 const wheelStyles = StyleSheet.create({
   col: { flex: 1, height: ITEM_H * VISIBLE },
+  scroll: { flex: 1 },
   content: { paddingVertical: ITEM_H * 2 },
   item: { height: ITEM_H, alignItems: 'center', justifyContent: 'center' },
   selected: { ...theme.typography.h1, color: theme.text.primary },
   adjacent: { ...theme.typography.body, color: theme.text.secondary },
   outer: { ...theme.typography.body, color: theme.text.hint },
+  selectionBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: ITEM_H * 2,       // 2 padding rows above center
+    height: ITEM_H,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: theme.border.strong,
+  },
 });
 
 // ─── Gender tag ───────────────────────────────────────────────────────────────
@@ -307,9 +323,18 @@ export function ChildProfileScreen() {
     else setStep((s) => (s - 1) as Step);
   };
 
+  const [birthdayConfirmVisible, setBirthdayConfirmVisible] = useState(false);
+
+  const formattedBirthday = `${MONTHS[monthIdx]} ${DAYS[dayIdx]}, ${YEARS[yearIdx]}`;
+
   const onContinue = () => {
-    if (step < 2) setStep((s) => (s + 1) as Step);
-    else router.push('/onboarding/permissions');
+    if (step === 1) {
+      setBirthdayConfirmVisible(true);
+    } else if (step < 2) {
+      setStep((s) => (s + 1) as Step);
+    } else {
+      router.push('/onboarding/permissions');
+    }
   };
 
   return (
@@ -459,6 +484,37 @@ export function ChildProfileScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Birthday confirm sheet */}
+      <Modal
+        visible={birthdayConfirmVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBirthdayConfirmVisible(false)}
+      >
+        <Pressable style={styles.confirmScrim} onPress={() => setBirthdayConfirmVisible(false)} />
+        <View style={styles.confirmSheet}>
+          <View style={styles.confirmHandle} />
+          <Text style={styles.confirmDate}>{formattedBirthday}</Text>
+          <Text style={styles.confirmTitle}>Please confirm the birthday.</Text>
+          <Text style={styles.confirmBody}>
+            Once saved, this date cannot be changed.{'\n'}Please double-check before continuing.
+          </Text>
+          <PrimaryButton
+            label="Confirm"
+            onPress={() => {
+              setBirthdayConfirmVisible(false);
+              setStep(2);
+            }}
+          />
+          <Pressable
+            style={styles.backToEditBtn}
+            onPress={() => setBirthdayConfirmVisible(false)}
+          >
+            <Text style={styles.backToEditLabel}>Back to edit</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -475,7 +531,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xxl,
-    paddingBottom: theme.spacing.l,
+    paddingBottom: 120,
     gap: theme.spacing.xxl,
   },
 
@@ -556,4 +612,49 @@ const styles = StyleSheet.create({
   },
   skipBtn: { height: 44, alignItems: 'center', justifyContent: 'center' },
   skipLabel: { ...theme.typography.buttonLabelM, color: theme.text.brand },
+
+  // Birthday confirm sheet
+  confirmScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  confirmSheet: {
+    backgroundColor: theme.surface.default,
+    borderTopLeftRadius: theme.radius.l,
+    borderTopRightRadius: theme.radius.l,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.m,
+    paddingBottom: theme.spacing.safeBtm + theme.spacing.l,
+    gap: theme.spacing.m,
+  },
+  confirmHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.border.strong,
+    alignSelf: 'center',
+    marginBottom: theme.spacing.s,
+  },
+  confirmDate: {
+    ...theme.typography.h1,
+    color: theme.text.primary,
+  },
+  confirmTitle: {
+    ...theme.typography.body,
+    color: theme.text.primary,
+  },
+  confirmBody: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    lineHeight: 22,
+  },
+  backToEditBtn: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backToEditLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
+  },
 });

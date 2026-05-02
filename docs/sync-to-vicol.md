@@ -8,7 +8,7 @@
 
 ## 2026-05-01
 
-### Q5 · 双层删除 UX 流程缺设计稿（🔴 高）
+### ~~Q5 · 双层删除 UX 流程缺设计稿（🔴 高）~~
 
 **背景**：决策 5（见 `docs/dev/ARCH-DECISIONS-API-DB-20260501.md`）引入"软删 + 30 天恢复窗"机制，**Figma 里完全没这个流程**。
 
@@ -34,9 +34,11 @@
 
 **临时实现**：mobile 还没接 trash UI；当前 API 已经支持，但屏幕上还没有"最近删除"入口。
 
+**确认 (vicol, 2026-05-01)**：MVP **不做** Trash / 恢复窗。Memory / Highlight 用户删除时**直接彻底删除**，不走软删路径，不暴露 trash / restore 入口。users / children 的软删策略待 Justin 单独评估后对齐。
+
 ---
 
-### Q6 · R-08 历史月份 Memory 编辑限制的 UX 表达（🟠 中）
+### ~~Q6 · R-08 历史月份 Memory 编辑限制的 UX 表达（🟠 中）~~
 
 **背景**：R-08 规定历史月份的 Memory 不可编辑/删除（避免影响已生成的 Story 内容连贯性）。
 
@@ -46,9 +48,11 @@
 
 **需要 vicol 决策**：是否需要在历史 Memory 详情页加一个 banner / tooltip 说明"This memory is from a past month and can no longer be edited"？还是保持静默？
 
+**确认 (vicol, 2026-05-01)**：**不新增**额外提示组件。H-03 列表层不区分只读/可编辑为预期行为。以 **Figma H-04 Memory Detail (Read Only)** 为准对齐实现；若当前仅静默 disabled 且与 Figma 只读态不一致，按 Figma 调整。
+
 ---
 
-### Q7 · Subscription 5 态命名的 user-visible 文案审核（🟡 低）
+### ~~Q7 · Subscription 5 态命名的 user-visible 文案审核（🟡 低）~~
 
 **背景**：决策 2 把订阅状态确定为 5 态枚举：
 
@@ -64,11 +68,13 @@
 
 文档处：`SubscriptionRules v1.3` R-10 章节。
 
+**确认 (vicol, 2026-05-01)**：`trial_ended` 和 `premium_ended` **不需要区分**，UI 展示保持一致（均显示 Renew / Expired 语境）。当前实现正确，无需改动。
+
 ---
 
 ## 2026-04-30
 
-### Q1 · 品牌绿背景上的文字颜色缺 Semantic Token（🟠 中）
+### ~~Q1 · 品牌绿背景上的文字颜色缺 Semantic Token（🟠 中）~~
 
 **出现位置**：`02 Main UI · O-02 Sign In (58:57)`，以及所有使用 `Surface.Brand`（Primary/500）作为背景的屏幕。
 
@@ -86,9 +92,11 @@
 
 **需要 vicol 决策**：是否在 `02 Tokens` 里补充 `Text.OnBrand-Subtle` 和 `Text.OnBrand-Emphasis` 两个 Semantic alias？确认后 Justin 会替换为正式 token 名。
 
+**确认 (vicol, 2026-05-01)**：无语义 Token 时**以 Figma 色值为准**，不强制升格为 Token。当前开发侧临时方案（`palette.primary[100]` / `palette.primary[50]`）**可保持**，MVP 阶段不需要替换为正式 token 名。
+
 ---
 
-### Q2 · O-01 Welcome hero 三色渐变不在 Token 系统里（🟡 低）
+### ~~Q2 · O-01 Welcome hero 三色渐变不在 Token 系统里（🟡 低）~~
 
 **出现位置**：`02 Main UI · O-01 Welcome (58:38)` hero 区域背景。
 
@@ -105,11 +113,15 @@
 1. 这是设计稿特意使用的 one-off 值，不需要进 token，保持现状？
 2. 还是需要加入 `01 Primitive` 作为命名色（例如 `Hero.Dark` / `Hero.Mid` / `Hero.Warm`）并在 `02 Tokens` 补充 semantic alias？
 
+**确认 (vicol, 2026-05-01)**：one-off 渐变**无需 token 化**，`WelcomeScreen.tsx` 直接写色值的方式正确，保持现状。
+
 ---
 
 ## 2026-04-25 · 技术栈定为 RN/Expo 双端
 
-> 历史同步项 — 已发出，未追踪 vicol 是否回复。
+> 历史同步项 — **vicol 已回复（2026-05-01）**：图标以 Remix Icon 为准，双端一致；Justin 需复核 Android 交付方式。
+>
+> **Justin 复核结论（2026-05-01）**：`react-native-remix-icon` v4.7.0 用 SVG 矢量组件交付（非字体文件），底层依赖 `react-native-svg`，iOS / Android 渲染路径完全一致，无平台差异，无已知限制。
 
 ### 1. App 是 iOS + Android 双端，不是纯 iOS
 

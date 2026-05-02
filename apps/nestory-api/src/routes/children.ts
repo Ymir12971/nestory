@@ -25,7 +25,7 @@ const setActiveSchema = z.object({
 
 // ---------- Serializer ----------
 
-function serializeChild(c: any) {
+function serializeChild(c: any, activeChildId: string | null = null) {
   return {
     id:               c.id,
     name:             c.name,
@@ -38,7 +38,7 @@ function serializeChild(c: any) {
     weightValue:      c.weightValue ? Number(c.weightValue) : null,
     weightUnit:       c.weightUnit,
     weightRecordedAt: c.weightRecordedAt?.toISOString() ?? null,
-    isActive:         false, // 由 caller 注入（要 join users.activeChildId）
+    isActive:         c.id === activeChildId,
     createdAt:        c.createdAt.toISOString(),
   };
 }
@@ -46,10 +46,15 @@ function serializeChild(c: any) {
 // ---------- Routes ----------
 
 export async function childrenRoutes(app: FastifyInstance) {
-  // POST /children — 创建档案
+  // POST /children — 创建档案；首个 child 自动激活
   app.post('/', async (req, reply) => {
     const body = parseBody(childCreateSchema, req);
     const now  = new Date();
+
+    const user = await prisma.user.findFirst({
+      where:  { ...whereNotDeleted, id: req.userId },
+      select: { activeChildId: true },
+    });
 
     const child = await prisma.child.create({
       data: {
@@ -66,8 +71,18 @@ export async function childrenRoutes(app: FastifyInstance) {
         weightRecordedAt: body.weightValue ? now : null,
       },
     });
+
+    let activeChildId = user?.activeChildId ?? null;
+    if (!activeChildId) {
+      await prisma.user.update({
+        where: { id: req.userId },
+        data:  { activeChildId: child.id },
+      });
+      activeChildId = child.id;
+    }
+
     reply.code(201);
-    return { data: serializeChild(child) };
+    return { data: serializeChild(child, activeChildId) };
   });
 
   // GET /children — 列档案（不含软删）
@@ -84,10 +99,7 @@ export async function childrenRoutes(app: FastifyInstance) {
     ]);
 
     return {
-      data: children.map(c => ({
-        ...serializeChild(c),
-        isActive: c.id === user?.activeChildId,
-      })),
+      data: children.map(c => serializeChild(c, user?.activeChildId ?? null)),
     };
   });
 
@@ -105,7 +117,7 @@ export async function childrenRoutes(app: FastifyInstance) {
     });
 
     return {
-      data: { ...serializeChild(child), isActive: child.id === user?.activeChildId },
+      data: serializeChild(child, user?.activeChildId ?? null),
     };
   });
 
@@ -122,16 +134,22 @@ export async function childrenRoutes(app: FastifyInstance) {
     });
     if (!existing) throw Errors.notFound('Child', id);
 
-    const updated = await prisma.child.update({
-      where: { id },
-      data: {
-        ...body,
-        birthDate:        body.birthDate ? new Date(body.birthDate) : undefined,
-        heightRecordedAt: body.heightValue !== undefined ? now : undefined,
-        weightRecordedAt: body.weightValue !== undefined ? now : undefined,
-      },
-    });
-    return { data: serializeChild(updated) };
+    const [updated, user] = await Promise.all([
+      prisma.child.update({
+        where: { id },
+        data: {
+          ...body,
+          birthDate:        body.birthDate ? new Date(body.birthDate) : undefined,
+          heightRecordedAt: body.heightValue !== undefined ? now : undefined,
+          weightRecordedAt: body.weightValue !== undefined ? now : undefined,
+        },
+      }),
+      prisma.user.findFirst({
+        where:  { ...whereNotDeleted, id: req.userId },
+        select: { activeChildId: true },
+      }),
+    ]);
+    return { data: serializeChild(updated, user?.activeChildId ?? null) };
   });
 
   // DELETE /children/:id — 软删
@@ -166,11 +184,17 @@ export async function childrenRoutes(app: FastifyInstance) {
     if (!existing) throw Errors.notFound('Child', id);
     if (!existing.deletedAt) throw Errors.validation('Child is not soft-deleted');
 
-    const restored = await prisma.child.update({
-      where: { id },
-      data:  { deletedAt: null },
-    });
-    return { data: serializeChild(restored) };
+    const [restored, user] = await Promise.all([
+      prisma.child.update({
+        where: { id },
+        data:  { deletedAt: null },
+      }),
+      prisma.user.findFirst({
+        where:  { ...whereNotDeleted, id: req.userId },
+        select: { activeChildId: true },
+      }),
+    ]);
+    return { data: serializeChild(restored, user?.activeChildId ?? null) };
   });
 
   // PATCH /children/active — 切换活跃档案；R-05 拒绝 never_paid 多档切换

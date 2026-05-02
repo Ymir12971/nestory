@@ -2,8 +2,9 @@
 
 export type StoryStatus =
   | 'pending'
+  | 'queued'
   | 'generating'
-  | 'completed'
+  | 'generated'
   | 'failed'
   | 'fallback_generated';
 

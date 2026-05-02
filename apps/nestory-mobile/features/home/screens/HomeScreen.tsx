@@ -357,6 +357,7 @@ const styles = StyleSheet.create({
   // Body
   body: {
     flex: 1,
+    backgroundColor: theme.surface.default,
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.l,
     paddingBottom: theme.spacing.safeBtm,
@@ -425,6 +426,7 @@ const styles = StyleSheet.create({
 
   // CTA
   cta: {
+    backgroundColor: theme.surface.default,
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.m,
     paddingBottom: theme.spacing.safeBtm,

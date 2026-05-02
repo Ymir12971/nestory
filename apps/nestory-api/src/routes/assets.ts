@@ -25,14 +25,12 @@ const memoryCreateSchema = z.object({
   tagValues:   z.array(z.string().min(1).max(50)).max(20).optional(),
   isHighlight: z.boolean().optional(),
   files:       z.array(fileInputSchema).max(10).optional(), // R-07 ≤ 10 张
-}).refine(d => (d.textNote && d.textNote.trim().length > 0) || (d.files && d.files.length > 0), {
-  message: 'Memory must have at least one of: textNote or files',
 });
 
+// Highlight toggle 走 POST /highlights（配额校验），不在 PATCH 里处理
 const memoryPatchSchema = z.object({
   textNote:        z.string().max(500).optional(),
   tagValues:       z.array(z.string().min(1).max(50)).max(20).optional(),
-  isHighlight:     z.boolean().optional(),
   addFiles:        z.array(fileInputSchema).optional(),
   removeFileIds:   z.array(z.string().uuid()).optional(),
   reorderFileIds:  z.array(z.string().uuid()).optional(),
@@ -93,6 +91,25 @@ async function ensureChildOwned(childId: string, userId: string): Promise<void> 
   if (!child) throw Errors.notFound('Child', childId);
 }
 
+/**
+ * Normalize tags: trim, drop empties, dedupe case-insensitively.
+ * Preserves first-occurrence casing so "Playtime" + "playtime" → ["Playtime"].
+ */
+function normalizeTags(tagValues: string[] | undefined): string[] {
+  if (!tagValues) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tagValues) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
 async function upsertCustomTags(userId: string, tagValues: string[]): Promise<void> {
   // 把不在预设/library 里的写入 user_tag_library；不存在则插入，存在则跳过
   // 用 raw SQL 才能用 LOWER(TRIM(name)) unique 索引去重
@@ -129,8 +146,16 @@ export async function assetsRoutes(app: FastifyInstance) {
 
     const hasFiles = (body.files?.length ?? 0) > 0;
     const hasText  = (body.textNote?.trim().length ?? 0) > 0;
+    if (!hasFiles && !hasText) {
+      throw new ApiError(
+        'EMPTY_MEMORY',
+        'Memory must have at least one photo or non-empty text',
+        400,
+      );
+    }
     const assetType: 'photo' | 'text' | 'mixed' =
       hasFiles && hasText ? 'mixed' : hasFiles ? 'photo' : 'text';
+    const normalizedTags = normalizeTags(body.tagValues);
 
     const memory = await prisma.$transaction(async (tx) => {
       const created = await tx.rawAsset.create({
@@ -139,7 +164,7 @@ export async function assetsRoutes(app: FastifyInstance) {
           userId:      req.userId,
           assetType,
           textNote:    body.textNote ?? null,
-          tags:        body.tagValues ?? [],
+          tags:        normalizedTags,
           isHighlight: false, // 必须走 POST /highlights 走配额校验
           capturedAt,
           files: body.files
@@ -159,8 +184,8 @@ export async function assetsRoutes(app: FastifyInstance) {
         include: { files: { orderBy: { displayOrder: 'asc' } } },
       });
 
-      if (body.tagValues && body.tagValues.length > 0) {
-        await upsertCustomTags(req.userId, body.tagValues);
+      if (normalizedTags.length > 0) {
+        await upsertCustomTags(req.userId, normalizedTags);
       }
 
       return created;
@@ -291,7 +316,7 @@ export async function assetsRoutes(app: FastifyInstance) {
     const tz = await getUserTimezone(req.userId);
     if (!isCurrentMonth(existing.capturedAt, tz)) {
       throw new ApiError(
-        'STORY_READ_ONLY',
+        'MEMORY_EDIT_RESTRICTED',
         'Cannot edit memories from past months (R-08)',
         403,
       );
@@ -302,10 +327,27 @@ export async function assetsRoutes(app: FastifyInstance) {
       throw Errors.validation('addFiles and reorderFileIds are mutually exclusive');
     }
 
+    // EMPTY_MEMORY: 删到空（无 file + 空 text）
+    const finalText  = body.textNote !== undefined ? body.textNote : existing.textNote;
+    const finalCount = existing.files.length
+      - (body.removeFileIds?.length ?? 0)
+      + (body.addFiles?.length ?? 0);
+    if ((finalText?.trim().length ?? 0) === 0 && finalCount <= 0) {
+      throw new ApiError(
+        'EMPTY_MEMORY',
+        'Memory cannot be left empty (no photos and no text)',
+        400,
+      );
+    }
+
+    const normalizedPatchTags = body.tagValues !== undefined
+      ? normalizeTags(body.tagValues)
+      : undefined;
+
     const updated = await prisma.$transaction(async (tx) => {
       const data: any = {};
-      if (body.textNote  !== undefined) data.textNote = body.textNote;
-      if (body.tagValues !== undefined) data.tags     = body.tagValues;
+      if (body.textNote        !== undefined) data.textNote = body.textNote;
+      if (normalizedPatchTags  !== undefined) data.tags     = normalizedPatchTags;
 
       if (Object.keys(data).length > 0) {
         await tx.rawAsset.update({ where: { id }, data });
@@ -350,11 +392,11 @@ export async function assetsRoutes(app: FastifyInstance) {
       }
 
       // 自定义 tags 入库
-      if (body.tagValues && body.tagValues.length > 0) {
-        for (const tag of body.tagValues) {
+      if (normalizedPatchTags && normalizedPatchTags.length > 0) {
+        for (const tag of normalizedPatchTags) {
           await tx.$executeRaw`
             INSERT INTO user_tag_library (user_id, name)
-            VALUES (${req.userId}::uuid, ${tag.trim()})
+            VALUES (${req.userId}::uuid, ${tag})
             ON CONFLICT DO NOTHING
           `;
         }
@@ -377,7 +419,7 @@ export async function assetsRoutes(app: FastifyInstance) {
     };
   });
 
-  // DELETE /assets/:id — 软删（?hard=true 硬删）
+  // DELETE /assets/:id — 硬删；R-08 先于 force 检查，历史月份无论如何不可删
   app.delete('/:id', async (req) => {
     const { id } = parseParams(uuidParam, req);
     const force  = (req.query as { hard?: string })?.hard === 'true';
@@ -388,16 +430,17 @@ export async function assetsRoutes(app: FastifyInstance) {
     });
     if (!existing) throw Errors.notFound('Memory', id);
 
+    // R-08：历史月份禁止任何删除，无论 soft/hard
+    const tz = await getUserTimezone(req.userId);
+    if (!isCurrentMonth(existing.capturedAt, tz)) {
+      throw new ApiError(
+        'MEMORY_EDIT_RESTRICTED',
+        'Cannot delete memories from past months (R-08)',
+        403,
+      );
+    }
+
     if (!force) {
-      // R-08：当月可软删，历史月份禁止任何删除
-      const tz = await getUserTimezone(req.userId);
-      if (!isCurrentMonth(existing.capturedAt, tz)) {
-        throw new ApiError(
-          'STORY_READ_ONLY',
-          'Cannot delete memories from past months (R-08)',
-          403,
-        );
-      }
       await prisma.rawAsset.update({
         where: { id },
         data:  { deletedAt: new Date() },
@@ -405,7 +448,6 @@ export async function assetsRoutes(app: FastifyInstance) {
       return { data: { deletedAt: new Date().toISOString() } };
     }
 
-    // 硬删（admin 或 trash 二次确认）
     await prisma.rawAsset.delete({ where: { id } });
     return { data: { hardDeleted: true } };
   });
