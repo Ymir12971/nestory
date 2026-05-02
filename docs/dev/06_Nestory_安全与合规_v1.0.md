@@ -64,7 +64,17 @@ if (!['image/jpeg', 'image/png', 'image/heif'].includes(type?.mime)) {
 
 ### 2.3 EXIF 隐私
 
-写入 Storage 前用 `sharp` strip 所有 EXIF（GPS / 设备型号 / 序列号）。仅保留 `exif_taken_at` 写入 DB。
+上传处理流程：
+
+1. 用 `sharp` 读取 EXIF
+2. 若存在 GPS 坐标：调用反向地理编码 API（如 OpenStreetMap Nominatim / Google Maps）→ 解析到**城市级**（如 `"Vancouver, BC"`）→ 存入 `raw_assets.location_label TEXT`
+3. 原始 GPS 坐标**立即丢弃**，不写入 DB、不写入 Storage
+4. 用 `sharp` strip 所有 EXIF（GPS / 设备型号 / 序列号）再写入 Storage
+5. `exif_taken_at` 写入 DB
+
+**Privacy Nutrition Label 填写**：Coarse Location（城市级），App 功能用途，与用户数据关联。不需申请 `CoreLocation` 设备权限（仅解析用户主动上传的照片 EXIF，不是实时位置请求）。
+
+iOS 14+ 分享照片时系统已询问用户是否包含位置；许多照片无 GPS，处理层需 graceful fallback（无位置则 `location_label = NULL`，故事生成不提地点）。
 
 ### 2.4 病毒扫描
 
@@ -203,10 +213,29 @@ if (capturedAt.getTime() > Date.now() + FUTURE_TOLERANCE_MS) {
 
 ## 9. 隐私与合规
 
+### 9.0 管辖权策略
+
+Nestory 分发到 App Store / Google Play，理论上任意地区用户都能下载。实际做法：**按最严标准统一实现，一份 Privacy Policy 覆盖所有法域**，不做地区适配。
+
+| 法规 | 适用场景 | Nestory 的应对 |
+|---|---|---|
+| COPPA（美国） | 面向 13 岁以下儿童的 app | **不适用**：用户是父母（成年人），儿童是照片主角不是 app 用户 |
+| PIPEDA（加拿大联邦） | 收集个人信息 | 知情同意 + 可删除 + 最小化收集 ✓ |
+| Quebec Law 25 | 魁省用户，高风险处理 | 同 PIPEDA 要求 + AI 处理披露 ✓ |
+| CCPA（加州） | 加州用户 | 同 GDPR 原则，已覆盖 ✓ |
+| GDPR（欧盟） | 欧盟用户 | 如主动进入欧盟市场需加 EU Supabase region；MVP 阶段仅 us-east-1 |
+
+**关键：Nestory 面向父母，不面向儿童**。COPPA 最严的"儿童 app"条款不适用。
+
+Privacy Policy 需明确声明：
+> "Photos are processed by AI to generate story content. Your photos are not used to train third-party AI models and are not shared with third parties."
+
+注册同意流程（Onboarding O-06 Terms / Privacy 勾选）覆盖所有法域的知情同意要求，无需按地区显示不同内容。
+
 ### 9.1 数据范围（涉及最敏感的两类）
 
-- **儿童照片与文字**（COPPA / GDPR Article 8 / 国内未成年人保护法）
-- **家长账户邮箱**（GDPR）
+- **儿童照片与文字**（COPPA / GDPR Article 8）
+- **家长账户邮箱**（GDPR / PIPEDA）
 
 ### 9.2 关键合规要求
 

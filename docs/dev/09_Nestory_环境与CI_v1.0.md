@@ -7,14 +7,32 @@
 
 ---
 
-## 1. 环境列表
+## 1. 部署架构决策（2026-04-30 确认）
+
+**原则：1 个月 deadline，不做 staging/demo 分离，Vercel + Railway 直接作为 Production 使用。**
+
+| 层 | 服务 | 说明 |
+|---|---|---|
+| Mobile | Expo + EAS Build | TestFlight（iOS）/ Google Play Internal Testing |
+| Web (H5) | Vercel | 每个 PR 自动 Preview Deployment，main → Production |
+| API | Railway | 单套，直接生产；Railway Metrics 监控 |
+| DB + Auth + Storage | Supabase | 两个 project：`nestory-dev`（本地联调）+ `nestory-prod`（线上） |
+| 订阅 | RevenueCat | 需 Apple Dev Account（注册中） |
+| 域名 | 已有 | DNS → Vercel（Web）+ Railway（API subdomain） |
+
+**为什么不做独立 staging**：PR Preview（Vercel）+ Supabase dev project + Expo Internal Distribution 已覆盖测试隔离需求，额外维护一套 staging 环境在 1 个月 deadline 内是纯成本。
+
+**Apple Developer Account**：需要今天注册（[developer.apple.com/account](https://developer.apple.com/account)，Individual，$99/年），审核 1-3 天，不注册无法发 TestFlight 和提交 App Store。
+
+---
+
+## 1.1 环境列表
 
 | 环境 | 用途 | 数据 | 触发 |
 |---|---|---|---|
-| `local` | 开发机 | docker-compose 跑 PostgreSQL + Redis | 本地 |
-| `preview` | PR 预览（每个 PR 自动起） | 共享 staging DB（隔离 schema） | PR open / push |
-| `staging` | 集成测试 + 内测 | 独立 DB，每周日重置 | merge to `main` |
-| `production` | 线上 | 生产 DB | 手动 promote staging build（按下 GitHub Actions deploy 按钮） |
+| `local` | 开发机 | Supabase dev project | 本地 |
+| `preview` | PR 预览 | Supabase dev project | PR open / push（Vercel 自动） |
+| `production` | 线上 | Supabase prod project | merge to `main` → 自动部署 |
 
 ---
 
