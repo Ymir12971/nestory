@@ -8,6 +8,8 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
+    "strip-icc": "node scripts/strip-icc.mjs",
+    "demo": "node scripts/start-demo.mjs",
     "dev": "turbo run dev --filter='./apps/nestory-api' --filter='./apps/nestory-web'",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
@@ -15,6 +17,7 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
+    "sharp": "^0.34.5",
     "turbo": "^2.5.0",
     "typescript": "^5.7.3"
   }

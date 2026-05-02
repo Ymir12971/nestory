@@ -1,17 +1,335 @@
+// Nestory — Prisma schema
+// 对齐文档：docs/dev/04_Nestory_数据库设计v1.7.md
+//          docs/dev/ARCH-DECISIONS-API-DB-20260501.md
+//
+// 命名约定（决策 1）：
+//   - TS 层 camelCase
+//   - DB 列 snake_case（通过 @map）
+//   - 表名复数 snake_case（通过 @@map）
+//
+// 删除策略（决策 5）：
+//   - users / children / rawAssets / highlights 支持软删（deletedAt）
+//   - audit_log / abuse_log 永不删，user_id 用 SET NULL
+//   - 其他表硬删 + CASCADE
+//
+// 部分索引、Realtime publication 等 Prisma DSL 不支持的，写在 migration SQL 后置脚本里。
+
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto]
 }
 
-// Schema 详细定义见 docs/dev/04_Nestory_数据库设计v1.7.md
-// 此处先放占位 user model，避免 prisma generate 失败
+// ============================================================================
+// users
+// ============================================================================
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String    @unique @db.VarChar(255)
+  name          String    @db.VarChar(100)
+  timezone      String    @default("UTC") @db.VarChar(50)
+  activeChildId String?   @map("active_child_id") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6) // 决策 5：软删
+  lockedAt      DateTime? @map("locked_at") @db.Timestamptz(6) // abuse lock
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6) // 文档 bug 修复
+
+  // Relations
+  activeChild     Child?           @relation("UserActiveChild", fields: [activeChildId], references: [id], onDelete: SetNull)
+  children        Child[]          @relation("UserChildren")
+  rawAssets       RawAsset[]
+  highlights      Highlight[]
+  stories         Story[]
+  subscription    Subscription?
+  tagLibrary      UserTagLibrary[]
+  linkedProviders LinkedProvider[]
+  auditLogs       AuditLog[]
+  abuseLogs       AbuseLog[]
+
+  @@index([deletedAt(sort: Desc)], map: "idx_users_deleted_at") // 部分索引在 migration SQL 加 WHERE
+  @@map("users")
+}
+
+// ============================================================================
+// linked_providers — OAuth 绑定（Apple / Google）
+// ============================================================================
+
+model LinkedProvider {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  provider       String   @db.VarChar(20) // 'apple' | 'google'
+  providerUserId String   @map("provider_user_id") @db.VarChar(255)
+  providerEmail  String?  @map("provider_email") @db.VarChar(255)
+  connectedAt    DateTime @default(now()) @map("connected_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId], map: "idx_linked_providers_user")
+  @@map("linked_providers")
+}
+
+// ============================================================================
+// children
+// ============================================================================
+
+model Child {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  name             String    @db.VarChar(50)
+  birthDate        DateTime  @map("birth_date") @db.Date
+  avatarUrl        String?   @map("avatar_url") @db.VarChar(500)
+  gender           String?   @db.VarChar(20) // 'boy' | 'girl' | 'prefer_not_to_say'
+  heightValue      Decimal?  @map("height_value") @db.Decimal(6, 2)
+  heightUnit       String?   @map("height_unit") @db.VarChar(5) // 'cm' | 'in'
+  heightRecordedAt DateTime? @map("height_recorded_at") @db.Timestamptz(6)
+  weightValue      Decimal?  @map("weight_value") @db.Decimal(6, 2)
+  weightUnit       String?   @map("weight_unit") @db.VarChar(5) // 'kg' | 'lb'
+  weightRecordedAt DateTime? @map("weight_recorded_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6) // 决策 5：软删（误删恢复）
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user           User        @relation("UserChildren", fields: [userId], references: [id], onDelete: Cascade)
+  activeForUsers User[]      @relation("UserActiveChild")
+  rawAssets      RawAsset[]
+  highlights     Highlight[]
+  stories        Story[]
+
+  @@index([userId], map: "idx_children_user")
+  @@index([deletedAt], map: "idx_children_deleted_at")
+  @@map("children")
+}
+
+// ============================================================================
+// raw_assets — Memory（一条 Memory 含 N 张照片）
+// ============================================================================
+
+model RawAsset {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId       String    @map("child_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid // 冗余列，决策 5：保留
+  assetType     String    @map("asset_type") @db.VarChar(10) // 'photo' | 'text' | 'mixed'
+  textNote      String?   @map("text_note") @db.Text
+  capturedAt    DateTime  @map("captured_at") @db.Timestamptz(6) // 用户本地时间，业务月份归档依据
+  exifTakenAt   DateTime? @map("exif_taken_at") @db.Timestamptz(6)
+  aiDescription String?   @map("ai_description") @db.Text
+  aiKeywords    Json?     @map("ai_keywords") @db.JsonB
+  tags          String[]  @default([])
+  isHighlight   Boolean   @default(false) @map("is_highlight")
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6) // 决策 5："最近删除"30 天
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  child     Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files     AssetFile[]
+  highlight Highlight?
+
+  @@index([childId, capturedAt(sort: Desc)], map: "idx_assets_child_captured")
+  @@index([deletedAt], map: "idx_assets_deleted_at")
+  // GIN(tags) 索引在 migration SQL 后置脚本加（Prisma DSL 不支持 GIN）
+  @@map("raw_assets")
+}
+
+// ============================================================================
+// asset_files
+// ============================================================================
+
+model AssetFile {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assetId      String   @map("asset_id") @db.Uuid
+  fileUrl      String   @map("file_url") @db.VarChar(500)
+  storagePath  String   @map("storage_path") @db.VarChar(500)
+  mimeType     String   @map("mime_type") @db.VarChar(50) // 'image/jpeg' | 'image/png' | 'image/heif'
+  widthPx      Int?     @map("width_px")
+  heightPx     Int?     @map("height_px")
+  byteSize     Int      @map("byte_size")
+  displayOrder Int      @default(0) @map("display_order") @db.SmallInt
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  rawAsset          RawAsset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  highlightCoverFor Highlight[] @relation("HighlightCover")
+
+  @@index([assetId, displayOrder], map: "idx_asset_files_asset")
+  @@map("asset_files")
+}
+
+// ============================================================================
+// user_tag_library
+// ============================================================================
+
+model UserTagLibrary {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String   @db.VarChar(50)
+  // matching key = LOWER(TRIM(name))，应用层 normalize；UNIQUE 约束基于此
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId], map: "idx_user_tag_library_user")
+  @@map("user_tag_library")
+}
+
+// ============================================================================
+// highlights
+// ============================================================================
+
+model Highlight {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  childId          String    @map("child_id") @db.Uuid
+  assetId          String    @unique @map("asset_id") @db.Uuid // 一条 Memory 最多对应一个 Highlight
+  coverFileId      String?   @map("cover_file_id") @db.Uuid
+  title            String?   @db.VarChar(100) // AI 异步写入，可用户覆写
+  cardType         String?   @map("card_type") @db.VarChar(50)
+  renderedImageUrl String?   @map("rendered_image_url") @db.VarChar(500)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6) // 决策 5：取消 highlight 软删
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  child     Child      @relation(fields: [childId], references: [id], onDelete: Cascade)
+  rawAsset  RawAsset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  coverFile AssetFile? @relation("HighlightCover", fields: [coverFileId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_highlights_user")
+  @@index([assetId], map: "idx_highlights_asset")
+  @@index([deletedAt], map: "idx_highlights_deleted_at")
+  @@map("highlights")
+}
+
+// ============================================================================
+// stories
+// ============================================================================
+
+model Story {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId  String @map("child_id") @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  monthKey String @map("month_key") @db.VarChar(7) // "YYYY-MM"，用户本地时区
+  status   String @default("pending") @db.VarChar(30)
+  // 'pending' | 'queued' | 'generating' | 'generated' | 'failed' | 'fallback_generated'
+
+  qualityLevel       String?   @map("quality_level") @db.VarChar(10) // 'low' | 'medium' | 'rich'
+  qualityScore       Decimal?  @map("quality_score") @db.Decimal(4, 3)
+  promptVersion      String?   @map("prompt_version") @db.VarChar(60)
+  modelName          String?   @map("model_name") @db.VarChar(60)
+  generatedAt        DateTime? @map("generated_at") @db.Timestamptz(6)
+  isLastFreeStory    Boolean   @default(false) @map("is_last_free_story")
+  generatedUnderPlan String?   @map("generated_under_plan") @db.VarChar(10) // 'free' | 'premium'
+
+  document       Json? @db.JsonB // StoryDocument
+  generationMeta Json? @map("generation_meta") @db.JsonB // StoryGenerationMeta
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  child  Child        @relation(fields: [childId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shares StoryShare[]
+
+  @@unique([childId, monthKey])
+  @@index([qualityLevel], map: "idx_stories_quality_level")
+  @@index([promptVersion], map: "idx_stories_prompt_version")
+  @@index([status], map: "idx_stories_status")
+  @@index([userId], map: "idx_stories_user")
+  // 部分索引 idx_stories_is_last_free WHERE is_last_free_story=TRUE 在 migration SQL 加
+  // Realtime publication 也在 migration SQL 加：ALTER PUBLICATION supabase_realtime ADD TABLE stories;
+  @@map("stories")
+}
+
+// ============================================================================
+// story_shares
+// ============================================================================
+
+model StoryShare {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storyId    String    @map("story_id") @db.Uuid
+  token      String    @unique @db.VarChar(64) // crypto.randomBytes(32).toString('base64url')，43 字符
+  visibility String    @default("private_link") @db.VarChar(20)
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([storyId], map: "idx_shares_story")
+  // 部分 unique 索引 (story_id) WHERE revoked_at IS NULL 在 migration SQL 加
+  @@map("story_shares")
+}
+
+// ============================================================================
+// subscriptions
+// ============================================================================
+
+model Subscription {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  // 决策 2：5 态枚举（never_paid / trial_active / premium_active / trial_ended / premium_ended）
+  subscriptionStatus String    @default("never_paid") @map("subscription_status") @db.VarChar(20)
+  planType           String    @default("free") @map("plan_type") @db.VarChar(10) // 'free' | 'premium'
+  status             String    @default("active") @db.VarChar(20) // RevenueCat: 'active' | 'cancelled' | 'expired'
+  billingCycle       String?   @map("billing_cycle") @db.VarChar(10) // 'yearly' | 'monthly'
+  storyQuota         Int       @default(2) @map("story_quota")
+  expiresAt          DateTime? @map("expires_at") @db.Timestamptz(6)
+  lastEventAt        DateTime? @map("last_event_at") @db.Timestamptz(6) // RevenueCat 事件时间
+  lastEventId        String?   @map("last_event_id") @db.VarChar(100)
+  paywallTriggerLog  Json      @default("{}") @map("paywall_trigger_log") @db.JsonB
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ============================================================================
+// audit_log — 永不删；user_id 用 SET NULL（决策 5）
+// ============================================================================
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  userId     String?  @map("user_id") @db.Uuid // NULL = 系统操作；SET NULL on user purge
+  actorType  String   @map("actor_type") @db.VarChar(20) // 'user' | 'system' | 'webhook'
+  action     String   @db.VarChar(50)
+  resource   String?  @db.VarChar(50)
+  resourceId String?  @map("resource_id") @db.VarChar(64)
+  metadata   Json?    @db.JsonB
+  ipAddr     String?  @map("ip_addr") @db.Inet
+  userAgent  String?  @map("user_agent") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_audit_log_user_id")
+  @@index([createdAt], map: "idx_audit_log_created_at")
+  @@map("audit_log")
+}
+
+// ============================================================================
+// abuse_log — 永不删；user_id 用 SET NULL（决策 5）
+// ============================================================================
+
+model AbuseLog {
+  id          BigInt   @id @default(autoincrement())
+  userId      String?  @map("user_id") @db.Uuid
+  ipAddr      String   @map("ip_addr") @db.Inet
+  endpoint    String   @db.VarChar(100)
+  triggerType String   @map("trigger_type") @db.VarChar(30)
+  // 'rate_limit_429' | 'upload_abuse' | 'manual_lock'
+  detail      Json?    @db.JsonB
+  triggeredAt DateTime @default(now()) @map("triggered_at") @db.Timestamptz(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_abuse_log_user_id")
+  @@index([ipAddr], map: "idx_abuse_log_ip")
+  @@index([triggeredAt], map: "idx_abuse_log_triggered_at")
+  @@map("abuse_log")
 }

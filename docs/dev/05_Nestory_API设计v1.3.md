@@ -1,10 +1,23 @@
 # Nestory — API 设计文档
 
-**版本：** v1.3
-**日期：** 2026-04-26
-**上一版本：** v1.2（2026-04-26）
-**依赖文档：** PRD v1.7 · PageStructure v1.6 · SubscriptionRules v1.3 · 技术架构 v1.3 · 数据库设计 v1.7
+**版本：** v1.4
+**日期：** 2026-05-01
+**上一版本：** v1.3（2026-04-26）
+**依赖文档：** PRD v1.7 · PageStructure v1.6 · SubscriptionRules v1.3 · 技术架构 v1.3 · 数据库设计 v1.8
 **编写者：** Justin
+**对应 ADR：** `ARCH-DECISIONS-API-DB-20260501.md`
+
+### v1.4 变更记录
+
+- **API 字段命名约定改为 camelCase（决策 1）**：所有 JSON request/response 字段统一 `camelCase`（如 `coverFileId / monthKey / isLastFreeStory / capturedAt / childId`）。本文档中残留的 snake_case 示例将随各 endpoint 实现陆续替换；TS 类型层 `packages/types/src/` 是当前最权威的字段定义。
+- **Base URL 端口由 3000 改为 3001**：与 `apps/nestory-api/src/config/env.ts` 默认值对齐
+- **移除 `POST /stories`（公网接口）**：决策 4 — Story 生成走 BullMQ worker，触发由 cron / milestone hook / `/internal/stories/enqueue` 完成。`STORY_ALREADY_EXISTS` (409) 改为 worker 内部错误码。
+- **`STORY_READ_ONLY` 错误码归属调整**：从 stories 模块移到 **assets** 模块，由 `PATCH /assets/:id` / `DELETE /assets/:id` 命中 R-08 时返回（编辑历史月份 memory）。
+- **新增 `/internal/*` 控制平面**：admin token 鉴权（与 user JWT 区分），不暴露给 client。详见 §"内部控制平面"章节。
+- **新增 GDPR 双层删除接口**：所有 `DELETE` endpoint 默认软删（移入 trash）；`?hard=true` 硬删；新增 `POST /:resource/:id/restore` 与 `GET /:resource/trash`（决策 5）。
+- **`GET /users/me` 响应补字段**：`name`、`linkedProviders[]`（OAuth 绑定列表）。详见 `packages/types/src/user.ts`。
+- **`GET /subscriptions/me` 响应补字段**：`subscriptionStatus` (5 态权威字段)、`billingCycle`、`benefits[]`、`storyQuotaRemaining`。
+- **模块索引接口数修正**：assets 4（漏算 DELETE）；新增 tags 模块 3 个；新增 internal 5 个。
 
 ### v1.3 变更记录
 
@@ -36,7 +49,7 @@
 ### Base URL
 
 ```
-开发：http://localhost:3000
+开发：http://localhost:3001
 生产：https://api.nestory.app
 ```
 
@@ -49,6 +62,15 @@ Authorization: Bearer <supabase_jwt_token>
 ```
 
 Token 由 Supabase Auth 签发，后端通过 Supabase JWT 验证获取 `user_id`。
+
+### 字段命名约定
+
+**全栈统一 camelCase**（v1.4 决策 1）：
+- HTTP request/response JSON 字段 → camelCase
+- TS 类型层 → camelCase（`packages/types/src/` 为权威）
+- DB 列名仍 snake_case，由 Prisma `@map` 自动映射
+
+本文档历史 snake_case 示例（v1.3 及之前）会随各 endpoint 实现替换；如示例与 `packages/types` 冲突，以 types 为准。
 
 ### 通用响应格式
 
@@ -83,9 +105,9 @@ Token 由 Supabase Auth 签发，后端通过 Supabase JWT 验证获取 `user_id
 | 403 | `HIGHLIGHT_LIMIT_REACHED` | Free 用户 Highlight 数量 ≥ 10（R-04） |
 | 403 | `PROFILE_SWITCH_RESTRICTED` | Never Paid 用户尝试切换档案（R-05；Ended 用户不拦截） |
 | 403 | `MEMORY_EDIT_RESTRICTED` | 尝试编辑历史月份 Memory（R-08） |
-| 403 | `STORY_READ_ONLY` | 尝试修改已生成 Story |
+| 403 | `STORY_READ_ONLY` | v1.4 改：`PATCH/DELETE /assets/:id` 命中已生成历史月份（R-08）时返回 |
 | 404 | `NOT_FOUND` | 资源不存在 |
-| 409 | `STORY_ALREADY_EXISTS` | 该月 Story 已存在 |
+| 409 | `STORY_ALREADY_EXISTS` | v1.4 改：仅 BullMQ worker 内部使用（重复入队保护），公网 API 不返回 |
 | 413 | `FILE_TOO_LARGE` | 单张照片超过 10MB（R-07） |
 | 422 | `INVALID_FILE_TYPE` | 照片格式不支持（仅 JPEG/PNG/HEIF） |
 | 422 | `INVALID_CAPTURED_AT_FUTURE` | `captured_at` 超过当前时间 5 分钟以上 |
@@ -117,13 +139,15 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
 
 | 模块 | 路径前缀 | 接口数 |
 |---|---|---|
-| 素材 | `/assets` | 3 |
-| Story | `/stories` | 3 |
-| Highlights | `/highlights` | 4 |
-| 孩子档案 | `/children` | 5 |
+| 用户 | `/users` | 3 |
+| 孩子档案 | `/children` | 7（含 restore + active） |
+| 素材 | `/assets` | 7（含 trash + restore） |
+| Highlights | `/highlights` | 5 |
+| Story | `/stories` | 3（仅读，无 POST） |
 | 订阅 | `/subscriptions` | 3 |
 | 分享 | `/shares` | 3 |
-| 用户 | `/users` | 2 |
+| Tags | `/tags` | 3 |
+| **内部控制平面** | `/internal` | 5（admin token） |
 
 ---
 
@@ -320,7 +344,9 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
       "is_last_free_story": false,
       // Paywall A 触发依据，前端从 S-02 返回时检查
       "watermark_enabled": true,
-      "generated_at": "2026-04-01T00:05:32Z"
+      "generated_at": "2026-04-01T00:05:32Z",
+      "memory_count": 14
+      // 生成该 Story 时使用的 Memory 数量；S-01 Generated card footer 展示用
     },
     {
       "id": null,
@@ -331,7 +357,8 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
       "title": "February",
       "is_last_free_story": false,
       "watermark_enabled": null,
-      "generated_at": null
+      "generated_at": null,
+      "memory_count": null
     }
   ],
   "current_month": {
@@ -508,6 +535,10 @@ Free/降级：
       "id": "uuid",
       "asset_id": "uuid",
       "cover_file_id": "uuid",
+      "cover_orientation": "portrait",
+      // "portrait" | "landscape"；由服务端按 cover_file 的 width_px/height_px 计算写入
+      // width >= height → "landscape"；width < height → "portrait"
+      // HL-01 卡片高度依赖此字段（portrait=228px / landscape=128px）
       "title": "First steps in the park",
       // AI 提取或用户覆写；null 表示尚未生成
       "card_type": "playtime",
@@ -1028,6 +1059,63 @@ App 启动
   → generateMetadata() 输出 OG meta
   → StoryRenderer 渲染内容
 ```
+
+---
+
+## 内部控制平面 `/internal/*`（v1.4 新增）
+
+**鉴权：** 与 user JWT 区分，使用单独的 admin token（`X-Admin-Token` header 校验，配置 in env）。
+**用途：** 决策 4 — Story BullMQ 触发与运维控制；不暴露给 mobile/web client。
+
+### POST /internal/stories/enqueue
+
+批量入队（filter 控制区域 / 数量 / dryRun）。
+
+**Body**
+```json
+{
+  "filter": {
+    "countries": ["US", "CA"],
+    "timezones": ["America/New_York"],
+    "userIds": ["uuid1", "uuid2"],
+    "childIds": ["uuid1"],
+    "cohort": "beta",
+    "monthKey": "current",
+    "batchSize": 100,
+    "maxJobsPerMinute": 30,
+    "dryRun": false
+  }
+}
+```
+**Response 200** `{ data: { enqueued: 234, skipped: 12 } }`（dryRun 仅返回会被入队的列表，不真入队）
+
+### POST /internal/stories/retry
+
+重试失败任务。
+
+**Body**
+```json
+{
+  "storyIds": ["uuid"],
+  "filter": { "status": "failed", "failedSince": "2026-04-01T00:00:00Z", "attemptsBelow": 3 }
+}
+```
+
+### POST /internal/stories/cancel
+
+取消队列中的任务。
+
+**Body** `{ "jobIds": ["bullmq-job-id"] }`
+
+### GET /internal/stories/queue
+
+队列状态总览。
+
+**Response** `{ data: { pending: 10, queued: 50, generating: 5, failed: 2 } }`
+
+### GET /internal/stories/jobs/:id
+
+单任务详情（BullMQ job + DB story 联合视图）。
 
 ---
 
