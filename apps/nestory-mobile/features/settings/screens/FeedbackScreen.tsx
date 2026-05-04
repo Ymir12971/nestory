@@ -1,18 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
-
-// Annotation: email field defaults to the user's Apple/Google account email
-const MOCK_USER_EMAIL = 'sarah.j@icloud.com';
+import { useMe } from '@/api';
 
 export function FeedbackScreen() {
   const router = useRouter();
+  const meQ = useMe();
   const [feedbackText, setFeedbackText] = useState('');
-  const [email, setEmail]               = useState(MOCK_USER_EMAIL);
+  const [email, setEmail]               = useState('');
+
+  // Default email to the signed-in user's address once it loads (only if user hasn't typed yet).
+  useEffect(() => {
+    if (!email && meQ.data?.email) setEmail(meQ.data.email);
+  }, [meQ.data?.email]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canSubmit = feedbackText.trim().length > 0;
 

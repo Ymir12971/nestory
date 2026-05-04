@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  ImageBackground,
   Pressable,
   Share,
   StyleSheet,
@@ -14,8 +15,9 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import WebView from 'react-native-webview';
 import { theme, palette } from '@/shared/theme';
 import { config } from '@/shared/config';
+import { useStory } from '@/api';
 
-// TODO: wire auth token injection so nestory-web can authenticate the request
+// TODO: wire auth token injection so nestory-web can authenticate the WebView request
 
 const HERO_H = 420;
 
@@ -33,24 +35,23 @@ export function StoryDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const storyQ = useStory(id ?? null);
 
   const [webviewState, setWebviewState] = useState<'loading' | 'loaded' | 'error'>('loading');
 
   const webUrl = `${config.webBaseUrl}/story/${id}`;
 
-  // TODO: replace with real data from GET /stories/:id
-  // For now derive display strings from the URL or a stub monthKey
-  const STUB_MONTH_KEY = '2026-03';
-  const { navTitle, heroTitle } = parseMonthKey(STUB_MONTH_KEY);
-  const STUB_STORY_TITLE = 'A Month of First Steps';
-  const STUB_STORY_SUBTITLE =
-    'Emma had the most eventful month yet — from her first steps to discovering her favorite toy.';
+  const meta       = storyQ.data?.document.meta;
+  const monthKey   = storyQ.data?.monthKey;
+  const navTitle   = monthKey ? parseMonthKey(monthKey).navTitle : 'Story';
+  const heroTitle  = meta?.title ?? '';
+  const heroSubtitle = storyQ.data?.document.shareMeta.ogDescription ?? '';
+  const coverImageUrl = meta?.coverImageUrl ?? null;
 
   const handleShare = async () => {
     // TODO: call POST /shares to get shareUrl + ogTitle, then use Share.share()
-    // See packages/types/src/share.ts — StoryShare.shareUrl
     try {
-      await Share.share({ url: webUrl, title: STUB_STORY_TITLE });
+      await Share.share({ url: webUrl, title: heroTitle || 'Story' });
     } catch {
       // user dismissed — no-op
     }
@@ -60,17 +61,22 @@ export function StoryDetailScreen() {
     <View style={styles.root}>
       {/* ── Hero ─────────────────────────────────────────────── */}
       <View style={[styles.hero, { height: HERO_H }]}>
-        {/* Background — TODO: replace with <ImageBackground source={{ uri: coverImageUrl }} resizeMode="cover" style={StyleSheet.absoluteFill} /> */}
-        <View style={[StyleSheet.absoluteFill, styles.heroBg]} />
+        {coverImageUrl ? (
+          <ImageBackground
+            source={{ uri: coverImageUrl }}
+            resizeMode="cover"
+            style={StyleSheet.absoluteFill}
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, styles.heroBg]} />
+        )}
 
-        {/* Gradient: top dark → mid transparent → bottom dark */}
         <LinearGradient
           colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.6)']}
           locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Status bar spacer + NavBar */}
         <View style={{ height: insets.top }} />
         <View style={styles.navBar}>
           <Pressable hitSlop={8} onPress={() => router.back()}>
@@ -80,11 +86,12 @@ export function StoryDetailScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        {/* Title group — absolute, anchored near hero bottom (top=260 per Figma) */}
-        <View style={styles.titleGroup}>
-          <Text style={styles.heroTitle}>{STUB_STORY_TITLE}</Text>
-          <Text style={styles.heroSubtitle}>{STUB_STORY_SUBTITLE}</Text>
-        </View>
+        {(heroTitle || heroSubtitle) && (
+          <View style={styles.titleGroup}>
+            {heroTitle ? <Text style={styles.heroTitle}>{heroTitle}</Text> : null}
+            {heroSubtitle ? <Text style={styles.heroSubtitle}>{heroSubtitle}</Text> : null}
+          </View>
+        )}
       </View>
 
       {/* ── WebView body ─────────────────────────────────────── */}

@@ -1,40 +1,31 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import type { Subscription } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
+import { useSubscription } from '@/api';
 
 // ---------- Types ----------
 
 type PlanCycle = 'yearly' | 'monthly';
 
-// ---------- Mock data — replace with GET /subscriptions/me ----------
+// ---------- Helpers ----------
 
-const MOCK_IS_PREMIUM = false; // toggle to test ST-02B
+function formatExpiry(iso: string | null): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
-const MOCK_FREE = {
-  label: 'Free Plan',
-  subtitle: '2 Stories remaining',
-};
-
-const MOCK_PREMIUM = {
-  label: 'Premium Plan',
-  cycle: 'Yearly',
-  renewsLabel: 'Renews Nov 12, 2026',
-  billingRows: [
-    { key: 'Plan',         value: 'Yearly' },
-    { key: 'Price',        value: '$99.99 / year' },
-    { key: 'Next billing', value: 'Nov 12, 2026' },
-  ],
-  benefits: [
-    'Unlimited AI Stories',
-    'Watermark-free sharing',
-    'Unlimited Highlights',
-    'Unlimited child profiles',
-  ],
-};
+function freeSubtitle(sub: Subscription): string {
+  if (sub.subscriptionStatus === 'trial_ended')   return 'Free trial ended';
+  if (sub.subscriptionStatus === 'premium_ended') return 'Premium ended';
+  const remaining = sub.storyQuotaRemaining;
+  if (remaining == null) return '';
+  return `${remaining} ${remaining === 1 ? 'Story' : 'Stories'} remaining`;
+}
 
 // ---------- Shared NavBar ----------
 
@@ -52,7 +43,7 @@ function NavBar({ onBack }: { onBack: () => void }) {
 
 // ---------- ST-02A Free Plan ----------
 
-function FreePlanContent({ router }: { router: ReturnType<typeof useRouter> }) {
+function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnType<typeof useRouter> }) {
   const [cycle, setCycle] = useState<PlanCycle>('yearly');
 
   return (
@@ -67,8 +58,8 @@ function FreePlanContent({ router }: { router: ReturnType<typeof useRouter> }) {
           <View style={styles.currentPlanPill}>
             <Text style={styles.currentPlanPillLabel}>CURRENT PLAN</Text>
           </View>
-          <Text style={styles.currentPlanName}>{MOCK_FREE.label}</Text>
-          <Text style={styles.currentPlanSubtitle}>{MOCK_FREE.subtitle}</Text>
+          <Text style={styles.currentPlanName}>Free Plan</Text>
+          <Text style={styles.currentPlanSubtitle}>{freeSubtitle(sub)}</Text>
         </View>
 
         {/* Compare table */}
@@ -173,7 +164,26 @@ function FreePlanContent({ router }: { router: ReturnType<typeof useRouter> }) {
 
 // ---------- ST-02B Premium Plan ----------
 
-function PremiumPlanContent() {
+function PremiumPlanContent({ sub }: { sub: Subscription }) {
+  const cycleLabel = sub.billingCycle === 'monthly' ? 'Monthly' : 'Yearly';
+  const renewsLabel = sub.expiresAt
+    ? `Renews ${formatExpiry(sub.expiresAt)}`
+    : 'Renewal date pending';
+  const billingRows: { key: string; value: string }[] = [
+    { key: 'Plan', value: cycleLabel },
+    ...(sub.expiresAt
+      ? [{ key: 'Next billing', value: formatExpiry(sub.expiresAt) }]
+      : []),
+  ];
+  const benefits = sub.benefits.length > 0
+    ? sub.benefits
+    : [
+        'Unlimited AI Stories',
+        'Watermark-free sharing',
+        'Unlimited Highlights',
+        'Unlimited child profiles',
+      ];
+
   return (
     <>
       <ScrollView
@@ -192,15 +202,15 @@ function PremiumPlanContent() {
           <View style={styles.premiumCurrentPill}>
             <Text style={styles.premiumCurrentPillLabel}>CURRENT PLAN</Text>
           </View>
-          <Text style={styles.premiumCurrentName}>{MOCK_PREMIUM.label}</Text>
+          <Text style={styles.premiumCurrentName}>Premium Plan</Text>
           <Text style={styles.premiumCurrentSubtitle}>
-            {MOCK_PREMIUM.cycle} · {MOCK_PREMIUM.renewsLabel}
+            {cycleLabel} · {renewsLabel}
           </Text>
         </LinearGradient>
 
         {/* Billing detail card */}
         <View style={styles.billingCard}>
-          {MOCK_PREMIUM.billingRows.map((row, i) => (
+          {billingRows.map((row, i) => (
             <View key={i}>
               {i > 0 && <View style={styles.divider} />}
               <View style={styles.billingRow}>
@@ -214,7 +224,7 @@ function PremiumPlanContent() {
         {/* What's included */}
         <View style={styles.includedCard}>
           <Text style={styles.includedTitle}>{"What's included"}</Text>
-          {MOCK_PREMIUM.benefits.map((benefit, i) => (
+          {benefits.map((benefit, i) => (
             <View key={i} style={styles.benefitRow}>
               <RemixIcon name="check-line" size={20} color={theme.text.brand} />
               <Text style={styles.benefitText}>{benefit}</Text>
@@ -240,11 +250,31 @@ function PremiumPlanContent() {
 
 export function SubscriptionScreen() {
   const router = useRouter();
+  const subQ = useSubscription();
+
+  const isPremium =
+    subQ.data?.subscriptionStatus === 'premium_active' ||
+    subQ.data?.subscriptionStatus === 'trial_active';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <NavBar onBack={() => router.back()} />
-      {MOCK_IS_PREMIUM ? <PremiumPlanContent /> : <FreePlanContent router={router} />}
+      {subQ.isLoading || !subQ.data ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : subQ.isError ? (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Failed to load subscription.</Text>
+          <Pressable onPress={() => subQ.refetch()}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      ) : isPremium ? (
+        <PremiumPlanContent sub={subQ.data} />
+      ) : (
+        <FreePlanContent sub={subQ.data} router={router} />
+      )}
     </SafeAreaView>
   );
 }
@@ -264,6 +294,21 @@ const styles = StyleSheet.create({
   navSpacer: { width: 24 },
 
   scroll: { flex: 1 },
+
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
+  },
 
   // ── Free plan body ────────────────────────────────────────
   bodyFree: {

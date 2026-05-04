@@ -11,12 +11,15 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
+import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import RemixIcon from 'react-native-remix-icon';
+import type { ChildCreate, ChildGender } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
+import { useCreateChild, uploadPhoto } from '@/api';
+import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 
 // ─── Progress bar (5 segments, N filled) ─────────────────────────────────────
 
@@ -118,17 +121,27 @@ function WheelColumn({
   onChange: (idx: number) => void;
 }) {
   const ref = useRef<ScrollView>(null);
+  // Idle-based snap: works on both native (momentum) and web (mouse wheel),
+  // since `onMomentumScrollEnd` doesn't fire for desktop browser scroll events.
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     ref.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
   }, []); // scroll to initial position on mount only
 
-  const snap = useCallback(
+  useEffect(() => () => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+  }, []);
+
+  const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       const y = e.nativeEvent.contentOffset.y;
-      const idx = Math.max(0, Math.min(items.length - 1, Math.round(y / ITEM_H)));
-      onChange(idx);
-      ref.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+      idleTimerRef.current = setTimeout(() => {
+        const idx = Math.max(0, Math.min(items.length - 1, Math.round(y / ITEM_H)));
+        onChange(idx);
+        ref.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+      }, 120);
     },
     [items.length, onChange],
   );
@@ -142,8 +155,8 @@ function WheelColumn({
         snapToInterval={ITEM_H}
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
-        onMomentumScrollEnd={snap}
-        onScrollEndDrag={snap}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
         {items.map((item, i) => {
           const dist = Math.abs(i - selectedIndex);
@@ -299,24 +312,32 @@ const YEARS = Array.from({ length: 10 }, (_, i) => String(THIS_YEAR - 9 + i));
 type Step = 0 | 1 | 2;
 type Gender = 'Girl' | 'Boy' | 'Prefer not to say' | null;
 
+const GENDER_TO_API: Record<NonNullable<Gender>, ChildGender> = {
+  Girl:                  'girl',
+  Boy:                   'boy',
+  'Prefer not to say':   'prefer_not_to_say',
+};
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function ChildProfileScreen() {
   const router = useRouter();
   const pickPhoto = usePhotoPicker();
+  const createChild = useCreateChild();
   const [step, setStep] = useState<Step>(0);
 
   const [name, setName] = useState('');
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarPhoto, setAvatarPhoto] = useState<PickedPhoto | null>(null);
 
   const [monthIdx, setMonthIdx] = useState(2);
   const [dayIdx, setDayIdx] = useState(14);
   const [yearIdx, setYearIdx] = useState(Math.max(0, YEARS.indexOf(String(THIS_YEAR - 1))));
 
   const [gender, setGender] = useState<Gender>(null);
-  const [height, setHeight] = useState('');
+  const heightState = useHeightState();
   const [weight, setWeight] = useState('');
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
+  const [weightSystem, setWeightSystem] = useState<UnitSystem>('metric');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const onBack = () => {
     if (step === 0) router.back();
@@ -327,13 +348,51 @@ export function ChildProfileScreen() {
 
   const formattedBirthday = `${MONTHS[monthIdx]} ${DAYS[dayIdx]}, ${YEARS[yearIdx]}`;
 
+  const buildBody = (avatarUrl?: string): ChildCreate => {
+    const month = String(monthIdx + 1).padStart(2, '0');
+    const day   = (DAYS[dayIdx] ?? '1').padStart(2, '0');
+    const year  = YEARS[yearIdx];
+
+    const weightNum = parseFloat(weight);
+
+    return {
+      name:      name.trim(),
+      birthDate: `${year}-${month}-${day}`,
+      ...(gender ? { gender: GENDER_TO_API[gender] } : {}),
+      ...(avatarUrl ? { avatarUrl } : {}),
+      ...(heightState.resolve() ?? {}),
+      ...(Number.isFinite(weightNum) && weightNum > 0
+        ? { weightValue: weightNum, weightUnit: weightSystem === 'metric' ? 'kg' : 'lb' }
+        : {}),
+    };
+  };
+
+  const saveAndGo = async (next: '/onboarding/permissions' | '/onboarding/second-child') => {
+    if (createChild.isPending) return;
+    setSaveError(null);
+    try {
+      const avatarUrl = avatarPhoto
+        ? (await uploadPhoto(avatarPhoto, 'avatars')).fileUrl
+        : undefined;
+      await createChild.mutateAsync(buildBody(avatarUrl));
+      router.push(next);
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to save profile. Please try again.');
+    }
+  };
+
   const onContinue = () => {
-    if (step === 1) {
+    if (step === 0) {
+      if (!name.trim()) {
+        setSaveError('Please enter a name to continue.');
+        return;
+      }
+      setSaveError(null);
+      setStep(1);
+    } else if (step === 1) {
       setBirthdayConfirmVisible(true);
-    } else if (step < 2) {
-      setStep((s) => (s + 1) as Step);
     } else {
-      router.push('/onboarding/permissions');
+      void saveAndGo('/onboarding/permissions');
     }
   };
 
@@ -354,11 +413,11 @@ export function ChildProfileScreen() {
               style={styles.avatarWrap}
               onPress={async () => {
                 const picked = await pickPhoto();
-                const first = picked[0]; if (first) setAvatarUri(first.uri);
+                const first = picked[0]; if (first) setAvatarPhoto(first);
               }}
             >
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.photoCircle} />
+              {avatarPhoto ? (
+                <Image source={{ uri: avatarPhoto.uri }} style={styles.photoCircle} />
               ) : (
                 <View style={styles.photoCircle} />
               )}
@@ -438,13 +497,15 @@ export function ChildProfileScreen() {
 
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Height</Text>
-              <UnitInput
-                value={height}
-                onChangeText={setHeight}
-                metricUnit="cm"
-                imperialUnit="in"
-                system={unitSystem}
-                onToggle={() => setUnitSystem((u) => (u === 'metric' ? 'imperial' : 'metric'))}
+              <HeightInput
+                system={heightState.system}
+                cm={heightState.cm}
+                ft={heightState.ft}
+                inches={heightState.inches}
+                onChangeCm={heightState.setCm}
+                onChangeFt={heightState.setFt}
+                onChangeInches={heightState.setInches}
+                onToggle={heightState.toggle}
               />
             </View>
 
@@ -455,14 +516,14 @@ export function ChildProfileScreen() {
                 onChangeText={setWeight}
                 metricUnit="kg"
                 imperialUnit="lb"
-                system={unitSystem}
-                onToggle={() => setUnitSystem((u) => (u === 'metric' ? 'imperial' : 'metric'))}
+                system={weightSystem}
+                onToggle={() => setWeightSystem((u) => (u === 'metric' ? 'imperial' : 'metric'))}
               />
             </View>
 
             <Pressable
               style={styles.addChildBtn}
-              onPress={() => router.push('/onboarding/second-child')}
+              onPress={() => void saveAndGo('/onboarding/second-child')}
             >
               <Text style={styles.addChildLabel}>Add Another Child</Text>
             </Pressable>
@@ -470,15 +531,21 @@ export function ChildProfileScreen() {
         </ScrollView>
       )}
 
-      <View style={styles.spacer} />
+      {/* Step 2 uses a ScrollView (flex:1); steps 0/1 use a static body, so add
+          a flex spacer to push the CTA to the bottom. */}
+      {step !== 2 && <View style={styles.spacer} />}
 
       {/* CTA ──────────────────────────────────────────────────────────────── */}
       <View style={styles.cta}>
-        <PrimaryButton label="Continue" onPress={onContinue} />
+        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
+        <PrimaryButton
+          label={createChild.isPending && step === 2 ? 'Saving…' : 'Continue'}
+          onPress={onContinue}
+        />
         {step === 2 && (
           <Pressable
             style={styles.skipBtn}
-            onPress={() => router.push('/onboarding/permissions')}
+            onPress={() => void saveAndGo('/onboarding/permissions')}
           >
             <Text style={styles.skipLabel}>Skip</Text>
           </Pressable>
@@ -612,6 +679,11 @@ const styles = StyleSheet.create({
   },
   skipBtn: { height: 44, alignItems: 'center', justifyContent: 'center' },
   skipLabel: { ...theme.typography.buttonLabelM, color: theme.text.brand },
+  errorText: {
+    ...theme.typography.caption,
+    color: theme.text.error,
+    textAlign: 'center',
+  },
 
   // Birthday confirm sheet
   confirmScrim: {

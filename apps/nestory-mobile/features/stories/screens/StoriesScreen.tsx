@@ -1,66 +1,23 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import type { CurrentMonthStatus, StoryListItem, SubscriptionStatus } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { TopNotify, type TopNotifyStatus } from '@/shared/components/TopNotify';
 import { PaywallModal } from '@/shared/components/PaywallModal';
+import { useChildren, useStories, useSubscription } from '@/api';
 
-// ---------- Types (mirrors @nestory/types CurrentMonthStatus + StoryListItem) ----------
-
-interface CurrentMonthData {
-  monthKey: string;
-  listItemState: 'current_collecting' | 'current_in_progress' | 'current_quota_exhausted';
-  memoryCount: number;
-  daysUntilGeneration: number;
-  milestoneLevel: null | '1' | '3' | '10' | '15+';
+function topNotifyForSub(sub: SubscriptionStatus): TopNotifyStatus | null {
+  if (sub === 'trial_ended')   return 'stories_trial_ended';
+  if (sub === 'premium_ended') return 'stories_premium_ended';
+  return null;
 }
 
-interface StoryItem {
-  id: string | null;
-  monthKey: string;
-  listItemState: 'historical_generated' | 'historical_not_generated';
-  coverImageUrl: string | null;
-  title: string | null;
-  memoryCount: number | null;
+function notifyKindFor(sub: SubscriptionStatus): 'trial' | 'premium' {
+  return sub === 'trial_ended' ? 'trial' : 'premium';
 }
-
-// ---------- Mock data — replace with GET /stories?child_id=:id ----------
-
-const MOCK_CURRENT: CurrentMonthData = {
-  monthKey: '2026-04',
-  listItemState: 'current_collecting',
-  memoryCount: 8,
-  daysUntilGeneration: 4,
-  milestoneLevel: '10',
-};
-
-const MOCK_STORIES: StoryItem[] = [
-  {
-    id: 'story-1',
-    monthKey: '2026-03',
-    listItemState: 'historical_generated',
-    coverImageUrl: null,
-    title: 'A Month of Milestones',
-    memoryCount: 14,
-  },
-  {
-    id: null,
-    monthKey: '2026-01',
-    listItemState: 'historical_not_generated',
-    coverImageUrl: null,
-    title: null,
-    memoryCount: null,
-  },
-];
-
-// TODO: derive from stories API response (distinct years present in data)
-const AVAILABLE_YEARS = [2026, 2025];
-
-// TODO: derive from GET /subscriptions/me — subscriptionStatus
-const MOCK_SUBSCRIPTION_STATUS: TopNotifyStatus | null = null;
-const MOCK_SUBSCRIPTION_KIND: 'trial' | 'premium' = 'premium';
 
 // ---------- Helpers ----------
 
@@ -81,7 +38,7 @@ function CollectingCard({
   data,
   onAddMemory,
 }: {
-  data: CurrentMonthData;
+  data: CurrentMonthStatus;
   onAddMemory: () => void;
 }) {
   // TODO: use proper milestone-target calculation once design logic is confirmed
@@ -144,23 +101,25 @@ function GeneratedCard({
   item,
   onPress,
 }: {
-  item: StoryItem;
+  item: StoryListItem;
   onPress: () => void;
 }) {
   const { badge } = parseMonthKey(item.monthKey);
   return (
     <Pressable style={styles.cardGenerated} onPress={onPress}>
       <View style={styles.coverArea}>
-        {/* TODO: replace with <Image source={{ uri: item.coverImageUrl }} resizeMode="cover" /> */}
-        <View style={styles.coverPlaceholder} />
+        {item.coverImageUrl ? (
+          <Image source={{ uri: item.coverImageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={styles.coverPlaceholder} />
+        )}
         <View style={styles.monthBadge}>
           <Text style={styles.monthBadgeLabel}>{badge}</Text>
         </View>
       </View>
       <View style={styles.generatedBody}>
         <View style={styles.generatedTextGroup}>
-          <Text style={styles.cardTitle}>{item.title}</Text>
-          {/* story excerpt — not in StoryListItem; TODO: add field to API or fetch on demand */}
+          <Text style={styles.cardTitle}>{item.title ?? '—'}</Text>
         </View>
         <View style={styles.cardFooter}>
           {item.memoryCount != null && (
@@ -174,7 +133,7 @@ function GeneratedCard({
   );
 }
 
-function NotGeneratedCard({ item }: { item: StoryItem }) {
+function NotGeneratedCard({ item }: { item: StoryListItem }) {
   const { full, monthName } = parseMonthKey(item.monthKey);
   return (
     <View style={styles.cardNotGenerated}>
@@ -198,7 +157,10 @@ function NotGeneratedCard({ item }: { item: StoryItem }) {
 
 export function StoriesScreen() {
   const router = useRouter();
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const childrenQ = useChildren();
+  const subQ      = useSubscription();
+  const thisYear  = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(thisYear);
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [paywallVariant, setPaywallVariant] = useState<'A' | 'C'>('A');
 
@@ -207,18 +169,39 @@ export function StoriesScreen() {
     setPaywallVisible(true);
   };
 
+  const children = childrenQ.data ?? [];
+  const activeChildId =
+    children.find(c => c.isActive)?.id ?? children[0]?.id ?? '';
+  const storiesQ = useStories({ childId: activeChildId, year: selectedYear });
+
+  // Available years: this year + the user's child birth year; collapse duplicates.
+  const availableYears = useMemo(() => {
+    const years = new Set<number>([thisYear]);
+    for (const c of children) {
+      const y = new Date(c.birthDate).getFullYear();
+      if (Number.isFinite(y)) years.add(y);
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [children, thisYear]);
+
+  const subStatus = subQ.data?.subscriptionStatus;
+  const notifyType = subStatus ? topNotifyForSub(subStatus) : null;
+
+  const isLoading = childrenQ.isLoading || storiesQ.isLoading;
+  const isError   = childrenQ.isError || storiesQ.isError;
+  const current   = storiesQ.data?.currentMonth;
+  const historical = storiesQ.data?.historical ?? [];
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Stories</Text>
         <Text style={styles.headerSubtitle}>Your little one's growth, told by AI</Text>
       </View>
 
-      {/* Year filter */}
       <View style={styles.filterWrap}>
         <View style={styles.filterBar}>
-          {AVAILABLE_YEARS.map(year => {
+          {availableYears.map(year => {
             const active = year === selectedYear;
             return (
               <Pressable
@@ -235,46 +218,59 @@ export function StoriesScreen() {
         </View>
       </View>
 
-      {/* S-01 / topNotify — Paywall C — rendered when subscriptionStatus is ended */}
-      {MOCK_SUBSCRIPTION_STATUS != null && (
+      {notifyType != null && subStatus && (
         <View style={styles.notifyWrap}>
           <TopNotify
-            type={MOCK_SUBSCRIPTION_STATUS}
-            kind={MOCK_SUBSCRIPTION_KIND}
+            type={notifyType}
+            kind={notifyKindFor(subStatus)}
             onPress={() => openPaywall('C')}
           />
         </View>
       )}
 
-      {/* Story cards */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {MOCK_CURRENT.listItemState === 'current_collecting' && (
-          <CollectingCard
-            data={MOCK_CURRENT}
-            onAddMemory={() => router.push('/memory/add')}
-          />
-        )}
-        {MOCK_CURRENT.listItemState === 'current_in_progress' && <GeneratingCard monthKey={MOCK_CURRENT.monthKey} />}
-        {MOCK_CURRENT.listItemState === 'current_quota_exhausted' && (
-          <LockedCard onUpgrade={() => openPaywall('A')} />
-        )}
-
-        {MOCK_STORIES.map(item =>
-          item.listItemState === 'historical_generated' ? (
-            <GeneratedCard
-              key={item.monthKey}
-              item={item}
-              onPress={() => router.push(`/story/${item.id}`)}
+      {isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>Failed to load stories.</Text>
+          <Pressable onPress={() => storiesQ.refetch()}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {current?.listItemState === 'current_collecting' && (
+            <CollectingCard
+              data={current}
+              onAddMemory={() => router.push('/memory/add')}
             />
-          ) : (
-            <NotGeneratedCard key={item.monthKey} item={item} />
-          )
-        )}
-      </ScrollView>
+          )}
+          {current?.listItemState === 'current_in_progress' && (
+            <GeneratingCard monthKey={current.monthKey} />
+          )}
+          {current?.listItemState === 'current_quota_exhausted' && (
+            <LockedCard onUpgrade={() => openPaywall('A')} />
+          )}
+
+          {historical.map(item =>
+            item.listItemState === 'historical_generated' && item.id ? (
+              <GeneratedCard
+                key={item.monthKey}
+                item={item}
+                onPress={() => router.push(`/story/${item.id}`)}
+              />
+            ) : (
+              <NotGeneratedCard key={item.monthKey} item={item} />
+            ),
+          )}
+        </ScrollView>
+      )}
 
       <PaywallModal
         visible={paywallVisible}
@@ -342,6 +338,21 @@ const styles = StyleSheet.create({
   },
   yearPillLabelActive: {
     color: theme.text.onColor,
+  },
+
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  emptyText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
   },
 
   // Scroll

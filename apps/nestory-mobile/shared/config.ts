@@ -16,4 +16,8 @@ const devHost     = expoHostUri.split(':')[0] || 'localhost';
 export const config = {
   apiBaseUrl: dev ? `http://${devHost}:3001` : 'https://api.nestory.app',
   webBaseUrl: dev ? `http://${devHost}:3000` : 'https://web.nestory.app',
+  // EXPO_PUBLIC_* envs are inlined at build time. Both default to '' so the
+  // Supabase client can be constructed lazily and produce a clear error if missing.
+  supabaseUrl:     process.env.EXPO_PUBLIC_SUPABASE_URL     ?? '',
+  supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
 } as const;

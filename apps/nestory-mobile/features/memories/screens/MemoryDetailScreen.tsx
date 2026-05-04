@@ -1,8 +1,10 @@
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import type { Memory } from '@nestory/types';
 import { theme } from '@/shared/theme';
+import { useAsset } from '@/api';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -14,36 +16,63 @@ const PHOTO_GAP      = 12;
 const CAROUSEL_PADDING = (SCREEN_W - PHOTO_CENTER_W) / 2;
 const CAROUSEL_INIT_X  = PHOTO_SIDE_W + PHOTO_GAP;
 
-const DOTS_TOTAL = 6;
-
-// TODO: replace with real data from GET /assets/:id
-const MOCK_MEMORY = {
-  id: '1',
-  text: 'Emma laughed at the ducks at the park today. She kept pointing at them and saying "quack quack quack" over and over. I have never seen her this excited about animals before.',
-  tags: ['Playtime', 'Park', 'First Time'],
-  isHighlight: true,
-  highlightTitle: 'Emma discovers ducks at the park',
-  capturedAt: 'April 8, 2026 · 5:34 PM',
-  isEditable: true,
-};
+function formatCapturedAt(iso: string): string {
+  const d = new Date(iso);
+  const datePart = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${datePart} · ${timePart}`;
+}
 
 export function MemoryDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const memoryQ = useAsset(id ?? null);
 
   return (
     <View style={styles.root}>
-      {/* Status bar spacer */}
       <View style={{ height: insets.top, backgroundColor: theme.surface.default }} />
 
-      {/* NavBar — "Memory" title + conditional Edit button */}
+      {memoryQ.isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : memoryQ.isError || !memoryQ.data ? (
+        <View style={styles.center}>
+          <View style={styles.navBar}>
+            <Pressable hitSlop={8} onPress={() => router.back()}>
+              <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
+            </Pressable>
+            <Text style={styles.navTitle}>Memory</Text>
+            <View style={styles.navSpacer} />
+          </View>
+          <Text style={styles.errorText}>Failed to load memory.</Text>
+          <Pressable onPress={() => memoryQ.refetch()}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Body memory={memoryQ.data} />
+      )}
+
+      <View style={{ height: insets.bottom }} />
+    </View>
+  );
+}
+
+function Body({ memory }: { memory: Memory }) {
+  const router = useRouter();
+  const dotCount = memory.files.length;
+
+  return (
+    <>
       <View style={styles.navBar}>
         <Pressable hitSlop={8} onPress={() => router.back()}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Memory</Text>
-        {MOCK_MEMORY.isEditable ? (
-          <Pressable hitSlop={8} onPress={() => router.push(`/memory/${MOCK_MEMORY.id}/edit`)}>
+        {memory.isEditable ? (
+          <Pressable hitSlop={8} onPress={() => router.push(`/memory/${memory.id}/edit`)}>
             <Text style={styles.editButton}>Edit</Text>
           </Pressable>
         ) : (
@@ -51,8 +80,8 @@ export function MemoryDetailScreen() {
         )}
       </View>
 
-      {/* Read-Only Banner — historical months only (R-08) */}
-      {!MOCK_MEMORY.isEditable && (
+      {/* H-04 Read-Only Banner — historical months only (R-08) */}
+      {!memory.isEditable && (
         <View style={styles.bannerWrap}>
           <View style={styles.banner}>
             <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
@@ -68,41 +97,50 @@ export function MemoryDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Photo Carousel */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={PHOTO_CENTER_W + PHOTO_GAP}
-          decelerationRate="fast"
-          contentOffset={{ x: CAROUSEL_INIT_X, y: 0 }}
-          style={styles.carouselScroll}
-          contentContainerStyle={[
-            styles.carouselContent,
-            { paddingHorizontal: CAROUSEL_PADDING },
-          ]}
-        >
-          {/* TODO: replace with real memory photos */}
-          <View style={[styles.photoSide, { marginRight: PHOTO_GAP }]} />
-          <View style={[styles.photoCenter, { marginRight: PHOTO_GAP }]} />
-          <View style={styles.photoSide} />
-        </ScrollView>
+        {memory.files.length > 0 && (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={PHOTO_CENTER_W + PHOTO_GAP}
+              decelerationRate="fast"
+              contentOffset={{ x: memory.files.length > 1 ? CAROUSEL_INIT_X : 0, y: 0 }}
+              style={styles.carouselScroll}
+              contentContainerStyle={[
+                styles.carouselContent,
+                { paddingHorizontal: CAROUSEL_PADDING },
+              ]}
+            >
+              {memory.files.map((f, i) => (
+                <Image
+                  key={f.id}
+                  source={{ uri: f.fileUrl }}
+                  style={[
+                    styles.photoCenter,
+                    i < memory.files.length - 1 ? { marginRight: PHOTO_GAP } : null,
+                  ]}
+                />
+              ))}
+            </ScrollView>
 
-        {/* Page dots */}
-        <View style={styles.dots}>
-          {Array.from({ length: DOTS_TOTAL }).map((_, i) => (
-            <View key={i} style={i === 0 ? styles.dotActive : styles.dotInactive} />
-          ))}
-        </View>
+            {dotCount > 1 && (
+              <View style={styles.dots}>
+                {Array.from({ length: dotCount }).map((_, i) => (
+                  <View key={i} style={i === 0 ? styles.dotActive : styles.dotInactive} />
+                ))}
+              </View>
+            )}
+          </>
+        )}
 
-        {/* Body */}
         <View style={styles.body}>
-          {/* Full text note */}
-          <Text style={styles.noteText}>{MOCK_MEMORY.text}</Text>
+          {memory.textNote ? (
+            <Text style={styles.noteText}>{memory.textNote}</Text>
+          ) : null}
 
-          {/* Tags row */}
-          {MOCK_MEMORY.tags.length > 0 && (
+          {memory.tags.length > 0 && (
             <View style={styles.tagsRow}>
-              {MOCK_MEMORY.tags.map(tag => (
+              {memory.tags.map(tag => (
                 <View key={tag} style={styles.tagPill}>
                   <Text style={styles.tagLabel}>{tag}</Text>
                 </View>
@@ -110,41 +148,37 @@ export function MemoryDetailScreen() {
             </View>
           )}
 
-          {/* Highlight card — only when is_highlight=true */}
-          {MOCK_MEMORY.isHighlight && (
+          {memory.isHighlight && memory.linkedHighlight && (
             <Pressable
               style={styles.highlightCard}
-              onPress={() => router.push('/highlight/1')}
+              onPress={() => router.push(`/highlight/${memory.linkedHighlight!.id}`)}
             >
-              {/* Cover photo thumbnail */}
-              <View style={styles.highlightPhoto} />
-
-              {/* Right content */}
+              {memory.files[0] ? (
+                <Image source={{ uri: memory.files[0].fileUrl }} style={styles.highlightPhoto} />
+              ) : (
+                <View style={styles.highlightPhoto} />
+              )}
               <View style={styles.highlightBody}>
                 <View style={styles.highlightHeadingRow}>
                   <RemixIcon name="star-fill" size={20} color={theme.text.brand} />
                   <Text style={styles.highlightHeading}>Marked as a highlight</Text>
                 </View>
-                {MOCK_MEMORY.highlightTitle ? (
+                {memory.linkedHighlight.title ? (
                   <Text style={styles.highlightTitle} numberOfLines={2}>
-                    {MOCK_MEMORY.highlightTitle}
+                    {memory.linkedHighlight.title}
                   </Text>
                 ) : null}
               </View>
             </Pressable>
           )}
 
-          {/* Timestamp meta */}
           <View style={styles.metaRow}>
             <RemixIcon name="time-line" size={16} color={theme.text.secondary} />
-            <Text style={styles.metaText}>{MOCK_MEMORY.capturedAt}</Text>
+            <Text style={styles.metaText}>{formatCapturedAt(memory.capturedAt)}</Text>
           </View>
         </View>
       </ScrollView>
-
-      {/* Bottom safe area */}
-      <View style={{ height: insets.bottom }} />
-    </View>
+    </>
   );
 }
 
@@ -154,7 +188,21 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.default,
   },
 
-  // NavBar
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
+  },
+
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -174,7 +222,6 @@ const styles = StyleSheet.create({
   },
   navSpacer: { width: 40 },
 
-  // Read-Only Banner
   bannerWrap: {
     paddingHorizontal: theme.spacing.xl,
   },
@@ -195,7 +242,6 @@ const styles = StyleSheet.create({
     color: theme.text.warning,
   },
 
-  // Carousel
   carouselScroll: {
     height: PHOTO_CENTER_H,
     marginTop: theme.spacing.s,
@@ -236,7 +282,6 @@ const styles = StyleSheet.create({
     borderColor: theme.border.strong,
   },
 
-  // Scroll + Body
   scroll: { flex: 1 },
   scrollContent: {
     paddingBottom: theme.spacing.xl,
@@ -252,7 +297,6 @@ const styles = StyleSheet.create({
     color: theme.text.primary,
   },
 
-  // Tags
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -269,7 +313,6 @@ const styles = StyleSheet.create({
     color: theme.text.onColor,
   },
 
-  // Highlight card
   highlightCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -305,7 +348,6 @@ const styles = StyleSheet.create({
     color: theme.text.secondary,
   },
 
-  // Meta
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',

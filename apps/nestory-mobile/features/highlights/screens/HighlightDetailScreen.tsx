@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView, Modal, Platform,
+  ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform,
   Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View,
   useWindowDimensions,
 } from 'react-native';
@@ -8,93 +8,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import type { Highlight } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-
-// ---------- Types (mirrors @nestory/types Highlight) ----------
-
-interface HighlightDetail {
-  id: string;
-  assetId: string;
-  coverOrientation: 'portrait' | 'landscape';
-  title: string | null;
-  asset: { capturedAt: string };
-}
-
-// ---------- Mock data — replace with GET /highlights/:id ----------
-
-const MOCK_DETAILS: Record<string, HighlightDetail> = {
-  'hl-1': { id: 'hl-1', assetId: 'asset-1', coverOrientation: 'portrait',  title: 'Her First Steps!',             asset: { capturedAt: '2026-03-15T14:30:00+08:00' } },
-  'hl-2': { id: 'hl-2', assetId: 'asset-2', coverOrientation: 'landscape', title: 'Laughing at the ducks',        asset: { capturedAt: '2026-03-12T11:00:00+08:00' } },
-  'hl-3': { id: 'hl-3', assetId: 'asset-3', coverOrientation: 'portrait',  title: 'First mango — priceless face', asset: { capturedAt: '2026-03-10T09:20:00+08:00' } },
-};
-
-const FALLBACK: HighlightDetail = {
-  id: '',
-  assetId: '',
-  coverOrientation: 'portrait',
-  title: null,
-  asset: { capturedAt: new Date().toISOString() },
-};
-
-// ---------- Helpers ----------
+import { useDeleteHighlight, useHighlight, useUpdateHighlight } from '@/api';
 
 function formatFullDate(capturedAt: string): string {
-  const date = new Date(capturedAt);
-  return date.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  // → "March 15, 2026"
+  return new Date(capturedAt).toLocaleString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  });
 }
 
-// ---------- Screen ----------
+function pickCoverUrl(item: Highlight): string | null {
+  if (item.renderedImageUrl) return item.renderedImageUrl;
+  return item.asset.fileUrls[0] ?? null;
+}
 
 export function HighlightDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { width } = useWindowDimensions();
-
-  const [editVisible, setEditVisible] = useState(false);
-  const [removeVisible, setRemoveVisible] = useState(false);
-  const [draftTitle, setDraftTitle] = useState('');
-
-  // In production: fetch from GET /highlights/:id
-  const item = (id && MOCK_DETAILS[id]) ? MOCK_DETAILS[id] : FALLBACK;
-
-  const coverW = width - theme.spacing.l * 2;
-  const coverH = item.coverOrientation === 'portrait'
-    ? Math.round(coverW * 4 / 3)
-    : Math.round(coverW * 3 / 4);
-
-  const handleShare = async () => {
-    // TODO: call POST /shares to get shareUrl, then Share.share()
-    try {
-      await Share.share({ message: item.title ?? 'Highlight' });
-    } catch {
-      // user dismissed — no-op
-    }
-  };
-
-  const handleRemove = () => {
-    setRemoveVisible(true);
-  };
-
-  const handleConfirmRemove = () => {
-    setRemoveVisible(false);
-    // TODO: call DELETE /highlights/:id, then router.back()
-    router.back();
-  };
-
-  const handleOpenEdit = () => {
-    setDraftTitle(item.title ?? '');
-    setEditVisible(true);
-  };
-
-  const handleSaveTitle = () => {
-    setEditVisible(false);
-    // TODO: call PATCH /highlights/:id { title: draftTitle }
-  };
+  const highlightQ = useHighlight(id ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* NavBar */}
       <View style={styles.navBar}>
         <Pressable hitSlop={8} onPress={() => router.back()}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
@@ -103,37 +38,108 @@ export function HighlightDetailScreen() {
         <View style={styles.navSpacer} />
       </View>
 
-      {/* Scrollable body: hero + content */}
+      {highlightQ.isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : highlightQ.isError || !highlightQ.data ? (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Failed to load highlight.</Text>
+          <Pressable onPress={() => highlightQ.refetch()}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Body key={highlightQ.data.id} item={highlightQ.data} />
+      )}
+    </SafeAreaView>
+  );
+}
+
+function Body({ item }: { item: Highlight }) {
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const updateHighlight = useUpdateHighlight(item.id);
+  const deleteHighlight = useDeleteHighlight();
+
+  const [editVisible, setEditVisible]     = useState(false);
+  const [removeVisible, setRemoveVisible] = useState(false);
+  const [draftTitle, setDraftTitle]       = useState('');
+  const [actionError, setActionError]     = useState<string | null>(null);
+
+  const coverUrl = pickCoverUrl(item);
+  const coverW = width - theme.spacing.l * 2;
+  const coverH = item.coverOrientation === 'portrait'
+    ? Math.round(coverW * 4 / 3)
+    : Math.round(coverW * 3 / 4);
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: item.title ?? 'Highlight',
+        url:     coverUrl ?? undefined,
+      });
+    } catch {
+      /* user dismissed */
+    }
+  };
+
+  const handleConfirmRemove = async () => {
+    setActionError(null);
+    try {
+      await deleteHighlight.mutateAsync(item.id);
+      setRemoveVisible(false);
+      router.back();
+    } catch (e: any) {
+      setActionError(e?.message ?? 'Failed to remove highlight.');
+    }
+  };
+
+  const handleOpenEdit = () => {
+    setDraftTitle(item.title ?? '');
+    setEditVisible(true);
+  };
+
+  const handleSaveTitle = async () => {
+    setActionError(null);
+    try {
+      await updateHighlight.mutateAsync({ title: draftTitle.trim() || null });
+      setEditVisible(false);
+    } catch (e: any) {
+      setActionError(e?.message ?? 'Failed to update title.');
+    }
+  };
+
+  return (
+    <>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero — px-16, cover rounded-16, portrait 3:4 / landscape 4:3 */}
         <View style={styles.hero}>
-          {/* TODO: replace with <Image source={{ uri: item.renderedImageUrl ?? fileUrls[0] }} resizeMode="cover" style={{ width: coverW, height: coverH, borderRadius: theme.radius.l }} /> */}
-          <View style={[styles.coverPhoto, { width: coverW, height: coverH }]} />
+          {coverUrl ? (
+            <Image
+              source={{ uri: coverUrl }}
+              style={[styles.coverPhoto, { width: coverW, height: coverH }]}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.coverPhoto, { width: coverW, height: coverH }]} />
+          )}
         </View>
 
-        {/* Content — pt-12, pb-16, px-20, gap-12 */}
         <View style={styles.content}>
-          {/* Info — gap-6 */}
           <View style={styles.info}>
             <Text style={styles.dateText}>{formatFullDate(item.asset.capturedAt)}</Text>
             <View style={styles.titleRow}>
-              <Text style={styles.titleText} numberOfLines={2}>
-                {item.title ?? '—'}
-              </Text>
-              <Pressable
-                hitSlop={8}
-                onPress={handleOpenEdit}
-              >
+              <Text style={styles.titleText} numberOfLines={2}>{item.title ?? '—'}</Text>
+              <Pressable hitSlop={8} onPress={handleOpenEdit}>
                 <RemixIcon name="pencil-line" size={20} color={theme.text.secondary} />
               </Pressable>
             </View>
           </View>
 
-          {/* View original memory → */}
           <Pressable
             style={styles.viewMemoryBtn}
             onPress={() => router.push(`/memory/${item.assetId}`)}
@@ -143,8 +149,8 @@ export function HighlightDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* CTA — pt-12, pb-safeBtm, px-20, gap-8 */}
       <View style={styles.cta}>
+        {actionError && <Text style={styles.errorInline}>{actionError}</Text>}
         <Pressable
           style={({ pressed }) => [styles.shareButtonWrap, pressed && { opacity: 0.85 }]}
           onPress={handleShare}
@@ -158,7 +164,7 @@ export function HighlightDetailScreen() {
             <Text style={styles.shareButtonLabel}>Share Highlight</Text>
           </LinearGradient>
         </Pressable>
-        <Pressable style={styles.removeBtn} onPress={handleRemove}>
+        <Pressable style={styles.removeBtn} onPress={() => setRemoveVisible(true)}>
           <Text style={styles.removeLabel}>Remove Highlight</Text>
         </Pressable>
       </View>
@@ -193,10 +199,10 @@ export function HighlightDetailScreen() {
               <Pressable
                 style={({ pressed }) => [
                   styles.sheetPrimaryWrap,
-                  (!draftTitle.trim() || pressed) && { opacity: 0.5 },
+                  (!draftTitle.trim() || pressed || updateHighlight.isPending) && { opacity: 0.5 },
                 ]}
                 onPress={handleSaveTitle}
-                disabled={!draftTitle.trim()}
+                disabled={!draftTitle.trim() || updateHighlight.isPending}
               >
                 <LinearGradient
                   colors={[palette.primary[500], palette.primary[400]]}
@@ -204,7 +210,9 @@ export function HighlightDetailScreen() {
                   end={{ x: 1, y: 0 }}
                   style={styles.sheetPrimaryBtn}
                 >
-                  <Text style={styles.sheetPrimaryLabel}>Save</Text>
+                  <Text style={styles.sheetPrimaryLabel}>
+                    {updateHighlight.isPending ? 'Saving…' : 'Save'}
+                  </Text>
                 </LinearGradient>
               </Pressable>
               <Pressable style={styles.sheetTextBtn} onPress={() => setEditVisible(false)}>
@@ -233,8 +241,14 @@ export function HighlightDetailScreen() {
                   {"This will permanently delete this Highlight. You can't undo this."}
                 </Text>
               </View>
-              <Pressable style={styles.sheetDestructiveBtn} onPress={handleConfirmRemove}>
-                <Text style={styles.sheetDestructiveLabel}>Remove Highlight</Text>
+              <Pressable
+                style={[styles.sheetDestructiveBtn, deleteHighlight.isPending && { opacity: 0.5 }]}
+                onPress={handleConfirmRemove}
+                disabled={deleteHighlight.isPending}
+              >
+                <Text style={styles.sheetDestructiveLabel}>
+                  {deleteHighlight.isPending ? 'Removing…' : 'Remove Highlight'}
+                </Text>
               </Pressable>
               <Pressable style={styles.sheetTextBtn} onPress={() => setRemoveVisible(false)}>
                 <Text style={styles.sheetTextBtnLabel}>Cancel</Text>
@@ -243,19 +257,13 @@ export function HighlightDetailScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </>
   );
 }
 
-// ---------- Styles ----------
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.surface.default,
-  },
+  container: { flex: 1, backgroundColor: theme.surface.default },
 
-  // NavBar — h-56, px-24
   navBar: {
     height: 56,
     flexDirection: 'row',
@@ -263,19 +271,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.xxl,
   },
-  navTitle: {
-    ...theme.typography.h2,
-    color: theme.text.primary,
-  },
+  navTitle: { ...theme.typography.h2, color: theme.text.primary },
   navSpacer: { width: 24 },
 
-  // Scroll
-  scroll: { flex: 1 },
-  scrollContent: {
-    paddingBottom: theme.spacing.m,
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
   },
 
-  // Hero — px-16, center
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: theme.spacing.m },
+
   hero: {
     paddingHorizontal: theme.spacing.l,
     alignItems: 'center',
@@ -285,7 +301,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.border.default,
   },
 
-  // Content — pt-12, pb-16, px-20, gap-12
   content: {
     paddingTop: theme.spacing.m,
     paddingBottom: theme.spacing.l,
@@ -293,14 +308,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing.m,
   },
 
-  // Info — gap-6
-  info: {
-    gap: 6,
-  },
-  dateText: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
-  },
+  info: { gap: 6 },
+  dateText: { ...theme.typography.caption, color: theme.text.secondary },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -313,7 +322,6 @@ const styles = StyleSheet.create({
     paddingRight: theme.spacing.s,
   },
 
-  // View original memory — h-44, min-w-110, rounded-full, text.brand
   viewMemoryBtn: {
     height: 44,
     minWidth: 110,
@@ -321,17 +329,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'flex-start',
   },
-  viewMemoryLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
-  },
+  viewMemoryLabel: { ...theme.typography.buttonLabelM, color: theme.text.brand },
 
-  // CTA — pt-12, pb-safeBtm, px-20, gap-8
   cta: {
     paddingTop: theme.spacing.m,
     paddingBottom: theme.spacing.safeBtm,
     paddingHorizontal: theme.spacing.xl,
     gap: theme.spacing.s,
+  },
+  errorInline: {
+    ...theme.typography.caption,
+    color: theme.text.error,
+    textAlign: 'center',
   },
   shareButtonWrap: {
     borderRadius: theme.radius.full,
@@ -344,25 +353,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shareButtonLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
-  removeBtn: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.s,
-  },
+  shareButtonLabel: { ...theme.typography.buttonLabelM, color: theme.text.onColor },
+  removeBtn: { alignItems: 'center', paddingVertical: theme.spacing.s },
   removeLabel: {
     fontFamily: 'Manrope_500Medium',
     fontSize: 16,
     color: theme.text.error,
   },
 
-  // ---- Sheets ----
-  sheetOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -377,11 +376,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 8,
   },
-  sheetHandle: {
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  sheetHandle: { height: 28, alignItems: 'center', justifyContent: 'center' },
   sheetHandleBar: {
     width: 36,
     height: 4,
@@ -393,23 +388,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.l,
     paddingBottom: theme.spacing.safeBtm,
   },
-  sheetTitle: {
-    ...theme.typography.h2,
-    color: theme.text.primary,
-  },
-  sheetTextBlock: {
-    gap: 12,
-  },
+  sheetTitle: { ...theme.typography.h2, color: theme.text.primary },
+  sheetTextBlock: { gap: 12 },
   sheetHeadline: {
     fontFamily: 'Manrope_700Bold',
     fontSize: 28,
     lineHeight: 38,
     color: theme.text.primary,
   },
-  sheetCaption: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
-  },
+  sheetCaption: { ...theme.typography.caption, color: theme.text.secondary },
   titleInput: {
     height: 48,
     borderWidth: 1,
@@ -432,10 +419,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetPrimaryLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
+  sheetPrimaryLabel: { ...theme.typography.buttonLabelM, color: theme.text.onColor },
   sheetDestructiveBtn: {
     height: 52,
     borderRadius: theme.radius.full,
@@ -444,18 +428,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetDestructiveLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.error,
-  },
+  sheetDestructiveLabel: { ...theme.typography.buttonLabelM, color: theme.text.error },
   sheetTextBtn: {
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: theme.radius.full,
   },
-  sheetTextBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
-  },
+  sheetTextBtnLabel: { ...theme.typography.buttonLabelM, color: theme.text.brand },
 });

@@ -1,20 +1,32 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import type { LinkedProvider } from '@nestory/types';
 import { theme } from '@/shared/theme';
+import { useMe } from '@/api';
+import { setDevSession } from '@/features/auth/hooks/useSession';
+import { getSupabaseClient } from '@/features/auth/supabaseClient';
 
-// ---------- Mock data — replace with real auth context ----------
-
-const MOCK_LINKED: { provider: 'apple' | 'google'; label: string; email: string; connected: boolean }[] = [
-  { provider: 'apple',  label: 'Apple',  email: 'sarah.j@icloud.com', connected: true  },
-  { provider: 'google', label: 'Google', email: 'Not connected',       connected: false },
+const PROVIDERS: { key: 'apple' | 'google'; label: string }[] = [
+  { key: 'apple',  label: 'Apple'  },
+  { key: 'google', label: 'Google' },
 ];
-
 const PROVIDER_ICON = { apple: 'apple-fill', google: 'google-fill' } as const;
 
 export function AccountScreen() {
   const router = useRouter();
+  const meQ = useMe();
+  const qc = useQueryClient();
+
+  const handleLogOut = async () => {
+    const sb = getSupabaseClient();
+    if (sb) await sb.auth.signOut();
+    setDevSession(null);
+    qc.clear();
+    router.replace('/onboarding/auth');
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -27,44 +39,61 @@ export function AccountScreen() {
       </View>
 
       <View style={styles.body}>
-        {/* LINKED ACCOUNTS section label */}
         <View style={styles.sectionLabelWrap}>
           <Text style={styles.sectionLabel}>LINKED ACCOUNTS</Text>
         </View>
 
-        {/* Linked accounts card */}
-        <View style={styles.card}>
-          {MOCK_LINKED.map((acct, i) => (
-            <View key={acct.provider}>
-              {i > 0 && <View style={styles.divider} />}
-              <View style={styles.row}>
-                <RemixIcon
-                  name={PROVIDER_ICON[acct.provider]}
-                  size={24}
-                  color={theme.text.primary}
-                />
-                <View style={styles.col}>
-                  <Text style={[styles.acctLabel, !acct.connected && { color: theme.text.secondary }]}>
-                    {acct.label}
-                  </Text>
-                  <Text style={styles.acctEmail}>{acct.email}</Text>
-                </View>
-                {acct.connected && (
-                  <View style={styles.connectedBadge}>
-                    <Text style={styles.connectedBadgeLabel}>Connected</Text>
-                  </View>
-                )}
-              </View>
+        {meQ.isLoading ? (
+          <View style={styles.card}>
+            <View style={styles.row}><ActivityIndicator color={theme.text.brand} /></View>
+          </View>
+        ) : meQ.isError || !meQ.data ? (
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Text style={[styles.acctEmail, { flex: 1 }]}>Failed to load.</Text>
+              <Pressable onPress={() => meQ.refetch()}>
+                <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
             </View>
-          ))}
-        </View>
+          </View>
+        ) : (
+          <View style={styles.card}>
+            {PROVIDERS.map((p, i) => {
+              const linked: LinkedProvider | undefined =
+                meQ.data!.linkedProviders.find(lp => lp.provider === p.key);
+              return (
+                <View key={p.key}>
+                  {i > 0 && <View style={styles.divider} />}
+                  <View style={styles.row}>
+                    <RemixIcon
+                      name={PROVIDER_ICON[p.key]}
+                      size={24}
+                      color={theme.text.primary}
+                    />
+                    <View style={styles.col}>
+                      <Text style={[styles.acctLabel, !linked && { color: theme.text.secondary }]}>
+                        {p.label}
+                      </Text>
+                      <Text style={styles.acctEmail}>
+                        {linked
+                          ? (linked.providerEmail ?? 'Email hidden')
+                          : 'Not connected'}
+                      </Text>
+                    </View>
+                    {linked && (
+                      <View style={styles.connectedBadge}>
+                        <Text style={styles.connectedBadgeLabel}>Connected</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
-        {/* Actions card */}
         <View style={styles.card}>
-          <Pressable
-            style={styles.row}
-            onPress={() => { /* TODO: sign out via auth provider, clear session, navigate to onboarding */ }}
-          >
+          <Pressable style={styles.row} onPress={handleLogOut}>
             <RemixIcon name="logout-box-r-line" size={20} color={theme.text.primary} />
             <Text style={[styles.acctLabel, { flex: 1 }]}>Log Out</Text>
             <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
@@ -72,7 +101,7 @@ export function AccountScreen() {
           <View style={styles.divider} />
           <Pressable
             style={styles.row}
-            onPress={() => { /* TODO: confirm dialog → DELETE /account */ }}
+            onPress={() => { /* TODO: confirm dialog → DELETE /users/me */ }}
           >
             <RemixIcon name="delete-bin-line" size={20} color={theme.text.error} />
             <Text style={[styles.acctLabel, { color: theme.text.error, flex: 1 }]}>Delete Account</Text>
@@ -126,6 +155,10 @@ const styles = StyleSheet.create({
   col: { flex: 1, gap: 2 },
   acctLabel: { ...theme.typography.h4, color: theme.text.primary },
   acctEmail: { ...theme.typography.caption, color: theme.text.secondary },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
+  },
 
   connectedBadge: {
     backgroundColor: theme.surface.successSubtle,

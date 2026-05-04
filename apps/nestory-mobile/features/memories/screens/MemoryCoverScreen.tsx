@@ -1,65 +1,120 @@
-import { useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme } from '@/shared/theme';
+import { useAsset, useHighlight, useUpdateHighlight } from '@/api';
 
-// TODO: receive real photo URIs via route params or shared state
-const MOCK_PHOTOS = [
-  'https://via.placeholder.com/300',
-  'https://via.placeholder.com/300',
-  'https://via.placeholder.com/300',
-  'https://via.placeholder.com/300',
-];
+const CELL_SIZE = 170;
 
 export function MemoryCoverScreen() {
   const router = useRouter();
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const { highlightId, assetId } = useLocalSearchParams<{
+    highlightId?: string;
+    assetId?:     string;
+  }>();
+  const highlightQ    = useHighlight(highlightId ?? null);
+  const assetQ        = useAsset(assetId ?? null);
+  const updateHighlight = useUpdateHighlight(highlightId ?? '');
+
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+
+  // Pre-select whatever the highlight already points at; fall back to the first file.
+  useEffect(() => {
+    if (selectedFileId) return;
+    const initial = highlightQ.data?.coverFileId ?? assetQ.data?.files[0]?.id ?? null;
+    if (initial) setSelectedFileId(initial);
+  }, [highlightQ.data?.coverFileId, assetQ.data, selectedFileId]);
+
+  const handleDone = async () => {
+    if (!highlightId || !selectedFileId) {
+      router.back();
+      return;
+    }
+    if (selectedFileId === highlightQ.data?.coverFileId) {
+      router.back();
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await updateHighlight.mutateAsync({ coverFileId: selectedFileId });
+      router.back();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to update cover.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isLoading = highlightQ.isLoading || assetQ.isLoading;
+  const isError   = highlightQ.isError || assetQ.isError;
+  const files     = assetQ.data?.files ?? [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* NavBar */}
       <View style={styles.navBar}>
         <Pressable hitSlop={8} onPress={() => router.back()}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Cover Photo</Text>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
-          <Text style={styles.doneBtn}>Done</Text>
+        <Pressable hitSlop={8} onPress={handleDone} disabled={saving}>
+          <Text style={[styles.doneBtn, saving && { opacity: 0.5 }]}>
+            {saving ? 'Saving…' : 'Done'}
+          </Text>
         </Pressable>
       </View>
 
-      <Text style={styles.subtitle}>Choose which photo appears on the highlight card.</Text>
-
-      <FlatList
-        data={MOCK_PHOTOS}
-        keyExtractor={(_, i) => String(i)}
-        numColumns={2}
-        contentContainerStyle={styles.grid}
-        columnWrapperStyle={styles.row}
-        renderItem={({ item, index }) => {
-          const isSelected = index === selectedIndex;
-          return (
-            <Pressable
-              style={[styles.cell, isSelected && styles.cellSelected]}
-              onPress={() => setSelectedIndex(index)}
-            >
-              <Image source={{ uri: item }} style={styles.thumb} />
-              {isSelected && (
-                <View style={styles.checkBadge}>
-                  <RemixIcon name="check-line" size={16} color={theme.text.onColor} />
-                </View>
-              )}
-            </Pressable>
-          );
-        }}
-      />
+      {!highlightId || !assetId ? (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Missing highlight context.</Text>
+        </View>
+      ) : isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Failed to load photos.</Text>
+          <Pressable onPress={() => { highlightQ.refetch(); assetQ.refetch(); }}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.subtitle}>Choose which photo appears on the highlight card.</Text>
+          {error && <Text style={styles.errorInline}>{error}</Text>}
+          <FlatList
+            data={files}
+            keyExtractor={f => f.id}
+            numColumns={2}
+            contentContainerStyle={styles.grid}
+            columnWrapperStyle={styles.row}
+            renderItem={({ item }) => {
+              const isSelected = item.id === selectedFileId;
+              return (
+                <Pressable
+                  style={[styles.cell, isSelected && styles.cellSelected]}
+                  onPress={() => setSelectedFileId(item.id)}
+                >
+                  <Image source={{ uri: item.fileUrl }} style={styles.thumb} />
+                  {isSelected && (
+                    <View style={styles.checkBadge}>
+                      <RemixIcon name="check-line" size={16} color={theme.text.onColor} />
+                    </View>
+                  )}
+                </Pressable>
+              );
+            }}
+          />
+        </>
+      )}
     </SafeAreaView>
   );
 }
-
-const CELL_SIZE = 170;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
@@ -77,6 +132,26 @@ const styles = StyleSheet.create({
     color: theme.text.secondary,
     paddingHorizontal: theme.spacing.xl,
     paddingBottom: theme.spacing.l,
+  },
+  errorInline: {
+    ...theme.typography.caption,
+    color: theme.text.error,
+    paddingHorizontal: theme.spacing.xl,
+    paddingBottom: theme.spacing.s,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
   },
   grid: {
     paddingHorizontal: theme.spacing.xl,

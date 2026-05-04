@@ -1,37 +1,47 @@
 import { useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import type { Child, ChildGender, ChildPatch } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
+import { useChild, useUpdateChild, uploadPhoto } from '@/api';
+import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 
-// ---------- Types ----------
+type UnitSystem = 'metric' | 'imperial';
 
-type Gender = 'girl' | 'boy' | 'prefer_not_to_say';
+const GENDERS: { key: ChildGender; label: string }[] = [
+  { key: 'girl',              label: 'Girl'              },
+  { key: 'boy',               label: 'Boy'               },
+  { key: 'prefer_not_to_say', label: 'Prefer not to say' },
+];
 
-// ---------- Mock data — replace with GET /children/:id ----------
-
-const MOCK_PROFILE = {
-  id: 'child-1',
-  name: 'Emma',
-  dob: 'Mar 15, 2025',
-  gender: 'girl' as Gender,
-  heightCm: '75',
-  weightKg: '20',
-};
+function formatBirthDate(birthDate: string): string {
+  return new Date(birthDate).toLocaleDateString('en-US', {
+    month: 'short',
+    day:   'numeric',
+    year:  'numeric',
+  });
+}
 
 // ---------- Unit input ----------
 
 function UnitInput({
   value,
-  unit,
   onChangeText,
+  metricUnit,
+  imperialUnit,
+  system,
+  onToggle,
 }: {
   value: string;
-  unit: string;
   onChangeText: (v: string) => void;
+  metricUnit: string;
+  imperialUnit: string;
+  system: UnitSystem;
+  onToggle: () => void;
 }) {
   return (
     <View style={styles.unitRow}>
@@ -42,40 +52,23 @@ function UnitInput({
         keyboardType="numeric"
         returnKeyType="done"
       />
-      <Pressable
-        style={styles.unitPill}
-        onPress={() => { /* TODO: unit toggle cm↔in or kg↔lb */ }}
-      >
-        <Text style={styles.unitPillLabel}>{unit}</Text>
+      <Pressable style={styles.unitPill} onPress={onToggle}>
+        <Text style={styles.unitPillLabel}>{system === 'metric' ? metricUnit : imperialUnit}</Text>
         <RemixIcon name="arrow-up-down-line" size={16} color={theme.text.brand} />
       </Pressable>
     </View>
   );
 }
 
-// ---------- Screen ----------
+// ---------- Wrapper ----------
 
 export function ChildProfileEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const pickPhoto = usePhotoPicker();
-
-  // In production: fetch from GET /children/:id
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const [name,    setName]    = useState(MOCK_PROFILE.name);
-  const [gender,  setGender]  = useState<Gender>(MOCK_PROFILE.gender);
-  const [height,  setHeight]  = useState(MOCK_PROFILE.heightCm);
-  const [weight,  setWeight]  = useState(MOCK_PROFILE.weightKg);
-
-  const GENDERS: { key: Gender; label: string }[] = [
-    { key: 'girl',             label: 'Girl'            },
-    { key: 'boy',              label: 'Boy'             },
-    { key: 'prefer_not_to_say', label: 'Prefer not to say' },
-  ];
+  const childQ = useChild(id ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* NavBar */}
       <View style={styles.navBar}>
         <Pressable hitSlop={8} onPress={() => router.back()}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
@@ -84,6 +77,81 @@ export function ChildProfileEditScreen() {
         <View style={styles.navSpacer} />
       </View>
 
+      {childQ.isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : childQ.isError || !childQ.data ? (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Failed to load profile.</Text>
+          <Pressable onPress={() => childQ.refetch()}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        // key forces fresh state when navigating between siblings
+        <EditForm key={childQ.data.id} child={childQ.data} />
+      )}
+    </SafeAreaView>
+  );
+}
+
+// ---------- Form (mounted only after child loads) ----------
+
+function EditForm({ child }: { child: Child }) {
+  const router = useRouter();
+  const updateChild = useUpdateChild(child.id);
+  const pickPhoto = usePhotoPicker();
+
+  const [avatarPhoto, setAvatarPhoto] = useState<PickedPhoto | null>(null);
+  const [name,    setName]    = useState(child.name);
+  const [gender,  setGender]  = useState<ChildGender | null>(child.gender);
+
+  const heightState = useHeightState({
+    initialValue: child.heightValue ?? null,
+    initialUnit:  child.heightUnit  ?? null,
+  });
+
+  const [weight,  setWeight]  = useState(child.weightValue?.toString() ?? '');
+  const [weightSystem, setWeightSystem] = useState<UnitSystem>(
+    child.weightUnit === 'lb' ? 'imperial' : 'metric',
+  );
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    if (updateChild.isPending) return;
+    if (!name.trim()) {
+      setSaveError('Name cannot be empty.');
+      return;
+    }
+    setSaveError(null);
+
+    const weightNum = parseFloat(weight);
+
+    try {
+      const avatarUrl = avatarPhoto
+        ? (await uploadPhoto(avatarPhoto, 'avatars')).fileUrl
+        : undefined;
+
+      const body: ChildPatch = {
+        name: name.trim(),
+        ...(gender ? { gender } : {}),
+        ...(avatarUrl ? { avatarUrl } : {}),
+        ...(heightState.resolve() ?? {}),
+        ...(Number.isFinite(weightNum) && weightNum > 0
+          ? { weightValue: weightNum, weightUnit: weightSystem === 'metric' ? 'kg' : 'lb' }
+          : {}),
+      };
+
+      await updateChild.mutateAsync(body);
+      router.back();
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to save changes.');
+    }
+  };
+
+  return (
+    <>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.body}
@@ -93,15 +161,17 @@ export function ChildProfileEditScreen() {
         {/* Photo area */}
         <View style={styles.photoArea}>
           <View style={styles.avatarCircle}>
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            {avatarPhoto ? (
+              <Image source={{ uri: avatarPhoto.uri }} style={styles.avatarImage} />
+            ) : child.avatarUrl ? (
+              <Image source={{ uri: child.avatarUrl }} style={styles.avatarImage} />
             ) : (
               <RemixIcon name="user-5-line" size={60} color={theme.text.onColor} />
             )}
           </View>
           <Pressable onPress={async () => {
             const picked = await pickPhoto();
-            const first = picked[0]; if (first) setAvatarUri(first.uri);
+            const first = picked[0]; if (first) setAvatarPhoto(first);
           }}>
             <Text style={styles.tapToChange}>Tap to change</Text>
           </Pressable>
@@ -120,7 +190,7 @@ export function ChildProfileEditScreen() {
         {/* DOB (read-only) + contact note */}
         <View style={styles.dobGroup}>
           <View style={[styles.input, styles.inputDisabled]}>
-            <Text style={styles.inputDisabledText}>{MOCK_PROFILE.dob}</Text>
+            <Text style={styles.inputDisabledText}>{formatBirthDate(child.birthDate)}</Text>
           </View>
           <View style={styles.dobNote}>
             <RemixIcon name="information-line" size={16} color={theme.text.secondary} />
@@ -158,21 +228,38 @@ export function ChildProfileEditScreen() {
         {/* Height */}
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Height</Text>
-          <UnitInput value={height} unit="cm" onChangeText={setHeight} />
+          <HeightInput
+            system={heightState.system}
+            cm={heightState.cm}
+            ft={heightState.ft}
+            inches={heightState.inches}
+            onChangeCm={heightState.setCm}
+            onChangeFt={heightState.setFt}
+            onChangeInches={heightState.setInches}
+            onToggle={heightState.toggle}
+          />
         </View>
 
         {/* Weight */}
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Weight</Text>
-          <UnitInput value={weight} unit="kg" onChangeText={setWeight} />
+          <UnitInput
+            value={weight}
+            onChangeText={setWeight}
+            metricUnit="kg"
+            imperialUnit="lb"
+            system={weightSystem}
+            onToggle={() => setWeightSystem(u => (u === 'metric' ? 'imperial' : 'metric'))}
+          />
         </View>
       </ScrollView>
 
       {/* CTA */}
       <View style={styles.cta}>
+        {saveError && <Text style={styles.errorInline}>{saveError}</Text>}
         <Pressable
           style={({ pressed }) => [styles.saveBtnWrap, pressed && { opacity: 0.85 }]}
-          onPress={() => { /* TODO: PATCH /children/:id then router.back() */ }}
+          onPress={handleSave}
         >
           <LinearGradient
             colors={[palette.primary[500], palette.primary[400]]}
@@ -180,11 +267,13 @@ export function ChildProfileEditScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.saveBtn}
           >
-            <Text style={styles.saveBtnLabel}>Save Changes</Text>
+            <Text style={styles.saveBtnLabel}>
+              {updateChild.isPending ? 'Saving…' : 'Save Changes'}
+            </Text>
           </LinearGradient>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </>
   );
 }
 
@@ -201,6 +290,21 @@ const styles = StyleSheet.create({
   },
   navTitle:  { ...theme.typography.h2, color: theme.text.primary },
   navSpacer: { width: 24 },
+
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
+  },
 
   scroll: { flex: 1 },
   body: {
@@ -325,6 +429,12 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.m,
     paddingBottom: theme.spacing.safeBtm,
     paddingHorizontal: theme.spacing.xl,
+    gap: theme.spacing.xs,
+  },
+  errorInline: {
+    ...theme.typography.caption,
+    color: theme.text.error,
+    textAlign: 'center',
   },
   saveBtnWrap: {
     borderRadius: theme.radius.full,

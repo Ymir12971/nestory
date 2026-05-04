@@ -50,6 +50,7 @@ const trashQuery = cursorPagination.extend({
 function serializeMemory(row: any): Memory {
   return {
     id:            row.id,
+    childId:       row.childId,
     assetType:     row.assetType,
     files:         row.files.map((f: any): MemoryFile => ({
       id:           f.id,

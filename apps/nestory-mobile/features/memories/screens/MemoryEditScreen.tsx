@@ -1,52 +1,34 @@
-import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import type { Memory, MemoryFile } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
+import { PaywallModal } from '@/shared/components/PaywallModal';
+import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
+import {
+  ApiClientError,
+  uploadPhoto,
+  useAsset,
+  useCreateHighlight,
+  useDeleteAsset,
+  useDeleteHighlight,
+  useUpdateAsset,
+} from '@/api';
 
-// TODO: derive from GET /assets/:id — pre-fill real data
-const MOCK_EDIT_DATA = {
-  noteText: 'Emma laughed at the ducks at the park today. She kept pointing at them and saying "quack quack" over and over.',
-  photos: ['placeholder_1', 'placeholder_2'],
-  tags: 'Playtime +2',
-  date: 'Apr 8, 2026',
-  isHighlight: true,
-};
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export function MemoryEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const pickPhotos = usePhotoPicker({ multiple: true });
-
-  const [noteText, setNoteText]       = useState(MOCK_EDIT_DATA.noteText);
-  const [isHighlight, setIsHighlight] = useState(MOCK_EDIT_DATA.isHighlight);
-  const [photos, setPhotos]           = useState<string[]>(MOCK_EDIT_DATA.photos);
-
-  const handleAddPhoto = async () => {
-    const picked = await pickPhotos();
-    if (picked.length > 0) setPhotos(prev => [...prev, ...picked.map(p => p.uri)]);
-  };
-
-  const handleRemovePhoto = (index: number) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSave = () => {
-    // TODO: call PATCH /assets/:id with updated fields
-    router.back();
-  };
-
-  const handleDelete = () => {
-    // TODO: call DELETE /assets/:id, then navigate to memory list
-    router.back();
-  };
+  const memoryQ = useAsset(id ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* NavBar */}
       <View style={styles.navBar}>
         <Pressable hitSlop={8} onPress={() => router.back()}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
@@ -55,25 +37,161 @@ export function MemoryEditScreen() {
         <View style={styles.navSpacer} />
       </View>
 
+      {memoryQ.isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : memoryQ.isError || !memoryQ.data ? (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Failed to load memory.</Text>
+          <Pressable onPress={() => memoryQ.refetch()}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <EditForm key={memoryQ.data.id} memory={memoryQ.data} />
+      )}
+    </SafeAreaView>
+  );
+}
+
+function EditForm({ memory }: { memory: Memory }) {
+  const router = useRouter();
+  const updateAsset     = useUpdateAsset(memory.id);
+  const deleteAsset     = useDeleteAsset();
+  const createHighlight = useCreateHighlight();
+  const deleteHighlight = useDeleteHighlight();
+  const pickPhotos      = usePhotoPicker({ multiple: true });
+
+  const [noteText, setNoteText]               = useState(memory.textNote ?? '');
+  const [removedFileIds, setRemovedFileIds]   = useState<Set<string>>(new Set());
+  const [newPhotos, setNewPhotos]             = useState<PickedPhoto[]>([]);
+  // is_highlight has its own quota-checked endpoint (POST /highlights); PATCH /assets ignores it.
+  const [isHighlight, setIsHighlight] = useState(memory.isHighlight);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving]       = useState(false);
+  const [deleting, setDeleting]   = useState(false);
+
+  const remainingFiles = useMemo(
+    () => memory.files.filter(f => !removedFileIds.has(f.id)),
+    [memory.files, removedFileIds],
+  );
+  const totalPhotos = remainingFiles.length + newPhotos.length;
+
+  const handleAddPhoto = async () => {
+    const picked = await pickPhotos();
+    if (picked.length > 0) setNewPhotos(prev => [...prev, ...picked]);
+  };
+
+  const handleRemoveExisting = (file: MemoryFile) => {
+    setRemovedFileIds(prev => {
+      const next = new Set(prev);
+      next.add(file.id);
+      return next;
+    });
+  };
+
+  const handleRemoveNew = (index: number) => {
+    setNewPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    if (totalPhotos === 0 && noteText.trim().length === 0) {
+      setSaveError('Add a photo or note before saving.');
+      return;
+    }
+    setSaveError(null);
+    setSaving(true);
+    try {
+      const uploaded = newPhotos.length > 0
+        ? await Promise.all(newPhotos.map(p => uploadPhoto(p, 'memories')))
+        : [];
+
+      const updated = await updateAsset.mutateAsync({
+        textNote: noteText.trim(),
+        ...(uploaded.length > 0      ? { addFiles:      uploaded } : {}),
+        ...(removedFileIds.size > 0  ? { removeFileIds: [...removedFileIds] } : {}),
+      });
+
+      // Sync highlight toggle separately (POST /highlights or DELETE /highlights/:id).
+      if (isHighlight && !memory.isHighlight) {
+        const coverFileId = updated.files.length > 1 ? updated.files[0]?.id : undefined;
+        try {
+          await createHighlight.mutateAsync({
+            assetId: updated.id,
+            childId: updated.childId,
+            ...(coverFileId ? { coverFileId } : {}),
+          });
+        } catch (hlErr) {
+          if (hlErr instanceof ApiClientError && hlErr.code === 'HIGHLIGHT_LIMIT_REACHED') {
+            setPaywallVisible(true);
+            setSaveError('Highlight limit reached. Memory saved without highlight.');
+            return;
+          }
+          throw hlErr;
+        }
+      } else if (!isHighlight && memory.isHighlight && memory.linkedHighlight) {
+        await deleteHighlight.mutateAsync(memory.linkedHighlight.id);
+      }
+
+      router.back();
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to save changes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    setSaveError(null);
+    setDeleting(true);
+    try {
+      await deleteAsset.mutateAsync({ id: memory.id, hard: true });
+      // Detail page is now stale; pop both detail+edit so user lands on list.
+      router.dismissAll();
+      router.replace('/memory/list');
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to delete memory.');
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Photo Strip */}
+        {/* Photo Strip — existing files first, then newly picked */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.photoStrip}
         >
-          {photos.map((uri, i) => (
-            <View key={uri} style={styles.photoThumbWrap}>
-              <Image source={{ uri }} style={styles.photoThumbImg} />
+          {remainingFiles.map(f => (
+            <View key={f.id} style={styles.photoThumbWrap}>
+              <Image source={{ uri: f.fileUrl }} style={styles.photoThumbImg} />
               <Pressable
                 style={styles.deleteBadge}
                 hitSlop={6}
-                onPress={() => handleRemovePhoto(i)}
+                onPress={() => handleRemoveExisting(f)}
+              >
+                <RemixIcon name="close-line" size={12} color={theme.text.onColor} />
+              </Pressable>
+            </View>
+          ))}
+          {newPhotos.map((p, i) => (
+            <View key={`new-${p.uri}`} style={styles.photoThumbWrap}>
+              <Image source={{ uri: p.uri }} style={styles.photoThumbImg} />
+              <Pressable
+                style={styles.deleteBadge}
+                hitSlop={6}
+                onPress={() => handleRemoveNew(i)}
               >
                 <RemixIcon name="close-line" size={12} color={theme.text.onColor} />
               </Pressable>
@@ -98,28 +216,32 @@ export function MemoryEditScreen() {
         {/* Details List */}
         <View style={styles.detailsList}>
           {/* Tags */}
-          <Pressable style={styles.detailRow} onPress={() => router.push('/memory/tags')}>
+          <Pressable
+            style={styles.detailRow}
+            onPress={() => router.push(`/memory/tags?memoryId=${memory.id}`)}
+          >
             <Text style={styles.detailLabel}>Tags</Text>
             <View style={styles.detailRight}>
-              <Text style={styles.detailValue}>{MOCK_EDIT_DATA.tags}</Text>
+              <Text style={styles.detailValue}>
+                {memory.tags.length > 0
+                  ? `${memory.tags[0]}${memory.tags.length > 1 ? ` +${memory.tags.length - 1}` : ''}`
+                  : 'None'}
+              </Text>
               <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
             </View>
           </Pressable>
 
           <View style={styles.rowDivider} />
 
-          {/* Date */}
-          <Pressable style={styles.detailRow} onPress={() => router.push('/memory/date')}>
+          {/* Date — read-only here; capture date is fixed at create */}
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date</Text>
-            <View style={styles.detailRight}>
-              <Text style={styles.detailValue}>{MOCK_EDIT_DATA.date}</Text>
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-            </View>
-          </Pressable>
+            <Text style={styles.detailValue}>{formatDate(memory.capturedAt)}</Text>
+          </View>
 
           <View style={styles.rowDivider} />
 
-          {/* Highlight toggle */}
+          {/* Highlight toggle — UI only; persistence goes through POST /highlights with quota check */}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Mark as Highlight</Text>
             <Switch
@@ -130,11 +252,15 @@ export function MemoryEditScreen() {
             />
           </View>
 
-          {/* Cover photo sub-row — visible when highlight on + ≥2 photos */}
-          {isHighlight && photos.length >= 2 && (
+          {isHighlight && totalPhotos >= 2 && memory.linkedHighlight && (
             <>
               <View style={styles.rowDivider} />
-              <Pressable style={styles.detailRow} onPress={() => router.push('/memory/cover')}>
+              <Pressable
+                style={styles.detailRow}
+                onPress={() => router.push(
+                  `/memory/cover?highlightId=${memory.linkedHighlight!.id}&assetId=${memory.id}`,
+                )}
+              >
                 <Text style={styles.detailLabelBrand}>Change cover photo</Text>
                 <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
               </Pressable>
@@ -145,9 +271,11 @@ export function MemoryEditScreen() {
 
       {/* CTA */}
       <View style={styles.cta}>
+        {saveError && <Text style={styles.errorInline}>{saveError}</Text>}
         <Pressable
-          style={({ pressed }) => [styles.saveWrap, pressed && { opacity: 0.88 }]}
+          style={({ pressed }) => [styles.saveWrap, pressed && !saving && { opacity: 0.88 }]}
           onPress={handleSave}
+          disabled={saving || deleting}
         >
           <LinearGradient
             colors={[palette.primary[500], palette.primary[400]]}
@@ -155,14 +283,23 @@ export function MemoryEditScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.saveBtn}
           >
-            <Text style={styles.saveBtnLabel}>Save Changes</Text>
+            <Text style={styles.saveBtnLabel}>{saving ? 'Saving…' : 'Save Changes'}</Text>
           </LinearGradient>
         </Pressable>
-        <Pressable style={styles.deleteBtn} onPress={handleDelete}>
-          <Text style={styles.deleteBtnLabel}>Delete Memory</Text>
+        <Pressable style={styles.deleteBtn} onPress={handleDelete} disabled={saving || deleting}>
+          <Text style={styles.deleteBtnLabel}>
+            {deleting ? 'Deleting…' : 'Delete Memory'}
+          </Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+
+      <PaywallModal
+        visible={paywallVisible}
+        variant="B"
+        onSubscribe={() => setPaywallVisible(false)}
+        onDismiss={() => setPaywallVisible(false)}
+      />
+    </>
   );
 }
 
@@ -174,7 +311,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.default,
   },
 
-  // NavBar
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -190,7 +326,21 @@ const styles = StyleSheet.create({
     width: 24,
   },
 
-  // Scroll
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
+  },
+
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: theme.spacing.xl,
@@ -198,7 +348,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.l,
   },
 
-  // Photo strip
   photoStrip: {
     gap: theme.spacing.s,
     paddingVertical: theme.spacing.s,
@@ -236,7 +385,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Note input
   noteInput: {
     height: 160,
     backgroundColor: theme.surface.card,
@@ -249,7 +397,6 @@ const styles = StyleSheet.create({
     color: theme.text.primary,
   },
 
-  // Details list
   detailsList: {
     backgroundColor: theme.surface.card,
     borderWidth: 1,
@@ -288,13 +435,17 @@ const styles = StyleSheet.create({
     color: theme.text.secondary,
   },
 
-  // CTA
   cta: {
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.m,
     paddingBottom: theme.spacing.safeBtm,
     gap: theme.spacing.s,
     alignItems: 'center',
+  },
+  errorInline: {
+    ...theme.typography.caption,
+    color: theme.text.error,
+    textAlign: 'center',
   },
   saveWrap: {
     width: '100%',

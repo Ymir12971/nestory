@@ -17,6 +17,7 @@ export interface MemoryFile {
 // GET /assets response item / POST /assets response
 export interface Memory {
   id: string;
+  childId: string;          // which child this memory belongs to
   assetType: AssetType;
   files: MemoryFile[];      // empty array for text-only memories
   textNote: string | null;

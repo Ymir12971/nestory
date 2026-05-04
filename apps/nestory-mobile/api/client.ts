@@ -19,22 +19,29 @@ export class ApiClientError extends Error {
 
 // ---------- Auth token ----------
 
+import { getSupabaseClient } from '@/features/auth/supabaseClient';
+
 /**
- * 获取 Bearer token。
- * 决策 4-6 之前还没接 Supabase Auth；dev 模式下走"dev-<userId>"约定。
- *
- * TODO: 接 Supabase Auth 后改为读真实 JWT。
+ * 获取 Bearer token。优先级：
+ *   1. 当前 Supabase session 的 access_token（真实 OAuth 登录后）
+ *   2. dev session（SignInScreen 的兜底登录，仅 __DEV__）— 走 'dev-<userId>'
+ *      约定，后端 auth.ts 在 NODE_ENV !== 'production' 时直接信任
  */
-let _devUserId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'; // 占位 UUID
+let _devUserId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'; // seed user 占位
 
 export function setDevUserId(id: string) {
   _devUserId = id;
 }
 
 async function getAuthToken(): Promise<string> {
+  const sb = getSupabaseClient();
+  if (sb) {
+    const { data } = await sb.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) return token;
+  }
   if (__DEV__) return `dev-${_devUserId}`;
-  // TODO: prod — Supabase getSession().access_token
-  throw new Error('Auth not yet wired for production');
+  throw new Error('Not signed in');
 }
 
 // ---------- Core fetch ----------

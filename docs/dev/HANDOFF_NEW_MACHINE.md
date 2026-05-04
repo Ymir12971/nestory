@@ -1,8 +1,78 @@
 # Nestory — 换机器交接说明
 
 **生成日期**：2026-04-30
-**最近更新**：2026-05-01（mobile 审计修复 + API 决策与骨架 + endpoint 实现 + mobile API client）
+**最近更新**：2026-05-03(本地端到端联调 — DB 接通,API 跑通,mobile bundle 受阻)
 **用途**：在另一台机器上恢复 Claude Code 协作上下文
+
+---
+
+## 0. 2026-05-03 更新摘要(最新)
+
+今天目标:**本地端到端跑通**(P0 — 不依赖 Apple/Google 注册的部分)。完成度大约 70%,mobile bundle 卡在 monorepo + Metro 配置。
+
+### ✅ 已完成
+
+1. **Supabase DB 真接通**(项目 ref `ovggqeaxqkaybrgnzfwh`)
+   - 12 张表全部 migrate 上去(在 [apps/nestory-api/prisma/migrations/20260503000000_init/](../../apps/nestory-api/prisma/migrations/20260503000000_init/))
+   - `post-init.sql` 应用完成(部分索引 + GIN + Realtime publication)
+   - seed 数据写入(Demo User + Emma 子档案 + 订阅 free 状态)
+2. **API 实跑通过**:`GET /health` 200 + `GET /subscriptions/me`(带 `Bearer dev-aaaaaaaa-...`)真实返回 seed 数据 = 整个 dev-token → Prisma → Supabase 链路 OK
+3. **连接串结构调整**:`schema.prisma` 加 `directUrl`,`env.ts` 加 `DIRECT_URL`,`.env.example` 注释清晰说明 dev/prod 策略(dev 两根都填直连;prod Railway 时把 `DATABASE_URL` 换 pooler)
+4. **架构决策更新到 memory**:
+   - `project_deployment_decisions.md` — 改为"现阶段单 Supabase 项目,prod 项目 TestFlight 前一周再建"
+   - 新增 `project_external_account_schedule.md` — Apple Dev / Google Play 注册推迟到 2026-05-10 那周
+
+### 🟠 阻塞中(明天首要解决)
+
+**Mobile Web bundle 启不来**。两阶段问题:
+
+**阶段 1**(已修):"Objects are not valid as a React child" — 监控错误 element 里的 `_store` key 是 React 18 internal,但 React 19 已删,说明 monorepo 里 `apps/nestory-web`(Next 15 + React 19) 的 React 19 通过 Metro 默认 hierarchical lookup 漏到了 mobile bundle。修复:新建 [apps/nestory-mobile/metro.config.js](../../apps/nestory-mobile/metro.config.js),设 `disableHierarchicalLookup: true` + 显式 `nodeModulesPaths`。
+
+**阶段 2**(未修):重启 Metro 清 cache 后,新 config 太严格,反过来解析不到 expo 自己的依赖:
+```
+Unable to resolve "react-native-helmet-async" from
+  node_modules/.pnpm/expo-router@4.0.22_.../node_modules/expo-router/build/head/ExpoHead.js
+Unable to resolve "expo-modules-core" from
+  node_modules/.pnpm/expo@52.0.49_.../node_modules/expo/src/Expo.ts
+```
+
+这俩在 monorepo 里都装着(分别是 expo-router 和 expo 的 transitive dep),只是 metro.config.js 的解析策略漏掉了。**明天的修法**(按可能性排序):
+
+1. 加 `extraNodeModules` 显式映射这俩(读 pnpm 的 .pnpm/<pkg>@<ver>/node_modules)
+2. 改用 [pnpm 官方推荐的 `expo-yarn-workspaces` 风格 metro 配置](https://docs.expo.dev/guides/monorepos/) — 但 Expo 官方 doc 主要给 yarn,pnpm 要适配
+3. 退而求其次:`hoist-pattern[]=*` 加进 `.npmrc` 把 React/Expo 关键包提到根 node_modules,绕过 pnpm 隔离 — 不优雅但能跑
+
+**具体复现命令**(明天换机后用):
+```bash
+cd apps/nestory-mobile
+pnpm exec expo start --web --clear
+# 浏览器打开 http://localhost:8081 触发 bundle,看终端日志确认是上面两个 module 的 resolve 错
+```
+
+### 🟡 没动的事(等修好 mobile 后再做)
+
+- 浏览器实际跑通"Welcome → Sign In → Home → 看到 Emma 数据"全流程
+- Anthropic key 不缺(可以延后),但 [src/index.ts:43-45](../../apps/nestory-api/src/index.ts#L43-L45) warn"Story worker 未启动"是预期的
+- 接 `STORY_AI_MOCK=1` 跑通 worker → mobile 渲染 story 链路(可绕过 Anthropic API key 验证整个 BullMQ 路径)
+
+### 📋 这周剩余优先级(2026-05-10 前)
+
+| 优先级 | 任务 |
+|---|---|
+| P0 | 修 mobile metro config,真在浏览器看到 demo flow |
+| P0 | 拿 Anthropic API key,验证 Story worker 端到端(或先用 `STORY_AI_MOCK=1`) |
+| P1 | 部署 API 到 Railway + 加 Redis 插件(不依赖 Apple) |
+| P1 | 把 [internal.ts](../../apps/nestory-api/src/routes/internal.ts) 几个 TODO 实现掉 |
+| P2 | 写 [subscriptions.ts:68](../../apps/nestory-api/src/routes/subscriptions.ts#L68) 的 RevenueCat webhook handler 框架(具体接入下周) |
+
+**下周(2026-05-10 起)才做**:Apple Dev 注册、Google Play 注册、Supabase Auth provider 配置、App Store Connect IAP 商品、RevenueCat dashboard、TestFlight 提交。
+
+### 📌 本机当前状态(明天换机不需要重做)
+
+- Supabase DB schema/seed 已经在线上(下机器只要拉代码 + 拷 .env 就接得上)
+- `.env` 在 `apps/nestory-api/.env` — **必须手工拷到新机器**(里面有 service_role key + DB password,提醒:之前在聊天里明文出现过,建议在 Supabase Dashboard 重置后再拷新值)
+- mobile `.env` 是占位,可以新机器重生成
+- 后台进程已全停(API + Metro)
 
 ---
 

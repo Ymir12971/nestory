@@ -4,9 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import type { SubscriptionStatus } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
-import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
+import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
+import { ApiClientError, uploadPhoto, useChildren, useCreateAsset, useCreateHighlight, useSubscription } from '@/api';
 
 type SaveState = 'both_empty' | 'need_photos' | 'need_note' | 'active';
 
@@ -24,13 +26,6 @@ const SAVE_LABELS: Record<SaveState, string> = {
   active:      'Save',
 };
 
-// TODO: derive from GET /subscriptions/me — highlightCount + highlightLimit
-const MOCK_HL_COUNT = 7;
-const MOCK_HL_LIMIT: number | null = 10; // null = Premium unlimited
-// TODO: derive from GET /subscriptions/me
-import type { SubscriptionStatus } from '@nestory/types';
-const MOCK_HL_SUB: SubscriptionStatus = 'never_paid';
-
 function getHlCaption(sub: SubscriptionStatus, count: number, limit: number): string {
   const K = sub === 'trial_ended' ? 'Trial' : 'Premium';
   return (sub === 'trial_ended' || sub === 'premium_ended')
@@ -41,27 +36,85 @@ function getHlCaption(sub: SubscriptionStatus, count: number, limit: number): st
 export function AddMemoryScreen() {
   const router = useRouter();
   const pickPhotos = usePhotoPicker({ multiple: true });
+  const childrenQ = useChildren();
+  const subQ      = useSubscription();
+  const createAsset     = useCreateAsset();
+  const createHighlight = useCreateHighlight();
   const [noteText, setNoteText]       = useState('');
   const [isHighlight, setIsHighlight] = useState(false);
-  const [photos, setPhotos]           = useState<string[]>([]);
+  const [photos, setPhotos]           = useState<PickedPhoto[]>([]);
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const hlLocked = MOCK_HL_LIMIT != null && MOCK_HL_COUNT >= MOCK_HL_LIMIT;
+  const sub = subQ.data;
+  const hlCount = sub?.highlightCount ?? 0;
+  const hlLimit = sub?.highlightLimit ?? null;
+  const hlSub: SubscriptionStatus = sub?.subscriptionStatus ?? 'never_paid';
+  const hlLocked = hlLimit != null && hlCount >= hlLimit;
 
   const hasPhotos   = photos.length > 0;
   const hasText     = noteText.trim().length > 0;
   const saveState   = getSaveState(hasPhotos, hasText);
-  const canSave     = saveState === 'active';
+  const canSave     = saveState === 'active' && !saving;
 
-  const handleSave = () => {
+  const children = childrenQ.data ?? [];
+  const activeChildId =
+    children.find(c => c.isActive)?.id ?? children[0]?.id ?? null;
+
+  const handleSave = async () => {
     if (!canSave) return;
-    // TODO: wire to POST /assets (memory create API)
-    router.back();
+    if (!activeChildId) {
+      setSaveError('No active child profile found.');
+      return;
+    }
+    setSaveError(null);
+    setSaving(true);
+    try {
+      const uploaded = await Promise.all(
+        photos.map((p, i) =>
+          uploadPhoto(p, 'memories').then(meta => ({ ...meta, displayOrder: i })),
+        ),
+      );
+
+      const memory = await createAsset.mutateAsync({
+        childId:    activeChildId,
+        capturedAt: new Date().toISOString(),
+        ...(noteText.trim() ? { textNote: noteText.trim() } : {}),
+        files: uploaded,
+      });
+
+      if (isHighlight) {
+        // Server requires coverFileId when memory has multiple files; default to first.
+        const coverFileId = memory.files.length > 1 ? memory.files[0]?.id : undefined;
+        try {
+          await createHighlight.mutateAsync({
+            assetId: memory.id,
+            childId: activeChildId,
+            ...(coverFileId ? { coverFileId } : {}),
+          });
+        } catch (hlErr) {
+          if (hlErr instanceof ApiClientError && hlErr.code === 'HIGHLIGHT_LIMIT_REACHED') {
+            // Memory was saved; surface paywall and keep user on this screen so they can subscribe and retry.
+            setPaywallVisible(true);
+            setSaveError('Highlight limit reached. Memory saved without highlight.');
+            return;
+          }
+          throw hlErr;
+        }
+      }
+
+      router.back();
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to save memory. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddPhoto = async () => {
     const picked = await pickPhotos();
-    if (picked.length > 0) setPhotos(prev => [...prev, ...picked.map(p => p.uri)]);
+    if (picked.length > 0) setPhotos(prev => [...prev, ...picked]);
   };
 
   const handleRemovePhoto = (index: number) => {
@@ -91,9 +144,9 @@ export function AddMemoryScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.photoStrip}
         >
-          {photos.map((uri, i) => (
-            <View key={uri} style={styles.photoThumbWrap}>
-              <Image source={{ uri }} style={styles.photoThumbImg} />
+          {photos.map((p, i) => (
+            <View key={p.uri} style={styles.photoThumbWrap}>
+              <Image source={{ uri: p.uri }} style={styles.photoThumbImg} />
               <Pressable
                 style={styles.deleteBadge}
                 hitSlop={6}
@@ -119,31 +172,9 @@ export function AddMemoryScreen() {
           onChangeText={setNoteText}
         />
 
-        {/* Details List */}
+        {/* Details List — Tags / Date / Cover are editable from MemoryEditScreen after the
+            memory is saved (no draft store yet to thread state through sub-screens). */}
         <View style={styles.detailsList}>
-          {/* Tags */}
-          <Pressable style={styles.detailRow} onPress={() => router.push('/memory/tags')}>
-            <Text style={styles.detailLabel}>Tags</Text>
-            <View style={styles.detailRight}>
-              <Text style={styles.detailValue}>Playtime +4</Text>
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-            </View>
-          </Pressable>
-
-          <View style={styles.rowDivider} />
-
-          {/* Date */}
-          <Pressable style={styles.detailRow} onPress={() => router.push('/memory/date')}>
-            <Text style={styles.detailLabel}>Date</Text>
-            <View style={styles.detailRight}>
-              <Text style={styles.detailValue}>Today, Mar 15</Text>
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-            </View>
-          </Pressable>
-
-          <View style={styles.rowDivider} />
-
-          {/* Highlight toggle — Locked when Free user at limit → Paywall B */}
           <Pressable
             style={styles.detailRow}
             onPress={hlLocked ? () => setPaywallVisible(true) : undefined}
@@ -157,23 +188,12 @@ export function AddMemoryScreen() {
               disabled={hlLocked}
             />
           </Pressable>
-          {hlLocked && MOCK_HL_LIMIT != null && (
+          {hlLocked && hlLimit != null && (
             <View style={styles.hlCaptionWrap}>
               <Text style={styles.hlCaption}>
-                {getHlCaption(MOCK_HL_SUB, MOCK_HL_COUNT, MOCK_HL_LIMIT)}
+                {getHlCaption(hlSub, hlCount, hlLimit)}
               </Text>
             </View>
-          )}
-
-          {/* Cover photo sub-row — visible when highlight on + ≥2 photos */}
-          {!hlLocked && isHighlight && photos.length >= 2 && (
-            <>
-              <View style={styles.rowDivider} />
-              <Pressable style={styles.detailRow} onPress={() => router.push('/memory/cover')}>
-                <Text style={styles.detailLabelBrand}>Change cover photo</Text>
-                <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-              </Pressable>
-            </>
           )}
         </View>
       </ScrollView>
@@ -187,6 +207,7 @@ export function AddMemoryScreen() {
 
       {/* Save CTA */}
       <View style={styles.cta}>
+        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
         <Pressable
           style={({ pressed }) => [styles.saveBtnWrap, pressed && canSave && { opacity: 0.85 }]}
           onPress={handleSave}
@@ -199,12 +220,14 @@ export function AddMemoryScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.saveButton}
             >
-              <Text style={styles.saveLabel}>{SAVE_LABELS[saveState]}</Text>
+              <Text style={styles.saveLabel}>
+                {saving ? 'Saving…' : SAVE_LABELS[saveState]}
+              </Text>
             </LinearGradient>
           ) : (
             <View style={[styles.saveButton, styles.saveButtonDisabled]}>
               <Text style={[styles.saveLabel, styles.saveLabelDisabled]}>
-                {SAVE_LABELS[saveState]}
+                {saving ? 'Saving…' : SAVE_LABELS[saveState]}
               </Text>
             </View>
           )}
@@ -349,6 +372,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.m,
     paddingBottom: theme.spacing.safeBtm,
+    gap: theme.spacing.xs,
+  },
+  errorText: {
+    ...theme.typography.caption,
+    color: theme.text.error,
+    textAlign: 'center',
   },
   saveBtnWrap: {
     width: '100%',

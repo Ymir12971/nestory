@@ -1,56 +1,67 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import type { Memory } from '@nestory/types';
 import { theme } from '@/shared/theme';
+import { useAssets, useChildren } from '@/api';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-type MockMemory = {
-  id: string;
-  text: string;
-  time: string;
-  photoCount: number;
-};
-
-type DayGroup = {
-  dayNum: string;
+interface DayGroup {
+  key:       string;        // YYYY-MM-DD
+  dayNum:    string;
   monthAbbr: string;
-  memories: MockMemory[];
-};
+  memories:  Memory[];
+}
 
-// TODO: replace with real API data from GET /assets?childId=&month=YYYY-MM
-const MOCK_GROUPS: DayGroup[] = [
-  {
-    dayNum: '15',
-    monthAbbr: 'Mar',
-    memories: [
-      { id: '1', text: 'Emma laughed at the ducks at the park today. She kept pointing and saying "quack".', time: '5:34 PM', photoCount: 3 },
-      { id: '2', text: 'First time eating mango. Made the funniest face!', time: '12:01 PM', photoCount: 1 },
-    ],
-  },
-  {
-    dayNum: '12',
-    monthAbbr: 'Mar',
-    memories: [
-      { id: '3', text: 'Tried crawling up the stairs for the very first time. So determined!', time: '10:22 AM', photoCount: 2 },
-    ],
-  },
-  {
-    dayNum: '8',
-    monthAbbr: 'Mar',
-    memories: [
-      { id: '4', text: 'Bath time splashing. Soaked the whole bathroom floor.', time: '7:15 PM', photoCount: 4 },
-      { id: '5', text: 'Said "mama" clearly for the second time.', time: '2:30 PM', photoCount: 1 },
-    ],
-  },
-];
+function groupByDay(items: Memory[]): DayGroup[] {
+  const map = new Map<string, DayGroup>();
+  for (const m of items) {
+    const d = new Date(m.capturedAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    let group = map.get(key);
+    if (!group) {
+      group = {
+        key,
+        dayNum:    String(d.getDate()),
+        monthAbbr: MONTH_LABELS[d.getMonth()]!,
+        memories:  [],
+      };
+      map.set(key, group);
+    }
+    group.memories.push(m);
+  }
+  // Newest day first; within a day, newest memory first (server already returns desc, but be safe).
+  return [...map.values()]
+    .sort((a, b) => (a.key < b.key ? 1 : -1))
+    .map(g => ({
+      ...g,
+      memories: [...g.memories].sort(
+        (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
+      ),
+    }));
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 
 export function MemoryListScreen() {
   const router = useRouter();
-  const [selectedYear, setSelectedYear]   = useState(2026);
-  const [selectedMonth, setSelectedMonth] = useState(3); // 1-indexed
+  const childrenQ = useChildren();
+  const now = new Date();
+  const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-indexed
+
+  const children = childrenQ.data ?? [];
+  const activeChildId =
+    children.find(c => c.isActive)?.id ?? children[0]?.id ?? '';
+  const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+
+  const assetsQ = useAssets({ childId: activeChildId, month: monthKey });
+  const groups  = useMemo(() => groupByDay(assetsQ.data?.data ?? []), [assetsQ.data]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -63,7 +74,7 @@ export function MemoryListScreen() {
         <View style={styles.navSpacer} />
       </View>
 
-      {/* Filter bar: year selector + month pills */}
+      {/* Filter bar */}
       <View style={styles.filterBar}>
         <Pressable style={styles.yearSelector} onPress={() => { /* TODO: year picker sheet */ }}>
           <Text style={styles.yearText}>{selectedYear}</Text>
@@ -95,57 +106,78 @@ export function MemoryListScreen() {
         </ScrollView>
       </View>
 
-      {/* Timeline */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {MOCK_GROUPS.map((group, groupIndex) => (
-          <View key={`${group.dayNum}-${group.monthAbbr}`} style={styles.dayGroup}>
-            {/* Left: date badge + connector line */}
-            <View style={styles.timelineLeft}>
-              <View style={styles.dateBadge}>
-                <Text style={styles.dateBadgeDay}>{group.dayNum}</Text>
-                <Text style={styles.dateBadgeMonth}>{group.monthAbbr}</Text>
+      {/* Body */}
+      {assetsQ.isLoading || childrenQ.isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : assetsQ.isError ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>Failed to load memories.</Text>
+          <Pressable onPress={() => assetsQ.refetch()}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      ) : groups.length === 0 ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>No memories this month yet.</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {groups.map((group, groupIndex) => (
+            <View key={group.key} style={styles.dayGroup}>
+              <View style={styles.timelineLeft}>
+                <View style={styles.dateBadge}>
+                  <Text style={styles.dateBadgeDay}>{group.dayNum}</Text>
+                  <Text style={styles.dateBadgeMonth}>{group.monthAbbr}</Text>
+                </View>
+                {groupIndex < groups.length - 1 && <View style={styles.connectorLine} />}
               </View>
-              {/* Connector line shown between groups, not after the last one */}
-              {groupIndex < MOCK_GROUPS.length - 1 && (
-                <View style={styles.connectorLine} />
-              )}
-            </View>
 
-            {/* Right: memory cards */}
-            <View style={styles.dayCards}>
-              {group.memories.map((memory, cardIndex) => (
-                <Pressable
-                  key={memory.id}
-                  style={[
-                    styles.memoryCard,
-                    cardIndex < group.memories.length - 1 && styles.memoryCardGap,
-                  ]}
-                  onPress={() => router.push(`/memory/${memory.id}`)}
-                >
-                  <View style={styles.cardPhotoWrap}>
-                    {/* TODO: replace with <Image source={{ uri: memory.fileUrl }} /> */}
-                    <View style={styles.cardPhotoPlaceholder} />
-                    {memory.photoCount > 1 && (
-                      <View style={styles.photoBadge}>
-                        <RemixIcon name="image-line" size={10} color={theme.text.onColor} />
-                        <Text style={styles.photoBadgeCount}>{memory.photoCount}</Text>
+              <View style={styles.dayCards}>
+                {group.memories.map((memory, cardIndex) => {
+                  const cover = memory.files[0];
+                  const photoCount = memory.files.length;
+                  return (
+                    <Pressable
+                      key={memory.id}
+                      style={[
+                        styles.memoryCard,
+                        cardIndex < group.memories.length - 1 && styles.memoryCardGap,
+                      ]}
+                      onPress={() => router.push(`/memory/${memory.id}`)}
+                    >
+                      <View style={styles.cardPhotoWrap}>
+                        {cover ? (
+                          <Image source={{ uri: cover.fileUrl }} style={styles.cardPhotoImg} />
+                        ) : (
+                          <View style={styles.cardPhotoPlaceholder} />
+                        )}
+                        {photoCount > 1 && (
+                          <View style={styles.photoBadge}>
+                            <RemixIcon name="image-line" size={10} color={theme.text.onColor} />
+                            <Text style={styles.photoBadgeCount}>{photoCount}</Text>
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                  <View style={styles.cardBody}>
-                    <Text style={styles.cardText} numberOfLines={2}>{memory.text}</Text>
-                    <Text style={styles.cardTime}>{memory.time}</Text>
-                  </View>
-                </Pressable>
-              ))}
+                      <View style={styles.cardBody}>
+                        <Text style={styles.cardText} numberOfLines={2}>
+                          {memory.textNote ?? '(no caption)'}
+                        </Text>
+                        <Text style={styles.cardTime}>{formatTime(memory.capturedAt)}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -160,7 +192,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.default,
   },
 
-  // NavBar
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -174,7 +205,6 @@ const styles = StyleSheet.create({
   },
   navSpacer: { width: 24 },
 
-  // Filter bar
   filterBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -220,7 +250,6 @@ const styles = StyleSheet.create({
     color: theme.text.onColor,
   },
 
-  // Scroll
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: theme.spacing.xl,
@@ -228,14 +257,27 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.safeBtm,
   },
 
-  // Day group
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  emptyText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
+  },
+
   dayGroup: {
     flexDirection: 'row',
     gap: theme.spacing.m,
     marginBottom: theme.spacing.l,
   },
 
-  // Timeline left column
   timelineLeft: {
     width: DATE_BADGE_W,
     alignItems: 'center',
@@ -263,7 +305,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.border.default,
   },
 
-  // Day cards column
   dayCards: {
     flex: 1,
     gap: 0,
@@ -287,6 +328,10 @@ const styles = StyleSheet.create({
     height: CARD_PHOTO,
     borderRadius: theme.radius.m,
     overflow: 'hidden',
+  },
+  cardPhotoImg: {
+    width: CARD_PHOTO,
+    height: CARD_PHOTO,
   },
   cardPhotoPlaceholder: {
     width: CARD_PHOTO,

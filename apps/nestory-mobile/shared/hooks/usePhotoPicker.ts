@@ -1,9 +1,24 @@
 import * as ImagePicker from 'expo-image-picker';
 
+export type PickedMime = 'image/jpeg' | 'image/png' | 'image/heif';
+
 export interface PickedPhoto {
-  uri: string;
-  width: number;
-  height: number;
+  uri:       string;
+  width:     number;
+  height:    number;
+  mimeType:  PickedMime;
+  byteSize?: number;        // sometimes unavailable on iOS — uploader will fall back to blob.size
+}
+
+function normalizeMime(raw: string | null | undefined, uri: string): PickedMime {
+  const mime = (raw ?? '').toLowerCase();
+  if (mime === 'image/jpg') return 'image/jpeg';
+  if (mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/heif') return mime;
+  // Fall back to URI extension when picker doesn't supply mimeType (iOS native sometimes).
+  const ext = uri.split('?')[0]!.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'png')                     return 'image/png';
+  if (ext === 'heic' || ext === 'heif')  return 'image/heif';
+  return 'image/jpeg'; // picker re-encodes to JPEG at quality 0.85 by default
 }
 
 /**
@@ -26,7 +41,13 @@ export function usePhotoPicker(options?: { multiple?: boolean }) {
     });
 
     if (result.canceled) return [];
-    return result.assets.map(a => ({ uri: a.uri, width: a.width, height: a.height }));
+    return result.assets.map(a => ({
+      uri:      a.uri,
+      width:    a.width,
+      height:   a.height,
+      mimeType: normalizeMime(a.mimeType, a.uri),
+      byteSize: a.fileSize,
+    }));
   };
 
   return launch;

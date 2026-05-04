@@ -1,31 +1,95 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
+import { useChildren } from '@/api';
 
-// ---------- Types ----------
-
-interface ChildProfile {
-  id: string;
-  name: string;
-  dob: string;       // display string, e.g. "Mar 15, 2025"
-  isActive: boolean;
-  avatarColor: string;
+function formatBirthDate(birthDate: string): string {
+  const d = new Date(birthDate);
+  return `Born ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 }
-
-// ---------- Mock data — replace with GET /children ----------
-
-const MOCK_PROFILES: ChildProfile[] = [
-  { id: 'child-1', name: 'Emma',   dob: 'Born Mar 15, 2025', isActive: true,  avatarColor: theme.surface.brand },
-  { id: 'child-2', name: 'Oliver', dob: 'Born Jan 8, 2024',  isActive: false, avatarColor: palette.accent[300] },
-];
 
 // ---------- Screen ----------
 
 export function ChildProfileListScreen() {
   const router = useRouter();
+  const childrenQ = useChildren();
+
+  const renderBody = () => {
+    if (childrenQ.isLoading) {
+      return (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      );
+    }
+
+    if (childrenQ.isError || !childrenQ.data) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Failed to load profiles.</Text>
+          <Pressable onPress={() => childrenQ.refetch()}>
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    const profiles = childrenQ.data;
+
+    if (profiles.length === 0) {
+      return (
+        <View style={styles.emptyWrap}>
+          <View style={styles.emptyIcon}>
+            <RemixIcon name="user-add-line" size={32} color={theme.text.brand} />
+          </View>
+          <Text style={styles.emptyTitle}>No child profiles yet</Text>
+          <Text style={styles.emptyBody}>
+            Add a child to start capturing memories.
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Warning notify — Free plan multi-profile restriction */}
+        <View style={styles.notify}>
+          <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
+          <Text style={styles.notifyText}>
+            Free plan supports one active profile. You can add more, but switching requires Premium.
+          </Text>
+        </View>
+
+        {/* Profile cards */}
+        {profiles.map((profile) => (
+          <Pressable
+            key={profile.id}
+            style={styles.card}
+            onPress={() => router.push(`/settings/profiles/${profile.id}`)}
+          >
+            <View style={[styles.avatar, { backgroundColor: theme.surface.brand }]} />
+            <View style={styles.col}>
+              <Text style={styles.profileName}>{profile.name}</Text>
+              <Text style={styles.profileDob}>{formatBirthDate(profile.birthDate)}</Text>
+            </View>
+            {profile.isActive && (
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeLabel}>Active</Text>
+              </View>
+            )}
+            <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+          </Pressable>
+        ))}
+      </ScrollView>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -38,52 +102,7 @@ export function ChildProfileListScreen() {
         <View style={styles.navSpacer} />
       </View>
 
-      {MOCK_PROFILES.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <View style={styles.emptyIcon}>
-            <RemixIcon name="user-add-line" size={32} color={theme.text.brand} />
-          </View>
-          <Text style={styles.emptyTitle}>No child profiles yet</Text>
-          <Text style={styles.emptyBody}>
-            Add a child to start capturing memories.
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.body}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Warning notify — Free plan multi-profile restriction */}
-          <View style={styles.notify}>
-            <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
-            <Text style={styles.notifyText}>
-              Free plan supports one active profile. You can add more, but switching requires Premium.
-            </Text>
-          </View>
-
-          {/* Profile cards */}
-          {MOCK_PROFILES.map((profile) => (
-            <Pressable
-              key={profile.id}
-              style={styles.card}
-              onPress={() => router.push(`/settings/profiles/${profile.id}`)}
-            >
-              <View style={[styles.avatar, { backgroundColor: profile.avatarColor }]} />
-              <View style={styles.col}>
-                <Text style={styles.profileName}>{profile.name}</Text>
-                <Text style={styles.profileDob}>{profile.dob}</Text>
-              </View>
-              {profile.isActive && (
-                <View style={styles.activeBadge}>
-                  <Text style={styles.activeBadgeLabel}>Active</Text>
-                </View>
-              )}
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-            </Pressable>
-          ))}
-        </ScrollView>
-      )}
+      {renderBody()}
 
       {/* CTA — Add Child */}
       <View style={styles.cta}>
@@ -194,6 +213,21 @@ const styles = StyleSheet.create({
   addBtnLabel: {
     ...theme.typography.buttonLabelM,
     color: theme.text.onColor,
+  },
+
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
   },
 
   // Empty state

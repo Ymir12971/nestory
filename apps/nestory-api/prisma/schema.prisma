@@ -21,8 +21,13 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
+  // Pooled connection (Transaction mode, port 6543) for runtime queries.
   url        = env("DATABASE_URL")
-  extensions = [pgcrypto]
+  // Direct connection (port 5432) for `prisma migrate` — pgBouncer doesn't
+  // support the prepared statements / DDL that migrations need.
+  directUrl  = env("DIRECT_URL")
+  // Supabase pre-installs these in `public`; declare them so migrate doesn't drift.
+  extensions = [pgcrypto, pg_stat_statements, uuid_ossp(map: "uuid-ossp"), supabase_vault]
 }
 
 // ============================================================================

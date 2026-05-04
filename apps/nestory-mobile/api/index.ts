@@ -8,3 +8,4 @@ export * from './stories';
 export * from './subscriptions';
 export * from './shares';
 export * from './tags';
+export * from './uploads';

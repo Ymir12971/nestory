@@ -1,25 +1,37 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
-import { theme, palette } from '@/shared/theme';
-
-const PRESET_TAGS = [
-  'Playtime', 'Bath time', 'First times', 'Milestones',
-  'Family', 'Friends', 'Outdoors', 'Food & eating',
-  'Sleep', 'Silly moments', 'Learning', 'Doctor visit',
-];
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { theme } from '@/shared/theme';
+import { useAsset, usePresetTags, useUpdateAsset, useUserTags } from '@/api';
 
 export function MemoryTagsScreen() {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<string>>(new Set(['Playtime']));
+  const { memoryId } = useLocalSearchParams<{ memoryId?: string }>();
+
+  const memoryQ      = useAsset(memoryId ?? null);
+  const presetTagsQ  = usePresetTags();
+  const userTagsQ    = useUserTags();
+  const updateAsset  = useUpdateAsset(memoryId ?? '');
+
+  const [selected, setSelected]       = useState<Set<string>>(new Set());
   const [customInput, setCustomInput] = useState('');
+  const [saving, setSaving]           = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+
+  // Hydrate selected from existing memory tags once it loads.
+  useEffect(() => {
+    if (memoryQ.data && selected.size === 0) {
+      setSelected(new Set(memoryQ.data.tags));
+    }
+  }, [memoryQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = (tag: string) => {
     setSelected(prev => {
       const next = new Set(prev);
-      next.has(tag) ? next.delete(tag) : next.add(tag);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
       return next;
     });
   };
@@ -31,62 +43,116 @@ export function MemoryTagsScreen() {
     setCustomInput('');
   };
 
+  const handleDone = async () => {
+    if (!memoryId) {
+      router.back();
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await updateAsset.mutateAsync({ tagValues: [...selected] });
+      router.back();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to save tags.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Combine presets + user-saved tags (case-insensitive dedupe so the chip grid stays unique).
+  const presetTags = presetTagsQ.data ?? [];
+  const userTags   = (userTagsQ.data ?? []).map(t => t.name);
+  const allTags = (() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const t of [...presetTags, ...userTags]) {
+      const key = t.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(t);
+    }
+    return out;
+  })();
+
+  const isLoading = memoryQ.isLoading || presetTagsQ.isLoading;
+  const isError   = memoryQ.isError || presetTagsQ.isError;
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* NavBar */}
       <View style={styles.navBar}>
         <Pressable hitSlop={8} onPress={() => router.back()}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Tags</Text>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
-          <Text style={styles.doneBtn}>Done</Text>
+        <Pressable hitSlop={8} onPress={handleDone} disabled={saving || !memoryId}>
+          <Text style={[styles.doneBtn, (saving || !memoryId) && { opacity: 0.5 }]}>
+            {saving ? 'Saving…' : 'Done'}
+          </Text>
         </Pressable>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.body}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Tag chips */}
-        <View style={styles.chipGrid}>
-          {PRESET_TAGS.map(tag => {
-            const active = selected.has(tag);
-            return (
-              <Pressable
-                key={tag}
-                style={[styles.chip, active ? styles.chipActive : styles.chipInactive]}
-                onPress={() => toggle(tag)}
-              >
-                {active && (
-                  <RemixIcon name="check-line" size={14} color={theme.text.onColor} />
-                )}
-                <Text style={[styles.chipLabel, active ? styles.chipLabelActive : styles.chipLabelInactive]}>
-                  {tag}
-                </Text>
-              </Pressable>
-            );
-          })}
+      {!memoryId ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>Open from a memory to edit its tags.</Text>
         </View>
-
-        {/* Custom tag input */}
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            value={customInput}
-            onChangeText={setCustomInput}
-            placeholder="Add a custom tag…"
-            placeholderTextColor={theme.text.hint}
-            returnKeyType="done"
-            onSubmitEditing={addCustom}
-          />
-          <Pressable style={styles.addBtn} onPress={addCustom}>
-            <RemixIcon name="add-line" size={20} color={theme.text.brand} />
+      ) : isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.text.brand} />
+        </View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>Failed to load tags.</Text>
+          <Pressable onPress={() => { memoryQ.refetch(); presetTagsQ.refetch(); }}>
+            <Text style={styles.retryText}>Tap to retry</Text>
           </Pressable>
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {error && <Text style={styles.errorInline}>{error}</Text>}
+
+          <View style={styles.chipGrid}>
+            {allTags.map(tag => {
+              const active = selected.has(tag);
+              return (
+                <Pressable
+                  key={tag}
+                  style={[styles.chip, active ? styles.chipActive : styles.chipInactive]}
+                  onPress={() => toggle(tag)}
+                >
+                  {active && (
+                    <RemixIcon name="check-line" size={14} color={theme.text.onColor} />
+                  )}
+                  <Text style={[styles.chipLabel, active ? styles.chipLabelActive : styles.chipLabelInactive]}>
+                    {tag}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Custom tag input */}
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              value={customInput}
+              onChangeText={setCustomInput}
+              placeholder="Add a custom tag…"
+              placeholderTextColor={theme.text.hint}
+              returnKeyType="done"
+              onSubmitEditing={addCustom}
+            />
+            <Pressable style={styles.addBtn} onPress={addCustom}>
+              <RemixIcon name="add-line" size={20} color={theme.text.brand} />
+            </Pressable>
+          </View>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -111,6 +177,24 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.l,
     paddingBottom: theme.spacing.xl,
     gap: theme.spacing.l,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  emptyText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
+  },
+  errorInline: {
+    ...theme.typography.caption,
+    color: theme.text.error,
   },
   chipGrid: {
     flexDirection: 'row',

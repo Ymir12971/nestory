@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { Dimensions, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Dimensions, Image, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import type { Child } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
+import { useAssets, useChildren, useSubscription, useStories, useSetActiveChild } from '@/api';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -20,38 +22,94 @@ const CAROUSEL_PADDING = (SCREEN_W - PHOTO_CENTER_W) / 2;
 // Scroll offset so center photo is visible on mount
 const CAROUSEL_INIT_X  = PHOTO_SIDE_W + PHOTO_GAP;
 
-const DOTS_TOTAL = 6;
-
-// TODO: replace with real data from GET /children
-const MOCK_PROFILES = [
-  { id: 'child-1', name: 'Emma',   isActive: true  },
-  { id: 'child-2', name: 'Oliver', isActive: false },
-];
-// TODO: derive from GET /subscriptions/me
-const MOCK_IS_PREMIUM = false;
-// TODO: derive from GET /assets count for active child
-const MOCK_MEMORY_COUNT: number = 12;
+// "1 yr 4 mo" → "1.4"; "6 mo" → "0.6". Single template for now.
+function formatAge(ageMonths: number): string {
+  const years = Math.floor(ageMonths / 12);
+  const months = ageMonths % 12;
+  return `${years}.${months}`;
+}
 
 export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [switcherVisible, setSwitcherVisible] = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
-  const [profiles, setProfiles] = useState(MOCK_PROFILES);
 
-  const activeProfile = profiles.find(p => p.isActive) ?? profiles[0]!;
-  const isMulti = profiles.length > 1;
+  const childrenQ    = useChildren();
+  const subQ         = useSubscription();
+  const setActive    = useSetActiveChild();
+
+  const profiles     = childrenQ.data ?? [];
+  const activeChild  = profiles.find(p => p.isActive) ?? profiles[0];
+  const isMulti      = profiles.length > 1;
+  const isPremium    =
+    subQ.data?.subscriptionStatus === 'premium_active' ||
+    subQ.data?.subscriptionStatus === 'trial_active';
+
+  // memory count for current month — driven by Stories endpoint
+  const storiesQ = useStories({ childId: activeChild?.id ?? '' });
+  const memoryCount = storiesQ.data?.currentMonth.memoryCount ?? 0;
+
+  // Latest memories with photos — drives the hero carousel.
+  const currentMonthKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+  const monthAssetsQ = useAssets({
+    childId: activeChild?.id ?? '',
+    month:   currentMonthKey,
+  });
+  const carouselPhotos = useMemo(() => {
+    const memories = monthAssetsQ.data?.data ?? [];
+    return memories
+      .flatMap(m => m.files.map(f => ({ id: f.id, fileUrl: f.fileUrl, memoryId: m.id })))
+      .slice(0, 6);
+  }, [monthAssetsQ.data]);
+
+  // Loading guard — wait for children + subscription so the screen has minimum
+  // viable data to render. Stories will resolve as a secondary call.
+  if (childrenQ.isLoading || subQ.isLoading) {
+    return (
+      <View style={[styles.root, styles.center]}>
+        <ActivityIndicator color={theme.text.brand} />
+      </View>
+    );
+  }
+
+  if (childrenQ.isError || subQ.isError) {
+    return (
+      <View style={[styles.root, styles.center]}>
+        <Text style={styles.errorText}>Failed to load home.</Text>
+        <Pressable onPress={() => { childrenQ.refetch(); subQ.refetch(); }}>
+          <Text style={styles.retryText}>Tap to retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // No children yet — user shouldn't normally reach here without onboarding,
+  // but if they do, send them back to set up.
+  if (!activeChild) {
+    return (
+      <View style={[styles.root, styles.center]}>
+        <Text style={styles.errorText}>No child profile yet.</Text>
+        <Pressable onPress={() => router.push('/onboarding/profile')}>
+          <Text style={styles.retryText}>Set up profile</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   const handleAvatarRowPress = () => {
     if (isMulti) {
       setSwitcherVisible(true);
     } else {
-      router.push(`/settings/profiles/${activeProfile.id}`);
+      router.push(`/settings/profiles/${activeChild.id}`);
     }
   };
 
   const handleSwitch = (id: string) => {
-    setProfiles(prev => prev.map(p => ({ ...p, isActive: p.id === id })));
+    setActive.mutate(id);
     setSwitcherVisible(false);
   };
 
@@ -73,7 +131,7 @@ export function HomeScreen() {
             onPress={handleAvatarRowPress}
           >
             <View style={styles.avatar} />
-            <Text style={styles.childName}>{activeProfile.name}</Text>
+            <Text style={styles.childName}>{activeChild.name}</Text>
             {isMulti && (
               <RemixIcon name="arrow-up-down-line" size={24} color={theme.text.onColor} />
             )}
@@ -83,8 +141,8 @@ export function HomeScreen() {
           </Pressable>
         </View>
 
-        {MOCK_MEMORY_COUNT === 0 ? (
-          /* Empty state — no memories yet */
+        {carouselPhotos.length === 0 ? (
+          /* Empty state — no memory photos this month */
           <View style={styles.emptyHero}>
             <View style={styles.emptyHeroCard}>
               <RemixIcon name="image-add-line" size={48} color={theme.text.onColor} />
@@ -96,60 +154,65 @@ export function HomeScreen() {
           </View>
         ) : (
           <>
-            {/* Photo carousel */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               snapToInterval={PHOTO_CENTER_W + PHOTO_GAP}
               decelerationRate="fast"
-              contentOffset={{ x: CAROUSEL_INIT_X, y: 0 }}
+              contentOffset={{ x: carouselPhotos.length > 1 ? CAROUSEL_INIT_X : 0, y: 0 }}
               style={styles.carouselScroll}
               contentContainerStyle={[
                 styles.carouselContent,
                 { paddingHorizontal: CAROUSEL_PADDING },
               ]}
             >
-              {/* TODO: replace placeholders with real memory photos */}
-              <View style={[styles.photoSide, { marginRight: PHOTO_GAP }]} />
-              <View style={[styles.photoCenter, { marginRight: PHOTO_GAP }]} />
-              <View style={styles.photoSide} />
+              {carouselPhotos.map((p, i) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => router.push(`/memory/${p.memoryId}`)}
+                  style={i < carouselPhotos.length - 1 ? { marginRight: PHOTO_GAP } : undefined}
+                >
+                  <Image source={{ uri: p.fileUrl }} style={styles.photoCenter} />
+                </Pressable>
+              ))}
             </ScrollView>
 
-            {/* Page dots */}
-            <View style={styles.dots}>
-              {Array.from({ length: DOTS_TOTAL }).map((_, i) => (
-                <View key={i} style={i === 0 ? styles.dotActive : styles.dotInactive} />
-              ))}
-            </View>
+            {carouselPhotos.length > 1 && (
+              <View style={styles.dots}>
+                {carouselPhotos.map((p, i) => (
+                  <View key={p.id} style={i === 0 ? styles.dotActive : styles.dotInactive} />
+                ))}
+              </View>
+            )}
           </>
         )}
       </ImageBackground>
 
       {/* ── Body ─────────────────────────────────────────────── */}
       <View style={styles.body}>
-        {/* Stats card — taps to child profile edit */}
+        {/* Stats card — Figma annotation: 点击直接跳 ST-03 Edit */}
         <Pressable
           style={styles.statsCard}
-          onPress={() => router.push('/settings/profiles/1')}
+          onPress={() => router.push(`/settings/profiles/${activeChild.id}`)}
         >
           <View style={styles.statCol}>
-            <Text style={styles.statValue}>1.4</Text>
+            <Text style={styles.statValue}>{formatAge(activeChild.ageMonths)}</Text>
             <Text style={styles.statLabel}>years old</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statCol}>
-            <Text style={styles.statValue}>40</Text>
-            <Text style={styles.statLabel}>cm</Text>
+            <Text style={styles.statValue}>{activeChild.heightValue ?? '—'}</Text>
+            <Text style={styles.statLabel}>{activeChild.heightUnit ?? 'cm'}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statCol}>
-            <Text style={styles.statValue}>25</Text>
-            <Text style={styles.statLabel}>kg</Text>
+            <Text style={styles.statValue}>{activeChild.weightValue ?? '—'}</Text>
+            <Text style={styles.statLabel}>{activeChild.weightUnit ?? 'kg'}</Text>
           </View>
         </Pressable>
 
         {/* Monthly summary row — taps to memory list */}
-        {MOCK_MEMORY_COUNT > 0 && (
+        {memoryCount > 0 && (
         <Pressable
           style={styles.summaryRow}
           onPress={() => router.push('/memory/list')}
@@ -157,7 +220,7 @@ export function HomeScreen() {
           <View style={styles.summaryLeft}>
             <RemixIcon name="chat-smile-ai-line" size={20} color={theme.text.primary} />
             <Text style={styles.summaryText}>
-              {MOCK_MEMORY_COUNT} {MOCK_MEMORY_COUNT === 1 ? 'memory' : 'memories'} this month
+              {memoryCount} {memoryCount === 1 ? 'memory' : 'memories'} this month
             </Text>
           </View>
           <View style={styles.summaryRight}>
@@ -198,9 +261,9 @@ export function HomeScreen() {
           {/* Drag handle */}
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>Switch Child</Text>
-          {profiles.map(profile => {
+          {profiles.map((profile: Child) => {
             const isActive  = profile.isActive;
-            const isLocked  = !isActive && !MOCK_IS_PREMIUM;
+            const isLocked  = !isActive && !isPremium;
             const isDimmed  = isLocked;
             return (
               <Pressable
@@ -232,7 +295,7 @@ export function HomeScreen() {
             );
           })}
 
-          {!MOCK_IS_PREMIUM && (
+          {!isPremium && (
             <Pressable
               style={({ pressed }) => [styles.upgradeCta, pressed && { opacity: 0.85 }]}
               onPress={() => { setSwitcherVisible(false); setPaywallVisible(true); }}
@@ -264,6 +327,19 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: theme.surface.default,
+  },
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  retryText: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
   },
 
   // Hero
