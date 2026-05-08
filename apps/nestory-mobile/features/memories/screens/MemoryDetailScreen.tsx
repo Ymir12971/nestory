@@ -29,6 +29,13 @@ export function MemoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const memoryQ = useAsset(id ?? null);
 
+  // On web, a hard refresh wipes the SPA's navigation stack, so router.back()
+  // becomes a no-op. Fall back to the tabs root.
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
+
   return (
     <View style={styles.root}>
       <View style={{ height: insets.top, backgroundColor: theme.surface.default }} />
@@ -40,7 +47,7 @@ export function MemoryDetailScreen() {
       ) : memoryQ.isError || !memoryQ.data ? (
         <View style={styles.center}>
           <View style={styles.navBar}>
-            <Pressable hitSlop={8} onPress={() => router.back()}>
+            <Pressable hitSlop={8} onPress={goBack}>
               <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
             </Pressable>
             <Text style={styles.navTitle}>Memory</Text>
@@ -64,10 +71,15 @@ function Body({ memory }: { memory: Memory }) {
   const router = useRouter();
   const dotCount = memory.files.length;
 
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
+
   return (
     <>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Memory</Text>
