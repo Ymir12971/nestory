@@ -4,6 +4,7 @@ import sensible from '@fastify/sensible';
 import { loadEnv } from './config/env';
 import { errorHandler } from './lib/errors';
 import authPlugin from './lib/auth';
+import { registerRateLimit } from './lib/rateLimit';
 import { ensureBuckets } from './lib/supabase';
 import { startStoryWorker } from './lib/storyQueue';
 import { isMockEnabled } from './lib/storyAi';
@@ -17,6 +18,9 @@ const app = Fastify({
 await app.register(cors, { origin: env.CORS_ORIGIN });
 await app.register(sensible);
 await app.register(authPlugin);
+// Rate limit runs at preHandler — registered AFTER auth so req.userId is set
+// before the limiter's key generator looks at it.
+await registerRateLimit(app);
 
 app.setErrorHandler(errorHandler);
 

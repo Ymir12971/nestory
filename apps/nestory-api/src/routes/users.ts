@@ -4,6 +4,7 @@ import type { User, LinkedProvider } from '@nestory/types';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { Errors } from '../lib/errors';
 import { parseBody } from '../lib/validation';
+import { audit } from '../lib/audit';
 
 const userPatchSchema = z.object({
   name:     z.string().min(1).max(100).optional(),
@@ -67,11 +68,20 @@ export async function usersRoutes(app: FastifyInstance) {
 
   // DELETE /users/me — 软删（注销账号，30 天恢复窗）
   app.delete('/me', async (req) => {
+    const deletedAt = new Date();
     await prisma.user.update({
       where: { id: req.userId },
-      data:  { deletedAt: new Date() },
+      data:  { deletedAt },
     });
-    // TODO: 同步触发 Supabase signOut（client side），写 audit_log
-    return { data: { deletedAt: new Date().toISOString() } };
+    audit({
+      userId:    req.userId,
+      actorType: 'user',
+      action:    'delete_account',
+      resource:  'user',
+      resourceId: req.userId,
+      req,
+    });
+    // TODO: 同步触发 Supabase signOut（client side）
+    return { data: { deletedAt: deletedAt.toISOString() } };
   });
 }
