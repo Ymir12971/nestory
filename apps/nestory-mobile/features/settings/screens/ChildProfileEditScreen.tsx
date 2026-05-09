@@ -9,6 +9,7 @@ import type { Child, ChildGender, ChildPatch } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { useChild, useUpdateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 type UnitSystem = 'metric' | 'imperial';
 
@@ -64,13 +65,14 @@ function UnitInput({
 
 export function ChildProfileEditScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const childQ = useChild(id ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Edit Profile</Text>
@@ -100,6 +102,7 @@ export function ChildProfileEditScreen() {
 
 function EditForm({ child }: { child: Child }) {
   const router = useRouter();
+  const goBack = useGoBack();
   const updateChild = useUpdateChild(child.id);
   const pickPhoto = usePhotoPicker();
 
@@ -144,7 +147,7 @@ function EditForm({ child }: { child: Child }) {
       };
 
       await updateChild.mutateAsync(body);
-      router.back();
+      goBack();
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to save changes.');
     }

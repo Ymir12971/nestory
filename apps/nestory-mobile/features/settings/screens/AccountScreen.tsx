@@ -5,6 +5,7 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import type { LinkedProvider } from '@nestory/types';
 import { theme } from '@/shared/theme';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 import { useMe } from '@/api';
 import { setDevSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient } from '@/features/auth/supabaseClient';
@@ -17,6 +18,7 @@ const PROVIDER_ICON = { apple: 'apple-fill', google: 'google-fill' } as const;
 
 export function AccountScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const meQ = useMe();
   const qc = useQueryClient();
 
@@ -31,7 +33,7 @@ export function AccountScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Account</Text>

@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme } from '@/shared/theme';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 // TODO: replace with real URLs once legal pages are deployed
 const TERMS_URL   = 'https://nestory.app/terms';
@@ -12,11 +13,12 @@ const APP_VERSION = '1.0.0 (Build 1)';
 
 export function AboutScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>About</Text>

@@ -5,6 +5,7 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { useChildren } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 function formatBirthDate(birthDate: string): string {
   const d = new Date(birthDate);
@@ -15,6 +16,7 @@ function formatBirthDate(birthDate: string): string {
 
 export function ChildProfileListScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const childrenQ = useChildren();
 
   const renderBody = () => {
@@ -95,7 +97,7 @@ export function ChildProfileListScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* NavBar */}
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Child Profiles</Text>

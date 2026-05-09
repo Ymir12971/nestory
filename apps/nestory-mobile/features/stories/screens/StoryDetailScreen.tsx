@@ -16,6 +16,7 @@ import WebView from 'react-native-webview';
 import { theme, palette } from '@/shared/theme';
 import { config } from '@/shared/config';
 import { useStory } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 // TODO: wire auth token injection so nestory-web can authenticate the WebView request
 
@@ -33,6 +34,7 @@ function parseMonthKey(monthKey: string): { navTitle: string; heroTitle: string 
 
 export function StoryDetailScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const storyQ = useStory(id ?? null);
@@ -79,7 +81,7 @@ export function StoryDetailScreen() {
 
         <View style={{ height: insets.top }} />
         <View style={styles.navBar}>
-          <Pressable hitSlop={8} onPress={() => router.back()}>
+          <Pressable hitSlop={8} onPress={goBack}>
             <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.onColor} />
           </Pressable>
           <Text style={styles.navTitle} numberOfLines={1}>{navTitle}</Text>

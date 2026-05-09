@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import type { Subscription } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { useSubscription } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 // ---------- Types ----------
 
@@ -250,6 +251,7 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
 
 export function SubscriptionScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const subQ = useSubscription();
 
   const isPremium =
@@ -258,7 +260,7 @@ export function SubscriptionScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <NavBar onBack={() => router.back()} />
+      <NavBar onBack={goBack} />
       {subQ.isLoading || !subQ.data ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.text.brand} />

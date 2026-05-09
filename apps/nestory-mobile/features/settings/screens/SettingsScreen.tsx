@@ -7,6 +7,7 @@ import type { SubscriptionStatus } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { useMe, useSubscription, useChildren } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 // ---------- Subscription entry derivation ----------
 
@@ -105,6 +106,7 @@ function ToggleRow({
 
 export function SettingsScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const meQ        = useMe();
   const subQ       = useSubscription();
   const childrenQ  = useChildren();
@@ -152,7 +154,7 @@ export function SettingsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* NavBar */}
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Settings</Text>

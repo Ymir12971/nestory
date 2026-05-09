@@ -20,6 +20,7 @@ import type { ChildCreate, ChildGender } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { useCreateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 // ─── Progress bar (5 segments, N filled) ─────────────────────────────────────
 
@@ -322,6 +323,7 @@ const GENDER_TO_API: Record<NonNullable<Gender>, ChildGender> = {
 
 export function ChildProfileScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const pickPhoto = usePhotoPicker();
   const createChild = useCreateChild();
   const [step, setStep] = useState<Step>(0);
@@ -340,7 +342,7 @@ export function ChildProfileScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const onBack = () => {
-    if (step === 0) router.back();
+    if (step === 0) goBack();
     else setStep((s) => (s - 1) as Step);
   };
 

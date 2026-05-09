@@ -5,11 +5,13 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme } from '@/shared/theme';
 import { useAsset, useHighlight, useUpdateHighlight } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const CELL_SIZE = 170;
 
 export function MemoryCoverScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const { highlightId, assetId } = useLocalSearchParams<{
     highlightId?: string;
     assetId?:     string;
@@ -31,18 +33,18 @@ export function MemoryCoverScreen() {
 
   const handleDone = async () => {
     if (!highlightId || !selectedFileId) {
-      router.back();
+      goBack();
       return;
     }
     if (selectedFileId === highlightQ.data?.coverFileId) {
-      router.back();
+      goBack();
       return;
     }
     setError(null);
     setSaving(true);
     try {
       await updateHighlight.mutateAsync({ coverFileId: selectedFileId });
-      router.back();
+      goBack();
     } catch (e: any) {
       setError(e?.message ?? 'Failed to update cover.');
     } finally {
@@ -57,7 +59,7 @@ export function MemoryCoverScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Cover Photo</Text>

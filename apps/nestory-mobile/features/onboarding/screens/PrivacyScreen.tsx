@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme } from '@/shared/theme';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const PRIVACY_SECTIONS = [
   {
@@ -25,12 +26,13 @@ const PRIVACY_SECTIONS = [
 
 export function PrivacyScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* NavBar */}
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Privacy Policy</Text>

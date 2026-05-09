@@ -5,6 +5,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Memory } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { useAsset } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -25,16 +26,10 @@ function formatCapturedAt(iso: string): string {
 
 export function MemoryDetailScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const memoryQ = useAsset(id ?? null);
-
-  // On web, a hard refresh wipes the SPA's navigation stack, so router.back()
-  // becomes a no-op. Fall back to the tabs root.
-  const goBack = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)');
-  };
 
   return (
     <View style={styles.root}>
@@ -69,12 +64,8 @@ export function MemoryDetailScreen() {
 
 function Body({ memory }: { memory: Memory }) {
   const router = useRouter();
+  const goBack = useGoBack();
   const dotCount = memory.files.length;
-
-  const goBack = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)');
-  };
 
   return (
     <>

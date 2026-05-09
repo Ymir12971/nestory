@@ -9,6 +9,7 @@ import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { ApiClientError, uploadPhoto, useChildren, useCreateAsset, useCreateHighlight, useSubscription } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 type SaveState = 'both_empty' | 'need_photos' | 'need_note' | 'active';
 
@@ -35,6 +36,7 @@ function getHlCaption(sub: SubscriptionStatus, count: number, limit: number): st
 
 export function AddMemoryScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const pickPhotos = usePhotoPicker({ multiple: true });
   const childrenQ = useChildren();
   const subQ      = useSubscription();
@@ -104,7 +106,7 @@ export function AddMemoryScreen() {
         }
       }
 
-      router.back();
+      goBack();
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to save memory. Please try again.');
     } finally {
@@ -125,7 +127,7 @@ export function AddMemoryScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* NavBar */}
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>New Memory</Text>

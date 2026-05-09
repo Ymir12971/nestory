@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme } from '@/shared/theme';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const DATA_POINTS = [
   'Your photos and text are processed securely to generate Stories.',
@@ -12,11 +13,12 @@ const DATA_POINTS = [
 
 export function DataPrivacyScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Data & Privacy</Text>

@@ -5,10 +5,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 import { useMe } from '@/api';
 
 export function FeedbackScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const meQ = useMe();
   const [feedbackText, setFeedbackText] = useState('');
   const [email, setEmail]               = useState('');
@@ -23,7 +25,7 @@ export function FeedbackScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Feedback</Text>

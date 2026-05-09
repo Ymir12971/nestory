@@ -5,19 +5,21 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { theme, palette } from '@/shared/theme';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 4;
 
 export function NotificationsScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* NavBar */}
       <View style={styles.navBar}>
         <View style={styles.navRow}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
+          <Pressable onPress={goBack} hitSlop={8}>
             <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
           </Pressable>
         </View>

@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const TOTAL_STEPS = 5;
 type Plan = 'yearly' | 'monthly';
@@ -23,6 +24,7 @@ const FEATURES: Array<{ name: string; free: string; premium: string }> = [
 
 export function PlanScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const [plan, setPlan] = useState<Plan>('yearly');
 
   return (
@@ -30,7 +32,7 @@ export function PlanScreen() {
       {/* NavBar */}
       <View style={styles.navBar}>
         <View style={styles.navRow}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
+          <Pressable onPress={goBack} hitSlop={8}>
             <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
           </Pressable>
         </View>

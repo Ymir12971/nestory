@@ -17,6 +17,7 @@ import {
   useDeleteHighlight,
   useUpdateAsset,
 } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -24,13 +25,14 @@ function formatDate(iso: string): string {
 
 export function MemoryEditScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const memoryQ = useAsset(id ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Edit Memory</Text>
@@ -57,6 +59,7 @@ export function MemoryEditScreen() {
 
 function EditForm({ memory }: { memory: Memory }) {
   const router = useRouter();
+  const goBack = useGoBack();
   const updateAsset     = useUpdateAsset(memory.id);
   const deleteAsset     = useDeleteAsset();
   const createHighlight = useCreateHighlight();
@@ -136,7 +139,7 @@ function EditForm({ memory }: { memory: Memory }) {
         await deleteHighlight.mutateAsync(memory.linkedHighlight.id);
       }
 
-      router.back();
+      goBack();
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to save changes.');
     } finally {

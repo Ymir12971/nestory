@@ -6,6 +6,7 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { usePhotoPicker } from '@/shared/hooks/usePhotoPicker';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 function ProgressBar() {
   return (
@@ -25,6 +26,7 @@ const pbStyles = StyleSheet.create({
 
 export function SecondChildScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const pickPhoto = usePhotoPicker();
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -36,7 +38,7 @@ export function SecondChildScreen() {
       {/* NavBar */}
       <View>
         <View style={styles.navRow}>
-          <Pressable hitSlop={8} onPress={() => router.back()}>
+          <Pressable hitSlop={8} onPress={goBack}>
             <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
           </Pressable>
           <View style={{ width: 24 }} />

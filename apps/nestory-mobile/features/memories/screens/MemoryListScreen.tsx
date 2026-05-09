@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import type { Memory } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { useAssets, useChildren } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -50,6 +51,7 @@ function formatTime(iso: string): string {
 
 export function MemoryListScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const childrenQ = useChildren();
   const now = new Date();
   const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
@@ -67,7 +69,7 @@ export function MemoryListScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* NavBar */}
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Memories</Text>

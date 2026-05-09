@@ -11,6 +11,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Highlight } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { useDeleteHighlight, useHighlight, useUpdateHighlight } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 function formatFullDate(capturedAt: string): string {
   return new Date(capturedAt).toLocaleString('en-US', {
@@ -25,13 +26,14 @@ function pickCoverUrl(item: Highlight): string | null {
 
 export function HighlightDetailScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const highlightQ = useHighlight(id ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Highlight</Text>
@@ -58,6 +60,7 @@ export function HighlightDetailScreen() {
 
 function Body({ item }: { item: Highlight }) {
   const router = useRouter();
+  const goBack = useGoBack();
   const { width } = useWindowDimensions();
   const updateHighlight = useUpdateHighlight(item.id);
   const deleteHighlight = useDeleteHighlight();
@@ -89,7 +92,7 @@ function Body({ item }: { item: Highlight }) {
     try {
       await deleteHighlight.mutateAsync(item.id);
       setRemoveVisible(false);
-      router.back();
+      goBack();
     } catch (e: any) {
       setActionError(e?.message ?? 'Failed to remove highlight.');
     }

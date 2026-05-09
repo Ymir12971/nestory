@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme } from '@/shared/theme';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -20,6 +21,7 @@ function getFirstWeekday(year: number, month: number) {
 
 export function MemoryDateScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const today = new Date();
   const [year,  setYear]  = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -55,11 +57,11 @@ export function MemoryDateScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* NavBar */}
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Date</Text>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <Text style={styles.doneBtn}>Done</Text>
         </Pressable>
       </View>

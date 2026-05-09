@@ -5,9 +5,11 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme } from '@/shared/theme';
 import { useAsset, usePresetTags, useUpdateAsset, useUserTags } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 export function MemoryTagsScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const { memoryId } = useLocalSearchParams<{ memoryId?: string }>();
 
   const memoryQ      = useAsset(memoryId ?? null);
@@ -45,14 +47,14 @@ export function MemoryTagsScreen() {
 
   const handleDone = async () => {
     if (!memoryId) {
-      router.back();
+      goBack();
       return;
     }
     setError(null);
     setSaving(true);
     try {
       await updateAsset.mutateAsync({ tagValues: [...selected] });
-      router.back();
+      goBack();
     } catch (e: any) {
       setError(e?.message ?? 'Failed to save tags.');
     } finally {
@@ -81,7 +83,7 @@ export function MemoryTagsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={() => router.back()}>
+        <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Tags</Text>
