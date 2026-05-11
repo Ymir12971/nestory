@@ -27,6 +27,17 @@ function getConnection(): IORedis {
     // BullMQ requires this null to keep connections alive on long blocking calls.
     maxRetriesPerRequest: null,
   });
+  // Without this listener, ioredis's connect retries emit 'error' events that
+  // count as unhandled and crash the process when Redis is down (e.g. Docker
+  // Desktop off in dev). Logging once is enough — repeated reconnect noise
+  // would drown out real errors.
+  let logged = false;
+  _connection.on('error', (err) => {
+    if (logged) return;
+    logged = true;
+    console.warn('[storyQueue] Redis unavailable:', err.message);
+  });
+  _connection.on('ready', () => { logged = false; });
   return _connection;
 }
 

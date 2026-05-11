@@ -1,0 +1,121 @@
+.story {
+  max-width: 720px;
+  margin: 0 auto;
+  background: #fefcfa;
+  color: #1c1f1c;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+.hero {
+  position: relative;
+  height: 60vh;
+  min-height: 360px;
+  overflow: hidden;
+}
+
+.cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coverPlaceholder {
+  background: linear-gradient(135deg, #23ab65 0%, #166534 100%);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.35) 0%,
+    rgba(0, 0, 0, 0) 35%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+.heroText {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 32px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.month {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.title {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.age {
+  margin: 10px 0 0;
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+.body {
+  padding: 40px 24px 60px;
+}
+
+.section {
+  margin: 0 0 24px;
+}
+
+.section p {
+  margin: 0 0 16px;
+  font-size: 18px;
+  color: #1c1f1c;
+}
+
+.sectionSummary p {
+  font-size: 20px;
+  font-weight: 500;
+  color: #166534;
+}
+
+.sectionMilestone p {
+  padding: 16px 20px;
+  background: #edfbf2;
+  border-left: 4px solid #23ab65;
+  border-radius: 6px;
+  font-style: italic;
+}
+
+.sectionReflection p {
+  color: #4a5550;
+  font-style: italic;
+}
+
+.sectionClosing p {
+  margin-top: 32px;
+  font-size: 20px;
+  font-weight: 500;
+  text-align: center;
+  color: #166534;
+}
+
+.watermark {
+  padding: 20px 24px 40px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.04em;
+}
+
+@media (min-width: 720px) {
+  .title { font-size: 44px; }
+  .body { padding: 56px 56px 80px; }
+}

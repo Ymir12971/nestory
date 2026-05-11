@@ -33,7 +33,7 @@ export function setDevUserId(id: string) {
   _devUserId = id;
 }
 
-async function getAuthToken(): Promise<string> {
+export async function getAuthToken(): Promise<string> {
   const sb = getSupabaseClient();
   if (sb) {
     const { data } = await sb.auth.getSession();

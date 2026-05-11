@@ -1,7 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Prisma } from '@prisma/client';
 import rateLimit from '@fastify/rate-limit';
-import IORedis from 'ioredis';
 import { prisma } from './prisma';
 
 /**
@@ -30,22 +29,14 @@ const DEFAULT_WINDOW_MS   = 60 * 1000;
 const ABUSE_TYPE          = 'rate_limit_429';
 
 export async function registerRateLimit(app: FastifyInstance): Promise<void> {
-  const redisUrl = process.env.REDIS_URL;
-  const redis = redisUrl
-    ? new IORedis(redisUrl, {
-        maxRetriesPerRequest: null,
-        // Crucial for @fastify/rate-limit: use a different connection mode
-        // than BullMQ's blocking calls. Bound to a single key namespace so
-        // BullMQ keys and rate keys don't collide.
-        connectTimeout: 5000,
-        keyPrefix: 'rl:',
-      })
-    : undefined;
-
+  // In-memory store. Single-instance dev (today) is unaffected; on Railway
+  // we'll spin up a Redis service and switch the plugin to a Redis store —
+  // the API is single-instance until that scales out. Keeping the in-mem
+  // path here avoids brittle ioredis startup races when Docker Desktop is
+  // off during local dev.
   await app.register(rateLimit, {
     max:        DEFAULT_MAX,
     timeWindow: DEFAULT_WINDOW_MS,
-    redis,
     nameSpace:  'nestory-rl-',
     // Run after auth (preHandler) so req.userId is populated. The default
     // onRequest fires too early — keyGenerator would only see IPs.

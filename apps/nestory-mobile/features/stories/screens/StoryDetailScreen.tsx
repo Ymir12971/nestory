@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ImageBackground,
@@ -15,10 +15,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import WebView from 'react-native-webview';
 import { theme, palette } from '@/shared/theme';
 import { config } from '@/shared/config';
-import { useStory } from '@/api';
+import { useStory, getAuthToken } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
-
-// TODO: wire auth token injection so nestory-web can authenticate the WebView request
 
 const HERO_H = 420;
 
@@ -40,8 +38,21 @@ export function StoryDetailScreen() {
   const storyQ = useStory(id ?? null);
 
   const [webviewState, setWebviewState] = useState<'loading' | 'loaded' | 'error'>('loading');
-
-  const webUrl = `${config.webBaseUrl}/story/${id}`;
+  // Resolve the auth token once and inject it as ?t=… so the web page can
+  // authenticate against the API server-side. We resolve it asynchronously
+  // because Supabase's getSession is a promise; the WebView stays in
+  // `loading` until the URL is ready.
+  const [webUrl, setWebUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getAuthToken().then((tok) => {
+      if (cancelled || !id) return;
+      setWebUrl(`${config.webBaseUrl}/story/${id}?t=${encodeURIComponent(tok)}`);
+    }).catch(() => {
+      if (!cancelled) setWebviewState('error');
+    });
+    return () => { cancelled = true; };
+  }, [id]);
 
   const meta       = storyQ.data?.document.meta;
   const monthKey   = storyQ.data?.monthKey;
@@ -52,8 +63,13 @@ export function StoryDetailScreen() {
 
   const handleShare = async () => {
     // TODO: call POST /shares to get shareUrl + ogTitle, then use Share.share()
+    // For now, share the public-share-less /story URL strip of auth token —
+    // the receiver won't be able to view it without a proper /share/<token>
+    // link, but this stub keeps the UI wired up.
+    if (!webUrl) return;
+    const shareableUrl = webUrl.split('?')[0]!;
     try {
-      await Share.share({ url: webUrl, title: heroTitle || 'Story' });
+      await Share.share({ url: shareableUrl, title: heroTitle || 'Story' });
     } catch {
       // user dismissed — no-op
     }
@@ -98,14 +114,16 @@ export function StoryDetailScreen() {
 
       {/* ── WebView body ─────────────────────────────────────── */}
       <View style={styles.webviewWrap}>
-        <WebView
-          source={{ uri: webUrl }}
-          style={styles.webview}
-          onLoadStart={() => setWebviewState('loading')}
-          onLoadEnd={() => setWebviewState('loaded')}
-          onError={() => setWebviewState('error')}
-          showsVerticalScrollIndicator={false}
-        />
+        {webUrl ? (
+          <WebView
+            source={{ uri: webUrl }}
+            style={styles.webview}
+            onLoadStart={() => setWebviewState('loading')}
+            onLoadEnd={() => setWebviewState('loaded')}
+            onError={() => setWebviewState('error')}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : null}
 
         {/* Loading overlay — hero stays, body shows skeleton (S-02 Story Detail · Loading) */}
         {webviewState === 'loading' && (
