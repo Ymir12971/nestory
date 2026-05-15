@@ -12,11 +12,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import WebView from 'react-native-webview';
 import { theme, palette } from '@/shared/theme';
 import { config } from '@/shared/config';
 import { useStory, getAuthToken } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { StoryWebView } from '../components/StoryWebView';
 
 const HERO_H = 420;
 
@@ -115,13 +115,12 @@ export function StoryDetailScreen() {
       {/* ── WebView body ─────────────────────────────────────── */}
       <View style={styles.webviewWrap}>
         {webUrl ? (
-          <WebView
-            source={{ uri: webUrl }}
+          <StoryWebView
+            uri={webUrl}
             style={styles.webview}
             onLoadStart={() => setWebviewState('loading')}
             onLoadEnd={() => setWebviewState('loaded')}
             onError={() => setWebviewState('error')}
-            showsVerticalScrollIndicator={false}
           />
         ) : null}
 
