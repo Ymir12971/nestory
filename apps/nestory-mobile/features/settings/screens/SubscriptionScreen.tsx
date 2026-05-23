@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import type { Subscription } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { useSubscription } from '@/api';
+import { useSubscription, queryClient, queryKeys } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { purchasePlan, openManageSubscriptions, isPurchasesAvailable } from '@/features/billing/purchases';
 
 // ---------- Types ----------
 
@@ -46,6 +47,26 @@ function NavBar({ onBack }: { onBack: () => void }) {
 
 function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnType<typeof useRouter> }) {
   const [cycle, setCycle] = useState<PlanCycle>('yearly');
+  const [purchasing, setPurchasing] = useState(false);
+
+  const handleUpgrade = async () => {
+    if (!isPurchasesAvailable()) {
+      Alert.alert('Not available', 'In-app purchases require the mobile app.');
+      return;
+    }
+    setPurchasing(true);
+    try {
+      const res = await purchasePlan(cycle);
+      if (res.status === 'purchased') {
+        // Refresh — once the webhook flips the row, this screen re-renders to Premium.
+        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+      }
+    } catch (e) {
+      Alert.alert('Purchase failed', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
 
   return (
     <>
@@ -145,8 +166,9 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
       {/* CTA */}
       <View style={styles.cta}>
         <Pressable
-          style={({ pressed }) => [styles.premiumBtnWrap, pressed && { opacity: 0.85 }]}
-          onPress={() => { /* TODO: initiate IAP purchase for selected cycle */ }}
+          style={({ pressed }) => [styles.premiumBtnWrap, (pressed || purchasing) && { opacity: 0.85 }]}
+          onPress={handleUpgrade}
+          disabled={purchasing}
         >
           <LinearGradient
             colors={[palette.accent[500], palette.accent[400]]}
@@ -154,7 +176,9 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
             end={{ x: 1, y: 0 }}
             style={styles.premiumBtn}
           >
-            <Text style={styles.premiumBtnLabel}>Try Premium Free for 1 Month</Text>
+            <Text style={styles.premiumBtnLabel}>
+              {purchasing ? 'Processing…' : 'Try Premium Free for 1 Month'}
+            </Text>
           </LinearGradient>
         </Pressable>
         <Text style={styles.ctaCaption}>Cancel anytime. Manage in Settings.</Text>
@@ -238,7 +262,17 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
       <View style={styles.ctaPremium}>
         <Pressable
           style={styles.cancelBtn}
-          onPress={() => { /* TODO: initiate IAP cancellation flow */ }}
+          onPress={() => {
+            // Android subscriptions are cancelled in the Play Store, not in-app.
+            Alert.alert(
+              'Cancel subscription',
+              'Subscriptions are managed in the Google Play Store. Open it now?',
+              [
+                { text: 'Not now', style: 'cancel' },
+                { text: 'Open Play Store', onPress: () => { openManageSubscriptions(); } },
+              ],
+            );
+          }}
         >
           <Text style={styles.cancelBtnLabel}>Cancel Subscription</Text>
         </Pressable>

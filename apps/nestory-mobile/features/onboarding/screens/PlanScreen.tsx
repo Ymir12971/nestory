@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { queryClient, queryKeys } from '@/api';
+import { purchasePlan, isPurchasesAvailable } from '@/features/billing/purchases';
 
 const TOTAL_STEPS = 5;
 type Plan = 'yearly' | 'monthly';
-
-// TODO(justin): replace with real App Store Connect product IDs after RevenueCat setup
-// See docs/dev/PENDING_INTEGRATION_TODOS.md
-const IAP_PRODUCT_ID_YEARLY   = 'nestory_premium_yearly_placeholder';
-const IAP_PRODUCT_ID_MONTHLY  = 'nestory_premium_monthly_placeholder';
 
 const FEATURES: Array<{ name: string; free: string; premium: string }> = [
   { name: 'AI Stories',             free: '2',          premium: 'Unlimited' },
@@ -26,6 +23,29 @@ export function PlanScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const [plan, setPlan] = useState<Plan>('yearly');
+  const [purchasing, setPurchasing] = useState(false);
+
+  const handleSubscribe = async () => {
+    // On web / dev (no RC key) just continue onboarding — purchases can't run here.
+    if (!isPurchasesAvailable()) {
+      router.replace('/');
+      return;
+    }
+    setPurchasing(true);
+    try {
+      const res = await purchasePlan(plan);
+      if (res.status === 'purchased') {
+        // Webhook updates the backend async; refresh so the app reflects premium.
+        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        router.replace('/');
+      }
+      // 'cancelled' → stay on screen, let the user choose again.
+    } catch (e) {
+      Alert.alert('Purchase failed', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -135,11 +155,9 @@ export function PlanScreen() {
       {/* CTAs */}
       <View style={styles.cta}>
         <Pressable
-          style={({ pressed }) => [styles.premiumWrap, pressed && { opacity: 0.85 }]}
-          onPress={() => {
-            // TODO: RevenueCat IAP purchase — pending vicol approval
-            router.replace('/');
-          }}
+          style={({ pressed }) => [styles.premiumWrap, (pressed || purchasing) && { opacity: 0.85 }]}
+          onPress={handleSubscribe}
+          disabled={purchasing}
         >
           <LinearGradient
             colors={[palette.accent[500], palette.accent[400]]}
@@ -147,7 +165,9 @@ export function PlanScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.premiumButton}
           >
-            <Text style={styles.premiumLabel}>Try Premium Free for 1 Month</Text>
+            <Text style={styles.premiumLabel}>
+              {purchasing ? 'Processing…' : 'Try Premium Free for 1 Month'}
+            </Text>
           </LinearGradient>
         </Pressable>
 

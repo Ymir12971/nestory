@@ -4,6 +4,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/api';
+import { useSession } from '@/features/auth/hooks/useSession';
+import { initPurchases, identifyPurchaseUser } from '@/features/billing/purchases';
 import {
   useFonts,
   Manrope_400Regular,
@@ -21,6 +23,7 @@ import {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const { session } = useSession();
   const [fontsLoaded, fontError] = useFonts({
     Manrope_400Regular,
     Manrope_500Medium,
@@ -35,6 +38,17 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) SplashScreen.hideAsync();
   }, [fontsLoaded, fontError]);
+
+  // Configure RevenueCat once at startup (no-op on web / when key absent).
+  useEffect(() => {
+    initPurchases();
+  }, []);
+
+  // Alias the RC customer to our user id whenever a session is present — covers
+  // both fresh sign-in and cold-start session restore.
+  useEffect(() => {
+    if (session?.userId) identifyPurchaseUser(session.userId);
+  }, [session?.userId]);
 
   if (!fontsLoaded && !fontError) return null;
 

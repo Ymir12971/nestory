@@ -20,4 +20,6 @@ export const config = {
   // Supabase client can be constructed lazily and produce a clear error if missing.
   supabaseUrl:     process.env.EXPO_PUBLIC_SUPABASE_URL     ?? '',
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+  // RevenueCat public SDK key (Android). Empty → IAP disabled (isPurchasesAvailable() false).
+  revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '',
 } as const;
