@@ -14,7 +14,9 @@ const expoHostUri = Constants.expoConfig?.hostUri ?? '';
 const devHost     = expoHostUri.split(':')[0] || 'localhost';
 
 export const config = {
-  apiBaseUrl: dev ? `http://${devHost}:3001` : 'https://api.nestory.app',
+  // Non-dev builds (EAS preview/production) hit the deployed Railway API.
+  apiBaseUrl: dev ? `http://${devHost}:3001` : 'https://nestoryapi-production.up.railway.app',
+  // TODO: nestory-web not deployed yet — Story WebView / share links need this.
   webBaseUrl: dev ? `http://${devHost}:3000` : 'https://web.nestory.app',
   // EXPO_PUBLIC_* envs are inlined at build time. Both default to '' so the
   // Supabase client can be constructed lazily and produce a clear error if missing.
