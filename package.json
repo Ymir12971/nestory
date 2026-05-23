@@ -12,6 +12,8 @@
     "demo": "node scripts/start-demo.mjs",
     "db:seed": "pnpm --filter @nestory/api prisma:seed",
     "dev": "turbo run dev --filter='./apps/nestory-api' --filter='./apps/nestory-web'",
+    "api": "pnpm --filter ./apps/nestory-api dev",
+    "mobile": "pnpm --filter ./apps/nestory-mobile start",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",

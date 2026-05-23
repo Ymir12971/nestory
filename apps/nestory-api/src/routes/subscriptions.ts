@@ -8,6 +8,11 @@ import type {
 } from '@nestory/types';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
+import {
+  deriveSubscriptionUpdate,
+  verifyWebhookAuth,
+  type RCWebhookPayload,
+} from '../lib/revenueCat';
 
 const HIGHLIGHT_LIMIT_FREE = 10;
 
@@ -63,10 +68,71 @@ export async function subscriptionsRoutes(app: FastifyInstance) {
     return { data };
   });
 
-  // POST /subscriptions/sync — RevenueCat webhook (no JWT, signature verify)
-  // TODO: 接 RevenueCat webhook 验签 + last_event_at 乱序保护 + last_event_id 幂等
-  app.post('/sync', async () => {
-    throw new ApiError('INTERNAL_ERROR', 'TODO: RevenueCat webhook handler', 501);
+  // POST /subscriptions/sync — RevenueCat webhook.
+  //
+  // Exempt from JWT auth (see lib/auth.ts) — instead we verify a shared secret
+  // in the Authorization header (configured in RC Dashboard → Integrations →
+  // Webhooks → Authorization header value, mirrored to REVENUECAT_WEBHOOK_SECRET).
+  //
+  // Idempotency / ordering:
+  //   - `lastEventId` blocks exact duplicates (RC retries on non-2xx)
+  //   - `lastEventAt` blocks events older than the last applied one, so
+  //     out-of-order delivery can't regress a more recent state.
+  //
+  // Always reply 2xx after auth passes; non-2xx triggers RC retries which we
+  // don't want for things like unknown event types or unknown users.
+  app.post('/sync', async (req, reply) => {
+    if (!verifyWebhookAuth(req)) {
+      return reply.status(401).send({
+        error: { code: 'UNAUTHORIZED', message: 'Invalid webhook authorization', statusCode: 401 },
+      });
+    }
+
+    const body = req.body as RCWebhookPayload | undefined;
+    const event = body?.event;
+    if (!event?.id || !event.type || !event.app_user_id || typeof event.event_timestamp_ms !== 'number') {
+      return reply.status(400).send({
+        error: { code: 'VALIDATION_ERROR', message: 'Malformed RC webhook payload', statusCode: 400 },
+      });
+    }
+
+    req.log.info(
+      { rcEventId: event.id, type: event.type, userId: event.app_user_id, env: event.environment },
+      'RC webhook received',
+    );
+
+    const sub = await prisma.subscription.findUnique({ where: { userId: event.app_user_id } });
+    if (!sub) {
+      // RC has the user but we don't — they haven't logged into our app yet,
+      // or app_user_id wasn't aliased to the Supabase user UUID. Ack & move on.
+      req.log.warn({ userId: event.app_user_id, rcEventId: event.id }, 'RC event for unknown user');
+      return { received: true, applied: false, reason: 'unknown_user' };
+    }
+
+    if (sub.lastEventId === event.id) {
+      return { received: true, applied: false, reason: 'duplicate' };
+    }
+    if (sub.lastEventAt && event.event_timestamp_ms < sub.lastEventAt.getTime()) {
+      return { received: true, applied: false, reason: 'stale' };
+    }
+
+    const update = deriveSubscriptionUpdate(event, sub);
+    const eventTs = new Date(event.event_timestamp_ms);
+
+    if (!update) {
+      // Informational event (TEST, TRANSFER, …) — record the id/ts but no state change.
+      await prisma.subscription.update({
+        where: { userId: event.app_user_id },
+        data:  { lastEventId: event.id, lastEventAt: eventTs },
+      });
+      return { received: true, applied: false, reason: 'informational', type: event.type };
+    }
+
+    await prisma.subscription.update({
+      where: { userId: event.app_user_id },
+      data:  { ...update, lastEventId: event.id, lastEventAt: eventTs },
+    });
+    return { received: true, applied: true, type: event.type };
   });
 
   // GET /subscriptions/paywall-config — A/B/C/D 配置（前端 PaywallModal 已硬编码 headlines/benefits，

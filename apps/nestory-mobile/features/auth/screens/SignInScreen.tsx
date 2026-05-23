@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,7 +7,7 @@ import * as AuthSession from 'expo-auth-session';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
-import { setDevSession } from '@/features/auth/hooks/useSession';
+import { setDevSession, useSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient, isSupabaseAuthAvailable } from '@/features/auth/supabaseClient';
 
 // Demo userId for the dev escape hatch (Supabase envs not configured); matches
@@ -16,9 +16,21 @@ const DEMO_USER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
 export function SignInScreen() {
   const router = useRouter();
+  const { session } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [pendingProvider, setPendingProvider] = useState<'apple' | 'google' | null>(null);
   const supabaseReady = isSupabaseAuthAvailable();
+
+  // On web, signInWithOAuth navigates the whole page away to the provider and
+  // back, landing on this screen again with the Supabase session already
+  // restored — no explicit navigation runs in that flow. Redirect once a real
+  // session appears. Dev sessions carry a null accessToken and are navigated
+  // by handleDevSignIn, so they don't trigger this.
+  useEffect(() => {
+    if (session?.accessToken) {
+      router.replace('/onboarding/profile');
+    }
+  }, [session?.accessToken, router]);
 
   const blurFocus = () => {
     // Avoids React Navigation aria-hidden warning when a Pressable keeps focus.

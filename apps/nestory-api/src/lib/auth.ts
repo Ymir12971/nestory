@@ -70,6 +70,17 @@ async function ensureUser(user: SupabaseAuthUser, req: FastifyRequest): Promise<
     create: { id: user.id, email, name, timezone: tz },
   });
 
+  // Every user needs a Subscription row — /subscriptions/me and four other
+  // routes do `findUnique({ where: { userId } })` and treat a missing row as a
+  // hard error. The seed user gets one from seed.ts; OAuth users are minted
+  // here, so create their default (free / never_paid) row on first login.
+  // All other columns fall back to their schema defaults.
+  await prisma.subscription.upsert({
+    where:  { userId: user.id },
+    update: {},
+    create: { userId: user.id },
+  });
+
   // Sync linked_providers from the JWT identities (idempotent on (provider, providerUserId)).
   const identities = (user.identities ?? []).filter(
     (i): i is { provider: string; identity_data?: Record<string, unknown> | null } =>
