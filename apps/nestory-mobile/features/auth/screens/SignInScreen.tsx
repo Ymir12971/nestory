@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
@@ -19,7 +19,11 @@ export function SignInScreen() {
   const { session } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [pendingProvider, setPendingProvider] = useState<'apple' | 'google' | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailPending, setEmailPending] = useState(false);
   const supabaseReady = isSupabaseAuthAvailable();
+  const busy = pendingProvider != null || emailPending;
 
   // On web, signInWithOAuth navigates the whole page away to the provider and
   // back, landing on this screen again with the Supabase session already
@@ -94,6 +98,26 @@ export function SignInScreen() {
   const handleApplePress  = () => (supabaseReady ? handleOAuthSignIn('apple')  : handleDevSignIn());
   const handleGooglePress = () => (supabaseReady ? handleOAuthSignIn('google') : handleDevSignIn());
 
+  // Email + password sign-in. Works on any device (no browser / Google / GMS)
+  // — the reliable path for no-GMS phones and mainland users. The useSession
+  // effect above handles the redirect once the session lands.
+  const handleEmailSignIn = async () => {
+    blurFocus();
+    setError(null);
+    const sb = getSupabaseClient();
+    if (!sb) { handleDevSignIn(); return; }
+    if (!email.trim() || !password) { setError('Enter your email and password.'); return; }
+    setEmailPending(true);
+    try {
+      const { error: err } = await sb.auth.signInWithPassword({ email: email.trim(), password });
+      if (err) throw err;
+    } catch (e: any) {
+      setError(e?.message ?? 'Sign-in failed. Please try again.');
+    } finally {
+      setEmailPending(false);
+    }
+  };
+
   return (
     <LinearGradient
       colors={[palette.primary[600], palette.primary[400]]}
@@ -127,13 +151,9 @@ export function SignInScreen() {
         {/* Buttons */}
         <View style={styles.buttonGroup}>
           <Pressable
-            style={({ pressed }) => [
-              styles.socialButton,
-              pressed && styles.pressed,
-              pendingProvider != null && styles.pressed,
-            ]}
+            style={({ pressed }) => [styles.socialButton, (pressed || busy) && styles.pressed]}
             onPress={handleApplePress}
-            disabled={pendingProvider != null}
+            disabled={busy}
           >
             <RemixIcon name="apple-fill" size={22} color={theme.text.brand} />
             <Text style={styles.socialButtonLabel}>
@@ -142,13 +162,9 @@ export function SignInScreen() {
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [
-              styles.socialButton,
-              pressed && styles.pressed,
-              pendingProvider != null && styles.pressed,
-            ]}
+            style={({ pressed }) => [styles.socialButton, (pressed || busy) && styles.pressed]}
             onPress={handleGooglePress}
-            disabled={pendingProvider != null}
+            disabled={busy}
           >
             <RemixIcon name="google-fill" size={20} color={theme.text.brand} />
             <Text style={styles.socialButtonLabel}>
@@ -156,12 +172,47 @@ export function SignInScreen() {
             </Text>
           </Pressable>
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          {!supabaseReady && (
-            <Text style={styles.devNoticeText}>
-              Dev mode: skipping OAuth (configure EXPO_PUBLIC_SUPABASE_URL + ANON_KEY to enable)
+          {/* Email + password — works on any device, no Google/GMS needed */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            placeholderTextColor={theme.text.hint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            editable={!busy}
+          />
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+            placeholderTextColor={theme.text.hint}
+            secureTextEntry
+            autoCapitalize="none"
+            editable={!busy}
+            onSubmitEditing={handleEmailSignIn}
+            returnKeyType="go"
+          />
+          <Pressable
+            style={({ pressed }) => [styles.emailButton, (pressed || busy) && styles.pressed]}
+            onPress={handleEmailSignIn}
+            disabled={busy}
+          >
+            <Text style={styles.emailButtonLabel}>
+              {emailPending ? 'Signing in…' : 'Sign in with Email'}
             </Text>
-          )}
+          </Pressable>
+
+          {error && <Text style={styles.errorText}>{error}</Text>}
         </View>
 
         {/* Footer */}
@@ -233,8 +284,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttonGroup: {
-    paddingTop: theme.spacing.xxl,
-    gap: theme.spacing.m,
+    paddingTop: theme.spacing.l,
+    gap: theme.spacing.s,
     alignItems: 'center',
   },
   socialButton: {
@@ -255,6 +306,43 @@ const styles = StyleSheet.create({
   socialButtonLabel: {
     ...theme.typography.buttonLabelM,
     color: theme.text.brand,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
+    width: 290,
+    marginVertical: theme.spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  dividerText: {
+    ...theme.typography.caption,
+    color: theme.text.onBrandSubtle,
+  },
+  input: {
+    width: 290,
+    height: 48,
+    backgroundColor: theme.surface.default,
+    borderRadius: theme.radius.m,
+    paddingHorizontal: theme.spacing.m,
+    color: theme.text.primary,
+    ...theme.typography.body,
+  },
+  emailButton: {
+    width: 290,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.surface.brand,
+  },
+  emailButtonLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.onColor,
   },
   errorText: {
     ...theme.typography.caption,
