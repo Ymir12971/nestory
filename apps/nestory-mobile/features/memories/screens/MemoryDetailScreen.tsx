@@ -1,4 +1,5 @@
-import { ActivityIndicator, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Dimensions, Image, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -15,7 +16,6 @@ const PHOTO_SIDE_W   = 195;
 const PHOTO_SIDE_H   = 260;
 const PHOTO_GAP      = 12;
 const CAROUSEL_PADDING = (SCREEN_W - PHOTO_CENTER_W) / 2;
-const CAROUSEL_INIT_X  = PHOTO_SIDE_W + PHOTO_GAP;
 
 function formatCapturedAt(iso: string): string {
   const d = new Date(iso);
@@ -66,6 +66,12 @@ function Body({ memory }: { memory: Memory }) {
   const router = useRouter();
   const goBack = useGoBack();
   const dotCount = memory.files.length;
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / (PHOTO_CENTER_W + PHOTO_GAP));
+    setActiveIndex(Math.max(0, Math.min(dotCount - 1, idx)));
+  };
 
   return (
     <>
@@ -107,7 +113,7 @@ function Body({ memory }: { memory: Memory }) {
               showsHorizontalScrollIndicator={false}
               snapToInterval={PHOTO_CENTER_W + PHOTO_GAP}
               decelerationRate="fast"
-              contentOffset={{ x: memory.files.length > 1 ? CAROUSEL_INIT_X : 0, y: 0 }}
+              onMomentumScrollEnd={onCarouselScroll}
               style={styles.carouselScroll}
               contentContainerStyle={[
                 styles.carouselContent,
@@ -129,7 +135,7 @@ function Body({ memory }: { memory: Memory }) {
             {dotCount > 1 && (
               <View style={styles.dots}>
                 {Array.from({ length: dotCount }).map((_, i) => (
-                  <View key={i} style={i === 0 ? styles.dotActive : styles.dotInactive} />
+                  <View key={i} style={i === activeIndex ? styles.dotActive : styles.dotInactive} />
                 ))}
               </View>
             )}

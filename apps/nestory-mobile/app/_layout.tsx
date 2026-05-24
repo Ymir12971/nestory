@@ -1,6 +1,5 @@
-import { Component, type ReactNode, useEffect } from 'react';
-import { ScrollView, Text } from 'react-native';
-import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -22,39 +21,6 @@ import {
 } from '@expo-google-fonts/inter';
 
 SplashScreen.preventAutoHideAsync();
-
-// expo-router catches errors thrown inside child routes at the nearest exported
-// `ErrorBoundary`. In production these otherwise render a blank page. Temporary
-// on-screen diagnostic — remove once the demo build is green.
-export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ padding: 24, paddingTop: 80 }}>
-      <Text style={{ fontSize: 18, fontWeight: '700', color: '#c00', marginBottom: 12 }}>Route error</Text>
-      <Text selectable style={{ fontSize: 13, color: '#222', marginBottom: 12 }}>{String(error?.message ?? error)}</Text>
-      <Text selectable style={{ fontSize: 11, color: '#666', marginBottom: 20 }}>{error?.stack ?? ''}</Text>
-      <Text onPress={retry} style={{ fontSize: 15, color: '#06f' }}>Tap to retry</Text>
-    </ScrollView>
-  );
-}
-
-// Surfaces render errors on screen in production builds (which otherwise just
-// show a blank page). Temporary diagnostic — keep until the demo build is green.
-class DebugErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
-  render() {
-    if (this.state.error) {
-      return (
-        <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ padding: 24, paddingTop: 80 }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#c00', marginBottom: 12 }}>App error</Text>
-          <Text selectable style={{ fontSize: 13, color: '#222', marginBottom: 12 }}>{String(this.state.error?.message ?? this.state.error)}</Text>
-          <Text selectable style={{ fontSize: 11, color: '#666' }}>{this.state.error?.stack ?? ''}</Text>
-        </ScrollView>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 export default function RootLayout() {
   const { session } = useSession();
@@ -87,12 +53,10 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <DebugErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <SafeAreaProvider>
-          <Stack screenOptions={{ headerShown: false }} />
-        </SafeAreaProvider>
-      </QueryClientProvider>
-    </DebugErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }
