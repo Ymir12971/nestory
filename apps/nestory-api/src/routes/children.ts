@@ -25,11 +25,22 @@ const setActiveSchema = z.object({
 
 // ---------- Serializer ----------
 
+// Whole months elapsed since birth (calendar-based, clamped at 0).
+function ageMonthsFrom(birthDate: Date): number {
+  const now = new Date();
+  let months =
+    (now.getFullYear() - birthDate.getFullYear()) * 12 +
+    (now.getMonth() - birthDate.getMonth());
+  if (now.getDate() < birthDate.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
 function serializeChild(c: any, activeChildId: string | null = null) {
   return {
     id:               c.id,
     name:             c.name,
     birthDate:        c.birthDate.toISOString().slice(0, 10), // YYYY-MM-DD
+    ageMonths:        ageMonthsFrom(c.birthDate),
     avatarUrl:        c.avatarUrl,
     gender:           c.gender,
     heightValue:      c.heightValue ? Number(c.heightValue) : null,
