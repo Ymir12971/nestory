@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
@@ -126,6 +126,15 @@ export function SignInScreen() {
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+       <KeyboardAvoidingView
+         style={styles.kav}
+         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+       >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {/* Top white card: photo + logo */}
         <View style={styles.card}>
           <Image
@@ -234,6 +243,8 @@ export function SignInScreen() {
             </Text>
           </Text>
         </View>
+        </ScrollView>
+       </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -245,6 +256,13 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  kav: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    flexGrow: 1,
     alignItems: 'center',
   },
   card: {
@@ -361,9 +379,9 @@ const styles = StyleSheet.create({
     maxWidth: 290,
   },
   footer: {
-    flex: 1,
-    justifyContent: 'flex-end',
+    marginTop: 'auto',
     alignItems: 'center',
+    paddingTop: theme.spacing.xl,
     paddingBottom: theme.spacing.safeBtm,
     gap: theme.spacing.xs,
   },
