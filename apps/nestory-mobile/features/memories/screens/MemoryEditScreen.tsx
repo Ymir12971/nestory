@@ -266,7 +266,7 @@ function EditForm({ memory }: { memory: Memory }) {
             <>
               <View style={styles.rowDivider} />
               <View style={styles.coverPicker}>
-                <Text style={styles.coverPickerLabel}>Highlight cover</Text>
+                <Text style={styles.coverPickerLabel}>Cover photo — tap to choose</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -278,13 +278,19 @@ function EditForm({ memory }: { memory: Memory }) {
                       <Pressable
                         key={f.id}
                         onPress={() => setCoverFileId(f.id)}
-                        style={[styles.coverThumbWrap, selected && styles.coverThumbSelected]}
+                        style={[styles.coverThumbWrap, selected ? styles.coverThumbSelected : styles.coverThumbDim]}
                       >
                         <Image source={{ uri: f.fileUrl }} style={styles.coverThumbImg} />
                         {selected && (
-                          <View style={styles.coverCheck}>
-                            <RemixIcon name="check-line" size={12} color={theme.text.onColor} />
-                          </View>
+                          <>
+                            <View style={styles.coverSelectedOverlay} />
+                            <View style={styles.coverCheck}>
+                              <RemixIcon name="check-line" size={16} color={theme.text.onColor} />
+                            </View>
+                            <View style={styles.coverBadge}>
+                              <Text style={styles.coverBadgeText}>Cover</Text>
+                            </View>
+                          </>
                         )}
                       </Pressable>
                     );
@@ -491,31 +497,52 @@ const styles = StyleSheet.create({
     gap: theme.spacing.s,
   },
   coverThumbWrap: {
-    width: 56,
-    height: 56,
+    width: 64,
+    height: 64,
     borderRadius: theme.radius.m,
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: 'transparent',
     overflow: 'hidden',
   },
   coverThumbSelected: {
     borderColor: theme.surface.brand,
   },
+  coverThumbDim: {
+    opacity: 0.45,
+  },
   coverThumbImg: {
     width: '100%',
     height: '100%',
     backgroundColor: theme.border.strong,
   },
+  coverSelectedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.surface.brand,
+    opacity: 0.18,
+  },
   coverCheck: {
     position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: 3,
+    right: 3,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: theme.surface.brand,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  coverBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: theme.surface.brand,
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  coverBadgeText: {
+    ...theme.typography.tagBadge,
+    color: theme.text.onColor,
   },
 
   cta: {
