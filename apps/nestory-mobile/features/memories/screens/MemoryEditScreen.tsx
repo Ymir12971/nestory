@@ -71,6 +71,9 @@ function EditForm({ memory }: { memory: Memory }) {
   const [newPhotos, setNewPhotos]             = useState<PickedPhoto[]>([]);
   // is_highlight has its own quota-checked endpoint (POST /highlights); PATCH /assets ignores it.
   const [isHighlight, setIsHighlight] = useState(memory.isHighlight);
+  // Cover photo chosen when marking a multi-photo memory as a highlight.
+  // Defaults to the first photo (matches the prior implicit behaviour).
+  const [coverFileId, setCoverFileId] = useState<string | undefined>(memory.files[0]?.id);
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
@@ -120,12 +123,15 @@ function EditForm({ memory }: { memory: Memory }) {
 
       // Sync highlight toggle separately (POST /highlights or DELETE /highlights/:id).
       if (isHighlight && !memory.isHighlight) {
-        const coverFileId = updated.files.length > 1 ? updated.files[0]?.id : undefined;
+        // Use the chosen cover if it survived any photo removals; else first photo.
+        const chosenCover = updated.files.length > 1
+          ? (updated.files.find(f => f.id === coverFileId)?.id ?? updated.files[0]?.id)
+          : undefined;
         try {
           await createHighlight.mutateAsync({
             assetId: updated.id,
             childId: updated.childId,
-            ...(coverFileId ? { coverFileId } : {}),
+            ...(chosenCover ? { coverFileId: chosenCover } : {}),
           });
         } catch (hlErr) {
           if (hlErr instanceof ApiClientError && hlErr.code === 'HIGHLIGHT_LIMIT_REACHED') {
@@ -255,7 +261,41 @@ function EditForm({ memory }: { memory: Memory }) {
             />
           </View>
 
-          {isHighlight && totalPhotos >= 2 && memory.linkedHighlight && (
+          {/* New highlight, multiple photos → pick which one is the cover before saving. */}
+          {isHighlight && !memory.isHighlight && remainingFiles.length >= 2 && (
+            <>
+              <View style={styles.rowDivider} />
+              <View style={styles.coverPicker}>
+                <Text style={styles.coverPickerLabel}>Highlight cover</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.coverStrip}
+                >
+                  {remainingFiles.map(f => {
+                    const selected = (coverFileId ?? remainingFiles[0]?.id) === f.id;
+                    return (
+                      <Pressable
+                        key={f.id}
+                        onPress={() => setCoverFileId(f.id)}
+                        style={[styles.coverThumbWrap, selected && styles.coverThumbSelected]}
+                      >
+                        <Image source={{ uri: f.fileUrl }} style={styles.coverThumbImg} />
+                        {selected && (
+                          <View style={styles.coverCheck}>
+                            <RemixIcon name="check-line" size={12} color={theme.text.onColor} />
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </>
+          )}
+
+          {/* Existing highlight → change cover on the dedicated screen. */}
+          {isHighlight && memory.isHighlight && totalPhotos >= 2 && memory.linkedHighlight && (
             <>
               <View style={styles.rowDivider} />
               <Pressable
@@ -436,6 +476,46 @@ const styles = StyleSheet.create({
   detailValue: {
     ...theme.typography.body,
     color: theme.text.secondary,
+  },
+
+  coverPicker: {
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.m,
+    gap: theme.spacing.s,
+  },
+  coverPickerLabel: {
+    ...theme.typography.body,
+    color: theme.text.primary,
+  },
+  coverStrip: {
+    gap: theme.spacing.s,
+  },
+  coverThumbWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.m,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  coverThumbSelected: {
+    borderColor: theme.surface.brand,
+  },
+  coverThumbImg: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: theme.border.strong,
+  },
+  coverCheck: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: theme.surface.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   cta: {
