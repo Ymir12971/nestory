@@ -19,8 +19,7 @@
       "output": "single"
     },
     "plugins": [
-      "expo-router",
-      "expo-web-browser"
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
