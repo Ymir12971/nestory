@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, ImageBackground, Modal, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
@@ -19,8 +19,6 @@ const PHOTO_GAP      = 12;
 
 // Horizontal padding to center the active (center) photo
 const CAROUSEL_PADDING = (SCREEN_W - PHOTO_CENTER_W) / 2;
-// Scroll offset so center photo is visible on mount
-const CAROUSEL_INIT_X  = PHOTO_SIDE_W + PHOTO_GAP;
 
 // "1 yr 4 mo" → "1.4"; "6 mo" → "0.6". Single template for now.
 function formatAge(ageMonths: number): string {
@@ -34,6 +32,7 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [switcherVisible, setSwitcherVisible] = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const childrenQ    = useChildren();
   const subQ         = useSubscription();
@@ -100,6 +99,11 @@ export function HomeScreen() {
     );
   }
 
+  const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / (PHOTO_CENTER_W + PHOTO_GAP));
+    setActiveIndex(Math.max(0, Math.min(carouselPhotos.length - 1, idx)));
+  };
+
   const handleAvatarRowPress = () => {
     if (isMulti) {
       setSwitcherVisible(true);
@@ -159,7 +163,7 @@ export function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               snapToInterval={PHOTO_CENTER_W + PHOTO_GAP}
               decelerationRate="fast"
-              contentOffset={{ x: carouselPhotos.length > 1 ? CAROUSEL_INIT_X : 0, y: 0 }}
+              onMomentumScrollEnd={onCarouselScroll}
               style={styles.carouselScroll}
               contentContainerStyle={[
                 styles.carouselContent,
@@ -180,7 +184,7 @@ export function HomeScreen() {
             {carouselPhotos.length > 1 && (
               <View style={styles.dots}>
                 {carouselPhotos.map((p, i) => (
-                  <View key={p.id} style={i === 0 ? styles.dotActive : styles.dotInactive} />
+                  <View key={p.id} style={i === activeIndex ? styles.dotActive : styles.dotInactive} />
                 ))}
               </View>
             )}
