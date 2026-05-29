@@ -9,6 +9,7 @@ import { theme, palette } from '@/shared/theme';
 import { useSubscription, queryClient, queryKeys } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { purchasePlan, openManageSubscriptions, isPurchasesAvailable } from '@/features/billing/purchases';
+import { showToast } from '@/features/ui/toast';
 
 // ---------- Types ----------
 
@@ -51,7 +52,7 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
 
   const handleUpgrade = async () => {
     if (!isPurchasesAvailable()) {
-      Alert.alert('Not available', 'In-app purchases require the mobile app.');
+      showToast({ type: 'warning', message: 'In-app purchases require the mobile app.' });
       return;
     }
     setPurchasing(true);
@@ -60,9 +61,11 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
       if (res.status === 'purchased') {
         // Refresh — once the webhook flips the row, this screen re-renders to Premium.
         await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        showToast({ type: 'success', message: 'Welcome to Premium!' });
       }
     } catch (e) {
-      Alert.alert('Purchase failed', e instanceof Error ? e.message : 'Please try again.');
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      showToast({ type: 'error', message: `Purchase failed: ${msg}` });
     } finally {
       setPurchasing(false);
     }

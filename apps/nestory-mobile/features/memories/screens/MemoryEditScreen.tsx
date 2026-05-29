@@ -137,7 +137,7 @@ function EditForm({ memory }: { memory: Memory }) {
         } catch (hlErr) {
           if (hlErr instanceof ApiClientError && hlErr.code === 'HIGHLIGHT_LIMIT_REACHED') {
             setPaywallVisible(true);
-            setSaveError('Highlight limit reached. Memory saved without highlight.');
+            showToast({ type: 'warning', message: 'Highlight limit reached. Memory saved without highlight.' });
             return;
           }
           throw hlErr;

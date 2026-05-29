@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { showToast } from '@/features/ui/toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
@@ -41,7 +42,8 @@ export function PlanScreen() {
       }
       // 'cancelled' → stay on screen, let the user choose again.
     } catch (e) {
-      Alert.alert('Purchase failed', e instanceof Error ? e.message : 'Please try again.');
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      showToast({ type: 'error', message: `Purchase failed: ${msg}` });
     } finally {
       setPurchasing(false);
     }
