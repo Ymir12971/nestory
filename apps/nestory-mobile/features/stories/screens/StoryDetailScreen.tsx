@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ImageBackground,
   Pressable,
   Share,
@@ -14,7 +15,7 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { config } from '@/shared/config';
-import { useStory, getAuthToken } from '@/api';
+import { useStory, getAuthToken, useCreateShare } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { StoryWebView } from '../components/StoryWebView';
 
@@ -38,6 +39,8 @@ export function StoryDetailScreen() {
   const storyQ = useStory(id ?? null);
 
   const [webviewState, setWebviewState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const createShare = useCreateShare();
+  const [sharing, setSharing] = useState(false);
   // Resolve the auth token once and inject it as ?t=… so the web page can
   // authenticate against the API server-side. We resolve it asynchronously
   // because Supabase's getSession is a promise; the WebView stays in
@@ -62,16 +65,26 @@ export function StoryDetailScreen() {
   const coverImageUrl = meta?.coverImageUrl ?? null;
 
   const handleShare = async () => {
-    // TODO: call POST /shares to get shareUrl + ogTitle, then use Share.share()
-    // For now, share the public-share-less /story URL strip of auth token —
-    // the receiver won't be able to view it without a proper /share/<token>
-    // link, but this stub keeps the UI wired up.
-    if (!webUrl) return;
-    const shareableUrl = webUrl.split('?')[0]!;
+    if (!id || sharing) return;
+    setSharing(true);
     try {
-      await Share.share({ url: shareableUrl, title: heroTitle || 'Story' });
-    } catch {
-      // user dismissed — no-op
+      // POST /shares is idempotent — reuses an existing active token if any.
+      // We build the URL with our own webBaseUrl so it works regardless of
+      // the backend's NESTORY_WEB_URL env.
+      const share = await createShare.mutateAsync({ storyId: id });
+      const url   = `${config.webBaseUrl}/share/${share.token}`;
+      const title = share.og.title || heroTitle || 'Nestory Story';
+      await Share.share({
+        title,
+        url,
+        // Android only honours `message`; iOS uses url+title. Include both.
+        message: `${title}\n${url}`,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      Alert.alert("Couldn't share this story", msg);
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -148,8 +161,9 @@ export function StoryDetailScreen() {
       {/* ── CTA ──────────────────────────────────────────────── */}
       <View style={[styles.cta, { paddingBottom: insets.bottom + theme.spacing.m }]}>
         <Pressable
-          style={({ pressed }) => [styles.shareButtonWrap, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.shareButtonWrap, (pressed || sharing) && { opacity: 0.85 }]}
           onPress={handleShare}
+          disabled={sharing}
         >
           <LinearGradient
             colors={[palette.primary[500], palette.primary[400]]}
@@ -157,7 +171,9 @@ export function StoryDetailScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.shareButton}
           >
-            <Text style={styles.shareButtonLabel}>Share this story</Text>
+            <Text style={styles.shareButtonLabel}>
+              {sharing ? 'Preparing link…' : 'Share this story'}
+            </Text>
           </LinearGradient>
         </Pressable>
       </View>
