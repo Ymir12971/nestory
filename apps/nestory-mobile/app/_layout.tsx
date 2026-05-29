@@ -6,6 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/api';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { initPurchases, identifyPurchaseUser } from '@/features/billing/purchases';
+import { ToastHost } from '@/features/ui/ToastHost';
 import {
   useFonts,
   Manrope_400Regular,
@@ -56,6 +57,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <Stack screenOptions={{ headerShown: false }} />
+        <ToastHost />
       </SafeAreaProvider>
     </QueryClientProvider>
   );

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ImageBackground,
   Pressable,
   Share,
@@ -16,6 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { config } from '@/shared/config';
 import { useStory, getAuthToken, useCreateShare } from '@/api';
+import { showToast } from '@/features/ui/toast';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { StoryWebView } from '../components/StoryWebView';
 
@@ -82,7 +82,7 @@ export function StoryDetailScreen() {
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Please try again.';
-      Alert.alert("Couldn't share this story", msg);
+      showToast({ type: 'error', message: `Couldn't share this story: ${msg}` });
     } finally {
       setSharing(false);
     }
@@ -133,7 +133,10 @@ export function StoryDetailScreen() {
             style={styles.webview}
             onLoadStart={() => setWebviewState('loading')}
             onLoadEnd={() => setWebviewState('loaded')}
-            onError={() => setWebviewState('error')}
+            onError={() => {
+              setWebviewState('error');
+              showToast({ type: 'error', message: "Couldn't load this Story. Pull down to retry." });
+            }}
           />
         ) : null}
 
@@ -153,7 +156,6 @@ export function StoryDetailScreen() {
             <Text style={styles.errorCaption}>
               Check your connection and pull down to retry.
             </Text>
-            {/* Toast · Story Load Failed should fire here — TODO once Toast component is implemented */}
           </View>
         )}
       </View>

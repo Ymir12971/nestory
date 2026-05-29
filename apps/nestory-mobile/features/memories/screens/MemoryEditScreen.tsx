@@ -8,6 +8,7 @@ import type { Memory, MemoryFile } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
+import { showToast } from '@/features/ui/toast';
 import {
   ApiClientError,
   uploadPhoto,
@@ -145,6 +146,7 @@ function EditForm({ memory }: { memory: Memory }) {
         await deleteHighlight.mutateAsync(memory.linkedHighlight.id);
       }
 
+      showToast({ type: 'success', message: 'Memory saved' });
       goBack();
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to save changes.');
