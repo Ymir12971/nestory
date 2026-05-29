@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import RemixIcon from 'react-native-remix-icon';
@@ -6,9 +6,11 @@ import { useRouter } from 'expo-router';
 import type { LinkedProvider } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
-import { useMe } from '@/api';
+import { useMe, useDeleteMe } from '@/api';
 import { setDevSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient } from '@/features/auth/supabaseClient';
+import { logOutPurchaseUser } from '@/features/billing/purchases';
+import { showToast } from '@/features/ui/toast';
 
 const PROVIDERS: { key: 'apple' | 'google'; label: string }[] = [
   { key: 'apple',  label: 'Apple'  },
@@ -20,14 +22,43 @@ export function AccountScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const meQ = useMe();
+  const deleteMe = useDeleteMe();
   const qc = useQueryClient();
 
   const handleLogOut = async () => {
     const sb = getSupabaseClient();
     if (sb) await sb.auth.signOut();
+    await logOutPurchaseUser();
     setDevSession(null);
     qc.clear();
     router.replace('/onboarding/auth');
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteMe.mutateAsync();
+      const sb = getSupabaseClient();
+      if (sb) await sb.auth.signOut();
+      await logOutPurchaseUser();
+      setDevSession(null);
+      qc.clear();
+      showToast({ type: 'success', message: 'Account deleted.' });
+      router.replace('/onboarding/auth');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      showToast({ type: 'error', message: `Couldn't delete account: ${msg}` });
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently removes your account, children, memories, and stories. This can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: confirmDelete },
+      ],
+    );
   };
 
   return (
@@ -103,10 +134,13 @@ export function AccountScreen() {
           <View style={styles.divider} />
           <Pressable
             style={styles.row}
-            onPress={() => { /* TODO: confirm dialog → DELETE /users/me */ }}
+            onPress={handleDeleteAccount}
+            disabled={deleteMe.isPending}
           >
             <RemixIcon name="delete-bin-line" size={20} color={theme.text.error} />
-            <Text style={[styles.acctLabel, { color: theme.text.error, flex: 1 }]}>Delete Account</Text>
+            <Text style={[styles.acctLabel, { color: theme.text.error, flex: 1 }]}>
+              {deleteMe.isPending ? 'Deleting…' : 'Delete Account'}
+            </Text>
           </Pressable>
         </View>
       </View>
