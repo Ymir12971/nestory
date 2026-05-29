@@ -5,9 +5,6 @@ import { useRouter } from 'expo-router';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
-// TODO: replace with real URLs once legal pages are deployed
-const TERMS_URL   = 'https://nestory.app/terms';
-const PRIVACY_URL = 'https://nestory.app/privacy';
 const REMIX_URL   = 'https://remixicon.com/';
 const APP_VERSION = '1.0.0 (Build 1)';
 
@@ -41,16 +38,16 @@ export function AboutScreen() {
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
 
-        {/* Legal links */}
+        {/* Legal links — point at in-app pages until public URLs are hosted */}
         <View style={styles.card}>
-          <Pressable style={styles.row} onPress={() => Linking.openURL(TERMS_URL)}>
+          <Pressable style={styles.row} onPress={() => router.push('/onboarding/terms')}>
             <Text style={styles.rowLabel}>Terms of Service</Text>
-            <RemixIcon name="external-link-line" size={20} color={theme.text.secondary} />
+            <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
           </Pressable>
           <View style={styles.divider} />
-          <Pressable style={styles.row} onPress={() => Linking.openURL(PRIVACY_URL)}>
+          <Pressable style={styles.row} onPress={() => router.push('/onboarding/privacy')}>
             <Text style={styles.rowLabel}>Privacy Policy</Text>
-            <RemixIcon name="external-link-line" size={20} color={theme.text.secondary} />
+            <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
           </Pressable>
         </View>
 
