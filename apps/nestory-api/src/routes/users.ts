@@ -5,6 +5,7 @@ import { prisma, whereNotDeleted } from '../lib/prisma';
 import { Errors } from '../lib/errors';
 import { parseBody } from '../lib/validation';
 import { audit } from '../lib/audit';
+import { getSupabase } from '../lib/supabase';
 
 const userPatchSchema = z.object({
   name:     z.string().min(1).max(100).optional(),
@@ -81,7 +82,20 @@ export async function usersRoutes(app: FastifyInstance) {
       resourceId: req.userId,
       req,
     });
-    // TODO: 同步触发 Supabase signOut（client side）
+
+    // Revoke every Supabase session for this user so they're signed out on
+    // every device — the client also calls auth.signOut, but we shouldn't
+    // trust that path alone. Best-effort: the user row is already soft-deleted
+    // so the request returns successfully even if Supabase rejects.
+    const authHeader = req.headers.authorization;
+    const jwt = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (jwt && !jwt.startsWith('dev-')) {
+      try {
+        await getSupabase().auth.admin.signOut(jwt, 'global');
+      } catch (err) {
+        req.log.warn({ err }, 'Supabase admin signOut failed after delete_account');
+      }
+    }
     return { data: { deletedAt: deletedAt.toISOString() } };
   });
 }

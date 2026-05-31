@@ -41,7 +41,8 @@ const jobIdParam = z.object({ id: z.string().min(1) });
 
 /**
  * 决策 4：内部控制平面，admin token 鉴权（不暴露给 client）。
- * TODO: 加 admin auth hook（与 user auth plugin 区分）。
+ * Auth is enforced in lib/auth.ts preHandler — requires
+ * `Authorization: Bearer <ADMIN_TOKEN>` matching the env var.
  */
 export async function internalRoutes(app: FastifyInstance) {
   // POST /internal/stories/generate — enqueue a single story generation job.

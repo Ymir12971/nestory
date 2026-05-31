@@ -17,6 +17,9 @@ const envSchema = z.object({
   // mobile-render path without burning tokens or coupling to today's prompt.
   STORY_AI_MOCK: z.string().optional(),
   REVENUECAT_WEBHOOK_SECRET: z.string().optional(),
+  // Shared-secret bearer for /internal/* admin endpoints (queue control,
+  // dispatcher backfills, etc.). When unset, the routes refuse all traffic.
+  ADMIN_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

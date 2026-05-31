@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import { Errors } from './errors';
@@ -22,7 +23,14 @@ async function authPlugin(app: FastifyInstance) {
     if (req.url === '/health') return;
     if (req.url.startsWith('/shares/public/')) return;
     if (req.url.startsWith('/subscriptions/sync')) return; // RevenueCat webhook (own signature check)
-    if (req.url.startsWith('/internal/')) return;          // admin token check (TODO)
+    if (req.url.startsWith('/internal/')) {
+      // Admin shared-secret check, separate from end-user auth.
+      const token = extractBearer(req);
+      if (!token || !checkAdminToken(token)) {
+        throw Errors.unauthorized('Invalid admin token');
+      }
+      return;
+    }
 
     const token = extractBearer(req);
     if (!token) throw Errors.unauthorized('Missing Authorization header');
@@ -34,6 +42,15 @@ async function authPlugin(app: FastifyInstance) {
 
     req.userId = await verifySupabaseJwt(token, req);
   });
+}
+
+function checkAdminToken(candidate: string): boolean {
+  const expected = process.env.ADMIN_TOKEN;
+  if (!expected) return false;     // never accept when unset — fail closed
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 async function verifySupabaseJwt(token: string, req: FastifyRequest): Promise<string> {
