@@ -9,6 +9,7 @@ import { sharesRoutes } from './shares';
 import { tagsRoutes } from './tags';
 import { uploadsRoutes } from './uploads';
 import { internalRoutes } from './internal';
+import { feedbackRoutes } from './feedback';
 
 export async function registerRoutes(app: FastifyInstance) {
   await app.register(usersRoutes,         { prefix: '/users' });
@@ -21,4 +22,5 @@ export async function registerRoutes(app: FastifyInstance) {
   await app.register(tagsRoutes,          { prefix: '/tags' });
   await app.register(uploadsRoutes,       { prefix: '/uploads' });
   await app.register(internalRoutes,      { prefix: '/internal' });
+  await app.register(feedbackRoutes,      { prefix: '/feedback' });
 }

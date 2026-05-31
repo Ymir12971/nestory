@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
@@ -56,11 +56,24 @@ export function MemoryListScreen() {
   const now = new Date();
   const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-indexed
+  const [yearPickerVisible, setYearPickerVisible] = useState(false);
 
   const children = childrenQ.data ?? [];
-  const activeChildId =
-    children.find(c => c.isActive)?.id ?? children[0]?.id ?? '';
+  const activeChild = children.find(c => c.isActive) ?? children[0];
+  const activeChildId = activeChild?.id ?? '';
   const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+
+  // Year picker range: from the active child's birth year (or 5 years back as
+  // a sensible fallback) up to the current year.
+  const availableYears = (() => {
+    const maxYear = now.getFullYear();
+    const minYear = activeChild?.birthDate
+      ? new Date(activeChild.birthDate).getFullYear()
+      : maxYear - 5;
+    const ys: number[] = [];
+    for (let y = maxYear; y >= minYear; y--) ys.push(y);
+    return ys;
+  })();
 
   const assetsQ = useAssets({ childId: activeChildId, month: monthKey });
   const groups  = useMemo(() => groupByDay(assetsQ.data?.data ?? []), [assetsQ.data]);
@@ -78,7 +91,7 @@ export function MemoryListScreen() {
 
       {/* Filter bar */}
       <View style={styles.filterBar}>
-        <Pressable style={styles.yearSelector} onPress={() => { /* TODO: year picker sheet */ }}>
+        <Pressable style={styles.yearSelector} onPress={() => setYearPickerVisible(true)}>
           <Text style={styles.yearText}>{selectedYear}</Text>
           <RemixIcon name="arrow-down-s-line" size={24} color={theme.text.primary} />
         </Pressable>
@@ -180,6 +193,33 @@ export function MemoryListScreen() {
           ))}
         </ScrollView>
       )}
+
+      {/* Year picker sheet */}
+      <Modal
+        visible={yearPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setYearPickerVisible(false)}
+      >
+        <Pressable style={styles.sheetScrim} onPress={() => setYearPickerVisible(false)} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Select Year</Text>
+          {availableYears.map((y, i) => (
+            <Pressable
+              key={y}
+              style={styles.yearRow}
+              onPress={() => { setSelectedYear(y); setYearPickerVisible(false); }}
+            >
+              <Text style={[styles.yearRowLabel, y === selectedYear && styles.yearRowLabelActive]}>{y}</Text>
+              {y === selectedYear && (
+                <RemixIcon name="check-line" size={20} color={theme.text.brand} />
+              )}
+              {i < availableYears.length - 1 && <View style={styles.yearRowDivider} />}
+            </Pressable>
+          ))}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -369,5 +409,54 @@ const styles = StyleSheet.create({
   cardTime: {
     ...theme.typography.caption,
     color: theme.text.secondary,
+  },
+
+  // Year picker sheet
+  sheetScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheet: {
+    backgroundColor: theme.surface.default,
+    borderTopLeftRadius: theme.radius.l,
+    borderTopRightRadius: theme.radius.l,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.m,
+    paddingBottom: theme.spacing.safeBtm + theme.spacing.m,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.border.strong,
+    alignSelf: 'center',
+    marginBottom: theme.spacing.m,
+  },
+  sheetTitle: {
+    ...theme.typography.h3,
+    color: theme.text.primary,
+    marginBottom: theme.spacing.s,
+  },
+  yearRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: theme.spacing.m,
+  },
+  yearRowLabel: {
+    ...theme.typography.body,
+    color: theme.text.primary,
+  },
+  yearRowLabelActive: {
+    color: theme.text.brand,
+    fontFamily: 'Manrope_600SemiBold',
+  },
+  yearRowDivider: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 1,
+    backgroundColor: theme.border.default,
   },
 });

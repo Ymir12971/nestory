@@ -100,15 +100,23 @@ export async function storiesRoutes(app: FastifyInstance) {
       orderBy: { monthKey: 'desc' },
     });
 
+    // memoryCount per month — bucket once instead of N queries. UTC drift
+    // matches the existing month_key compromise; precise tz bucketing waits
+    // for the generated month_key column.
+    const allMemoryDates = await prisma.rawAsset.findMany({
+      where:  { ...whereNotDeleted, childId: q.childId },
+      select: { capturedAt: true },
+    });
+    const memoryCountByMonth = new Map<string, number>();
+    for (const r of allMemoryDates) {
+      const d = r.capturedAt;
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      memoryCountByMonth.set(key, (memoryCountByMonth.get(key) ?? 0) + 1);
+    }
+
     // 当月数据
     const curStory = stories.find(s => s.monthKey === curMonthKey);
-    const memCount = await prisma.rawAsset.count({
-      where: {
-        ...whereNotDeleted,
-        childId: q.childId,
-        // TODO: 用 generated month_key 列做精确过滤，目前简化为粗筛
-      },
-    });
+    const memCount = memoryCountByMonth.get(curMonthKey) ?? 0;
 
     const currentMonth: CurrentMonthStatus = {
       monthKey: curMonthKey,
@@ -118,7 +126,7 @@ export async function storiesRoutes(app: FastifyInstance) {
           ? 'current_in_progress'
           : 'current_collecting',
       memoryCount:         memCount,
-      daysUntilGeneration: 7, // TODO: 实际算法 = 月末 - 今天
+      daysUntilGeneration: daysUntilNextMonth(),
       milestoneLevel:      memCount >= 15 ? '15+' : memCount >= 10 ? '10' : memCount >= 3 ? '3' : memCount >= 1 ? '1' : null,
     };
 
@@ -151,7 +159,7 @@ export async function storiesRoutes(app: FastifyInstance) {
         isLastFreeStory:  s.isLastFreeStory,
         watermarkEnabled: doc?.watermark.enabled ?? null,
         generatedAt:      s.generatedAt?.toISOString() ?? null,
-        memoryCount:      null, // TODO: 从 generation_meta 回填
+        memoryCount:      memoryCountByMonth.get(monthKey) ?? 0,
       };
     });
 
@@ -198,4 +206,13 @@ export async function storiesRoutes(app: FastifyInstance) {
       },
     };
   });
+}
+
+// Days remaining until the story dispatcher fires (first day of next month).
+// UTC-based: small drift around month boundaries vs the user's local time, but
+// it's a UI hint, not a precise SLA.
+function daysUntilNextMonth(): number {
+  const now = new Date();
+  const firstOfNext = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return Math.max(0, Math.ceil((firstOfNext.getTime() - now.getTime()) / 86_400_000));
 }

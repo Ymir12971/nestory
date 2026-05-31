@@ -6,12 +6,14 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
-import { useMe } from '@/api';
+import { useMe, useSubmitFeedback } from '@/api';
+import { showToast } from '@/features/ui/toast';
 
 export function FeedbackScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const meQ = useMe();
+  const submit = useSubmitFeedback();
   const [feedbackText, setFeedbackText] = useState('');
   const [email, setEmail]               = useState('');
 
@@ -20,7 +22,22 @@ export function FeedbackScreen() {
     if (!email && meQ.data?.email) setEmail(meQ.data.email);
   }, [meQ.data?.email]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canSubmit = feedbackText.trim().length > 0;
+  const canSubmit = feedbackText.trim().length > 0 && !submit.isPending;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    try {
+      await submit.mutateAsync({
+        text:  feedbackText.trim(),
+        ...(email.trim() ? { email: email.trim() } : {}),
+      });
+      showToast({ type: 'success', message: 'Thanks! We\'ll get back to you soon.' });
+      goBack();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      showToast({ type: 'error', message: `Couldn't send feedback: ${msg}` });
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -83,7 +100,7 @@ export function FeedbackScreen() {
           {canSubmit ? (
             <Pressable
               style={({ pressed }) => [styles.submitBtnWrap, pressed && { opacity: 0.85 }]}
-              onPress={() => { /* TODO: POST /feedback { text: feedbackText, email } */ }}
+              onPress={handleSubmit}
             >
               <LinearGradient
                 colors={[palette.primary[500], palette.primary[400]]}
@@ -91,7 +108,9 @@ export function FeedbackScreen() {
                 end={{ x: 1, y: 0 }}
                 style={styles.submitBtn}
               >
-                <Text style={styles.submitBtnLabel}>Submit Feedback</Text>
+                <Text style={styles.submitBtnLabel}>
+                  {submit.isPending ? 'Sending…' : 'Submit Feedback'}
+                </Text>
               </LinearGradient>
             </Pressable>
           ) : (
