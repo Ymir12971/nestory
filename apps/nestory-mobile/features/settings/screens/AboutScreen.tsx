@@ -1,4 +1,4 @@
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
@@ -29,11 +29,12 @@ export function AboutScreen() {
       >
         {/* Brand column */}
         <View style={styles.brandCol}>
-          {/* TODO: replace with <Image source={require('@/assets/logo.png')} style={{ width: 160, height: 53 }} /> */}
-          <View style={styles.logoPlaceholder}>
-            <RemixIcon name="heart-2-fill" size={28} color={theme.text.onColor} />
-            <Text style={styles.logoText}>Nestory</Text>
-          </View>
+          <Image
+            source={require('@/assets/images/icon.png')}
+            style={styles.appIcon}
+            resizeMode="contain"
+          />
+          <Text style={styles.appName}>Nestory</Text>
           <Text style={styles.tagline}>Every little moment becomes a story</Text>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
@@ -93,18 +94,15 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.l,
     paddingBottom: theme.spacing.s,
   },
-  logoPlaceholder: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.surface.brand,
-    paddingHorizontal: theme.spacing.l,
-    paddingVertical: theme.spacing.s,
-    borderRadius: theme.radius.m,
-    gap: theme.spacing.s,
+  appIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 20,
+    marginBottom: theme.spacing.s,
   },
-  logoText: {
+  appName: {
     ...theme.typography.h1,
-    color: theme.text.onColor,
+    color: theme.text.primary,
   },
   tagline: { ...theme.typography.caption, color: theme.text.secondary },
   version: { ...theme.typography.caption, color: theme.text.secondary },

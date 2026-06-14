@@ -7,13 +7,23 @@
     "userInterfaceStyle": "automatic",
     "scheme": "nestory",
     "newArchEnabled": true,
+    "icon": "./assets/images/icon.png",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FBF6EC"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.blakard.nestory"
     },
     "android": {
       "package": "com.blakard.nestory",
-      "versionCode": 3
+      "versionCode": 5,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/splash-icon.png",
+        "backgroundColor": "#FBF6EC"
+      }
     },
     "web": {
       "bundler": "metro",
