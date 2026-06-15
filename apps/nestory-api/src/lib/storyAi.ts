@@ -140,19 +140,41 @@ export async function generateStory(input: GenerateStoryInput): Promise<Generate
 
   const userContent = buildUserContent(input);
 
-  const response = await client.messages.parse({
+  const baseRequest = {
     model:      MODEL,
     max_tokens: MAX_TOKENS,
     system: [
       // The system prompt is identical for every generation — cache it. ~80%
       // of input tokens come from this block, so cache hits cut cost sharply.
-      { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+      { type: 'text' as const, text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' as const } },
     ],
-    messages: [{ role: 'user', content: userContent }],
     // SDK helper's .d.ts is typed for Zod v3's ZodType but it `require()`s
     // `zod/v4` at runtime — cast around the type mismatch.
     output_config: { format: zodOutputFormat(modelOutputSchema as any) },
-  });
+  };
+
+  let response;
+  try {
+    response = await client.messages.parse({
+      ...baseRequest,
+      messages: [{ role: 'user', content: userContent }],
+    });
+  } catch (err) {
+    // If Anthropic couldn't fetch an attached image (host robots.txt, invalid
+    // URL, etc.), retry text-only — a story without photo grounding is still
+    // far better than a hard failure.
+    if (isImageFetchError(err) && userContent.some(b => b.type === 'image')) {
+      response = await client.messages.parse({
+        ...baseRequest,
+        messages: [{
+          role: 'user',
+          content: userContent.filter(b => b.type !== 'image'),
+        }],
+      });
+    } else {
+      throw err;
+    }
+  }
 
   if (!response.parsed_output) {
     throw new Error(`Story generation returned no parsed output (stop_reason=${response.stop_reason})`);
@@ -226,7 +248,9 @@ function buildUserContent(input: GenerateStoryInput): UserContentBlock[] {
   if (selected.length < MAX_IMAGES) {
     for (const [i, m] of input.memories.entries()) {
       for (let j = 1; j < m.fileUrls.length; j++) {
-        selected.push({ memoryIndex: i, fileUrl: m.fileUrls[j]! });
+        const url = m.fileUrls[j];
+        if (!url) continue;
+        selected.push({ memoryIndex: i, fileUrl: url });
         if (selected.length >= MAX_IMAGES) break;
       }
       if (selected.length >= MAX_IMAGES) break;
@@ -273,6 +297,14 @@ function buildUserContent(input: GenerateStoryInput): UserContentBlock[] {
     blocks.push({ type: 'image', source: { type: 'url', url: s.fileUrl } });
   }
   return blocks;
+}
+
+// Anthropic refuses to fetch images that violate the host's robots.txt or are
+// otherwise invalid. The structured error text varies; match the common shapes
+// so we can fall back to a text-only retry.
+function isImageFetchError(err: unknown): boolean {
+  const msg = (err as { message?: string })?.message ?? String(err);
+  return /Only HTTPS URLs|robots\.txt|cannot fetch.*image|image.*disallowed|invalid.*image/i.test(msg);
 }
 
 function formatAge(months: number): string {
