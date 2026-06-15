@@ -2,11 +2,17 @@ import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import * as Application from 'expo-application';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
-const REMIX_URL   = 'https://remixicon.com/';
-const APP_VERSION = '1.0.0 (Build 1)';
+const REMIX_URL = 'https://remixicon.com/';
+// Read the real version + build code from the installed package. Falls back to
+// the source string when expo-application can't resolve it (web, etc.).
+const APP_VERSION =
+  Application.nativeApplicationVersion && Application.nativeBuildVersion
+    ? `${Application.nativeApplicationVersion} (Build ${Application.nativeBuildVersion})`
+    : '0.0.1 (dev)';
 
 export function AboutScreen() {
   const router = useRouter();
