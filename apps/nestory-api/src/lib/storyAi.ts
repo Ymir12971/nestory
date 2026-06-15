@@ -1,5 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { z } from 'zod';
+// The Anthropic SDK's structured-output helper consumes Zod v4 schemas
+// (`.def` internals). Zod 3.25+ exposes a v4 subpath — use it ONLY here so the
+// rest of the codebase keeps using plain `zod` for request validation.
+import { z } from 'zod/v4';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { GenerationMeta, StoryDocument } from '@nestory/types';
 
@@ -146,7 +149,9 @@ export async function generateStory(input: GenerateStoryInput): Promise<Generate
       { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
     ],
     messages: [{ role: 'user', content: userContent }],
-    output_config: { format: zodOutputFormat(modelOutputSchema) },
+    // SDK helper's .d.ts is typed for Zod v3's ZodType but it `require()`s
+    // `zod/v4` at runtime — cast around the type mismatch.
+    output_config: { format: zodOutputFormat(modelOutputSchema as any) },
   });
 
   if (!response.parsed_output) {
