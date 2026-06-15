@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  ImageBackground,
   Pressable,
   Share,
   StyleSheet,
@@ -19,16 +18,10 @@ import { showToast } from '@/features/ui/toast';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { StoryWebView } from '../components/StoryWebView';
 
-const HERO_H = 420;
-
-function parseMonthKey(monthKey: string): { navTitle: string; heroTitle: string } {
+function formatMonth(monthKey: string): string {
   const [year, month] = monthKey.split('-').map(Number) as [number, number];
   const date = new Date(year, month - 1, 1);
-  const monthName = date.toLocaleString('en-US', { month: 'long' });
-  return {
-    navTitle: `Story of ${monthName} ${year}`,
-    heroTitle: `${monthName} ${year}`,
-  };
+  return `Story of ${date.toLocaleString('en-US', { month: 'long' })} ${year}`;
 }
 
 export function StoryDetailScreen() {
@@ -57,12 +50,11 @@ export function StoryDetailScreen() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const meta       = storyQ.data?.document.meta;
-  const monthKey   = storyQ.data?.monthKey;
-  const navTitle   = monthKey ? parseMonthKey(monthKey).navTitle : 'Story';
-  const heroTitle  = meta?.title ?? '';
-  const heroSubtitle = storyQ.data?.document.shareMeta.ogDescription ?? '';
-  const coverImageUrl = meta?.coverImageUrl ?? null;
+  const monthKey  = storyQ.data?.monthKey;
+  const navTitle  = monthKey ? formatMonth(monthKey) : 'Story';
+  // Used only as a fallback share title — the rendered cover/title come from
+  // the WebView (StoryRenderer.tsx) so we no longer paint them natively.
+  const docTitle  = storyQ.data?.document.meta.title ?? '';
 
   const handleShare = async () => {
     if (!id || sharing) return;
@@ -73,7 +65,7 @@ export function StoryDetailScreen() {
       // the backend's NESTORY_WEB_URL env.
       const share = await createShare.mutateAsync({ storyId: id });
       const url   = `${config.webBaseUrl}/share/${share.token}`;
-      const title = share.og.title || heroTitle || 'Nestory Story';
+      const title = share.og.title || docTitle || 'Nestory Story';
       await Share.share({
         title,
         url,
@@ -90,39 +82,14 @@ export function StoryDetailScreen() {
 
   return (
     <View style={styles.root}>
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <View style={[styles.hero, { height: HERO_H }]}>
-        {coverImageUrl ? (
-          <ImageBackground
-            source={{ uri: coverImageUrl }}
-            resizeMode="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.heroBg]} />
-        )}
-
-        <LinearGradient
-          colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.6)']}
-          locations={[0, 0.5, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-
-        <View style={{ height: insets.top }} />
-        <View style={styles.navBar}>
-          <Pressable hitSlop={8} onPress={goBack}>
-            <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.onColor} />
-          </Pressable>
-          <Text style={styles.navTitle} numberOfLines={1}>{navTitle}</Text>
-          <View style={styles.navSpacer} />
-        </View>
-
-        {(heroTitle || heroSubtitle) && (
-          <View style={styles.titleGroup}>
-            {heroTitle ? <Text style={styles.heroTitle}>{heroTitle}</Text> : null}
-            {heroSubtitle ? <Text style={styles.heroSubtitle}>{heroSubtitle}</Text> : null}
-          </View>
-        )}
+      {/* ── NavBar (cover + title rendered by the WebView itself) ──── */}
+      <View style={{ height: insets.top, backgroundColor: theme.surface.default }} />
+      <View style={styles.navBar}>
+        <Pressable hitSlop={8} onPress={goBack}>
+          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
+        </Pressable>
+        <Text style={styles.navTitle} numberOfLines={1}>{navTitle}</Text>
+        <View style={styles.navSpacer} />
       </View>
 
       {/* ── WebView body ─────────────────────────────────────── */}
@@ -189,40 +156,22 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.default,
   },
 
-  // Hero
-  hero: {
-    overflow: 'hidden',
-  },
-  heroBg: {
-    backgroundColor: '#6b8c4d', // Figma placeholder; replace with cover image
-  },
+  // NavBar
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.xxl,
     height: 56,
+    backgroundColor: theme.surface.default,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border.default,
   },
   navTitle: {
     ...theme.typography.h2,
-    color: theme.text.onColor,
+    color: theme.text.primary,
   },
   navSpacer: { width: 24 },
-  titleGroup: {
-    position: 'absolute',
-    top: 260,
-    left: theme.spacing.xl,
-    right: theme.spacing.xl,
-    gap: theme.spacing.s,
-  },
-  heroTitle: {
-    ...theme.typography.h1,
-    color: theme.text.onColor,
-  },
-  heroSubtitle: {
-    ...theme.typography.body,
-    color: theme.text.onColor,
-  },
 
   // WebView
   webviewWrap: {
