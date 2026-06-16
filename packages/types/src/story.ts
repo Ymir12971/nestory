@@ -15,6 +15,7 @@ export type StoryListItemState =
   | 'current_collecting'       // current month, memories accumulating
   | 'current_in_progress'      // current month, generation triggered/running
   | 'current_quota_exhausted'  // current month, Free quota used up (R-01)
+  | 'current_generated'        // current month, story finished (manual trigger / early generation)
   | 'historical_generated'     // past month, story completed (watermark per watermarkEnabled)
   | 'historical_not_generated'; // past month, no story exists
 
@@ -35,10 +36,18 @@ export interface StoryListItem {
 // GET /stories — current_month object
 export interface CurrentMonthStatus {
   monthKey: string;
-  listItemState: Extract<StoryListItemState, 'current_collecting' | 'current_in_progress' | 'current_quota_exhausted'>;
+  listItemState: Extract<
+    StoryListItemState,
+    'current_collecting' | 'current_in_progress' | 'current_quota_exhausted' | 'current_generated'
+  >;
   memoryCount: number;
   daysUntilGeneration: number;
   milestoneLevel: null | '1' | '3' | '10' | '15+';
+  // Populated when listItemState === 'current_generated' — lets the mobile
+  // card show the title + navigate to /story/:storyId.
+  storyId: string | null;
+  title: string | null;
+  coverImageUrl: string | null;
 }
 
 // Story watermark (stored in document, frozen at generation time per R-02)

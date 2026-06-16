@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CurrentMonthStatus,
   StoryListItem,
@@ -7,6 +7,17 @@ import type {
 } from '@nestory/types';
 import { apiFetch } from './client';
 import { queryKeys } from './queryClient';
+
+export interface GenerateNowInput {
+  childId:   string;
+  monthKey?: string;
+}
+export interface GenerateNowResult {
+  jobId:    string;
+  childId:  string;
+  monthKey: string;
+  status:   'enqueued' | 'already_in_progress';
+}
 
 interface StoriesResponse {
   data: { currentMonth: CurrentMonthStatus; historical: StoryListItem[] };
@@ -26,6 +37,14 @@ export async function getStory(id: string): Promise<StoryDetail> {
 
 export async function getStoryStatus(id: string): Promise<StoryStatusPoll> {
   const res = await apiFetch<{ data: StoryStatusPoll }>(`/stories/${id}/status`);
+  return res.data;
+}
+
+export async function generateStoryNow(body: GenerateNowInput): Promise<GenerateNowResult> {
+  const res = await apiFetch<{ data: GenerateNowResult }>('/stories/generate-now', {
+    method: 'POST',
+    body,
+  });
   return res.data;
 }
 
@@ -53,5 +72,17 @@ export function useStoryStatus(id: string | null, opts?: { refetchIntervalMs?: n
     queryFn:         () => getStoryStatus(id!),
     enabled:         !!id,
     refetchInterval: opts?.refetchIntervalMs ?? 5000,
+  });
+}
+
+export function useGenerateStoryNow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: generateStoryNow,
+    onSuccess: () => {
+      // Invalidate all stories queries — once the worker finishes (~20-30s),
+      // a refetch will pick up the new 'current_generated' state.
+      qc.invalidateQueries({ queryKey: ['stories'] });
+    },
   });
 }

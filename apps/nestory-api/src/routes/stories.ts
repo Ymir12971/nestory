@@ -12,8 +12,9 @@ import type {
 } from '@nestory/types';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
-import { parseParams, parseQuery, uuidParam } from '../lib/validation';
+import { parseBody, parseParams, parseQuery, uuidParam } from '../lib/validation';
 import { currentMonthKey } from '../lib/month';
+import { enqueueStoryGeneration, getStoryQueue } from '../lib/storyQueue';
 
 /**
  * 决策 4：没有 POST /stories（公网）。
@@ -24,6 +25,12 @@ import { currentMonthKey } from '../lib/month';
 const listQuery = z.object({
   childId: z.string().uuid(),
   year:    z.coerce.number().int().min(2020).max(2100).optional(),
+});
+
+const generateNowSchema = z.object({
+  childId:  z.string().uuid(),
+  // Defaults to the user's current local month when omitted.
+  monthKey: z.string().regex(/^\d{4}-\d{2}$/).optional(),
 });
 
 // ---------- Helpers ----------
@@ -118,16 +125,29 @@ export async function storiesRoutes(app: FastifyInstance) {
     const curStory = stories.find(s => s.monthKey === curMonthKey);
     const memCount = memoryCountByMonth.get(curMonthKey) ?? 0;
 
+    const curStoryDoc = curStory?.document as StoryDocument | null | undefined;
+    const isCurGenerated =
+      curStory?.status === 'generated' || curStory?.status === 'fallback_generated';
+    const isCurInProgress =
+      curStory?.status === 'generating' ||
+      curStory?.status === 'pending' ||
+      curStory?.status === 'queued';
+
     const currentMonth: CurrentMonthStatus = {
       monthKey: curMonthKey,
-      listItemState: isFreeQuotaOut
-        ? 'current_quota_exhausted'
-        : (curStory?.status === 'generating' || curStory?.status === 'pending' || curStory?.status === 'queued')
-          ? 'current_in_progress'
-          : 'current_collecting',
+      listItemState: isCurGenerated
+        ? 'current_generated'
+        : isFreeQuotaOut
+          ? 'current_quota_exhausted'
+          : isCurInProgress
+            ? 'current_in_progress'
+            : 'current_collecting',
       memoryCount:         memCount,
       daysUntilGeneration: daysUntilNextMonth(),
       milestoneLevel:      memCount >= 15 ? '15+' : memCount >= 10 ? '10' : memCount >= 3 ? '3' : memCount >= 1 ? '1' : null,
+      storyId:       isCurGenerated ? curStory!.id : null,
+      title:         isCurGenerated ? (curStoryDoc?.meta.title ?? null) : null,
+      coverImageUrl: isCurGenerated ? (curStoryDoc?.meta.coverImageUrl ?? null) : null,
     };
 
     // 历史月份（最多回溯到 child 出生所在月）
@@ -187,6 +207,49 @@ export async function storiesRoutes(app: FastifyInstance) {
         generationMeta: story.generationMeta as unknown as GenerationMeta,
       },
     };
+  });
+
+  // POST /stories/generate-now — user-triggered generation for *their* child.
+  // Wraps the same BullMQ enqueue path the internal endpoint and cron use, but
+  // gated on Supabase JWT ownership instead of the admin token. Idempotent: a
+  // terminal (failed/completed) job is removed first so a fresh attempt runs;
+  // an in-flight job is reused as-is.
+  app.post('/generate-now', async (req, reply) => {
+    const body = parseBody(generateNowSchema, req);
+
+    const [child, user] = await Promise.all([
+      prisma.child.findFirst({
+        where:  { ...whereNotDeleted, id: body.childId, userId: req.userId },
+        select: { id: true },
+      }),
+      prisma.user.findFirst({
+        where:  { ...whereNotDeleted, id: req.userId },
+        select: { timezone: true },
+      }),
+    ]);
+    if (!child) throw Errors.notFound('Child', body.childId);
+    if (!user)  throw Errors.notFound('User', req.userId);
+
+    const monthKey = body.monthKey ?? currentMonthKey(user.timezone);
+    const expectedJobId = `story:${body.childId}:${monthKey}`;
+
+    // If the deterministic job already exists, only retry/replace terminal ones;
+    // active/waiting/delayed get reused so we don't double-charge the API.
+    const queue = getStoryQueue();
+    const existing = await queue.getJob(expectedJobId);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'failed' || state === 'completed') {
+        await existing.remove();
+      } else {
+        reply.code(202);
+        return { data: { jobId: expectedJobId, childId: body.childId, monthKey, status: 'already_in_progress' } };
+      }
+    }
+
+    const jobId = await enqueueStoryGeneration({ childId: body.childId, monthKey });
+    reply.code(202);
+    return { data: { jobId, childId: body.childId, monthKey, status: 'enqueued' } };
   });
 
   // GET /stories/:id/status — 轻量轮询（推荐用 Supabase Realtime 替代）

@@ -7,7 +7,8 @@ import type { CurrentMonthStatus, StoryListItem, SubscriptionStatus } from '@nes
 import { theme, palette } from '@/shared/theme';
 import { TopNotify, type TopNotifyStatus } from '@/shared/components/TopNotify';
 import { PaywallModal } from '@/shared/components/PaywallModal';
-import { useChildren, useStories, useSubscription } from '@/api';
+import { useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
+import { showToast } from '@/features/ui/toast';
 
 function topNotifyForSub(sub: SubscriptionStatus): TopNotifyStatus | null {
   if (sub === 'trial_ended')   return 'stories_trial_ended';
@@ -37,9 +38,13 @@ function parseMonthKey(monthKey: string) {
 function CollectingCard({
   data,
   onAddMemory,
+  onGenerateNow,
+  generating,
 }: {
   data: CurrentMonthStatus;
   onAddMemory: () => void;
+  onGenerateNow: () => void;
+  generating: boolean;
 }) {
   // TODO: use proper milestone-target calculation once design logic is confirmed
   const progress = Math.min(data.memoryCount / 15, 1);
@@ -54,11 +59,57 @@ function CollectingCard({
           {data.memoryCount} {data.memoryCount === 1 ? 'memory' : 'memories'} so far — your story is starting to take shape.
         </Text>
       </View>
-      <Pressable style={styles.addMemoryBtn} onPress={onAddMemory}>
-        <RemixIcon name="add-line" size={20} color={theme.text.brand} />
-        <Text style={styles.addMemoryBtnLabel}>Add Memory</Text>
-      </Pressable>
+      <View style={styles.collectingActions}>
+        <Pressable style={styles.addMemoryBtn} onPress={onAddMemory}>
+          <RemixIcon name="add-line" size={20} color={theme.text.brand} />
+          <Text style={styles.addMemoryBtnLabel}>Add Memory</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.generateNowBtn, generating && { opacity: 0.6 }]}
+          onPress={onGenerateNow}
+          disabled={generating}
+        >
+          <RemixIcon name="magic-line" size={18} color={theme.text.onColor} />
+          <Text style={styles.generateNowBtnLabel}>
+            {generating ? 'Generating…' : 'Generate Now'}
+          </Text>
+        </Pressable>
+      </View>
     </View>
+  );
+}
+
+function CurrentGeneratedCard({
+  data,
+  onPress,
+}: {
+  data: CurrentMonthStatus;
+  onPress: () => void;
+}) {
+  const { badge } = parseMonthKey(data.monthKey);
+  return (
+    <Pressable style={styles.cardGenerated} onPress={onPress}>
+      <View style={styles.coverArea}>
+        {data.coverImageUrl ? (
+          <Image source={{ uri: data.coverImageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={styles.coverPlaceholder} />
+        )}
+        <View style={styles.monthBadge}>
+          <Text style={styles.monthBadgeLabel}>{badge}</Text>
+        </View>
+      </View>
+      <View style={styles.generatedBody}>
+        <View style={styles.generatedTextGroup}>
+          <Text style={styles.cardTitle}>{data.title ?? '—'}</Text>
+        </View>
+        <View style={styles.cardFooter}>
+          <Text style={styles.nsCaption}>{data.memoryCount} memories</Text>
+          <View style={{ flex: 1 }} />
+          <RemixIcon name="arrow-right-s-line" size={24} color={theme.text.secondary} />
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -173,6 +224,24 @@ export function StoriesScreen() {
   const activeChildId =
     children.find(c => c.isActive)?.id ?? children[0]?.id ?? '';
   const storiesQ = useStories({ childId: activeChildId, year: selectedYear });
+  const generateNow = useGenerateStoryNow();
+
+  const handleGenerateNow = async () => {
+    if (!activeChildId || generateNow.isPending) return;
+    try {
+      const res = await generateNow.mutateAsync({ childId: activeChildId });
+      showToast({
+        type: 'info',
+        message: res.status === 'already_in_progress'
+          ? 'Your Story is already on its way — give it a moment.'
+          : 'Generating your Story… give it ~30 seconds, then pull to refresh.',
+        duration: 5000,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      showToast({ type: 'error', message: `Couldn't start generation: ${msg}` });
+    }
+  };
 
   // Available years: this year + the user's child birth year; collapse duplicates.
   const availableYears = useMemo(() => {
@@ -249,6 +318,8 @@ export function StoriesScreen() {
             <CollectingCard
               data={current}
               onAddMemory={() => router.push('/memory/add')}
+              onGenerateNow={handleGenerateNow}
+              generating={generateNow.isPending}
             />
           )}
           {current?.listItemState === 'current_in_progress' && (
@@ -256,6 +327,12 @@ export function StoriesScreen() {
           )}
           {current?.listItemState === 'current_quota_exhausted' && (
             <LockedCard onUpgrade={() => openPaywall('A')} />
+          )}
+          {current?.listItemState === 'current_generated' && current.storyId && (
+            <CurrentGeneratedCard
+              data={current}
+              onPress={() => router.push(`/story/${current.storyId}`)}
+            />
           )}
 
           {historical.map(item =>
@@ -397,6 +474,11 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.text.secondary,
   },
+  collectingActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.s,
+  },
   addMemoryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -409,11 +491,24 @@ const styles = StyleSheet.create({
     borderColor: theme.border.brand,
     backgroundColor: theme.surface.default,
     gap: 4,
-    alignSelf: 'flex-start',
   },
   addMemoryBtnLabel: {
     ...theme.typography.buttonLabelM,
     color: theme.text.brand,
+  },
+  generateNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 36,
+    paddingHorizontal: theme.spacing.l,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.surface.brand,
+    gap: 6,
+  },
+  generateNowBtnLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.onColor,
   },
 
   // topNotify wrap
