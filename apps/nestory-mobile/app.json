@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FBF6EC"
+      "backgroundColor": "#FEFCFA"
     },
     "ios": {
       "supportsTablet": false,
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.blakard.nestory",
-      "versionCode": 5,
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/splash-icon.png",
         "backgroundColor": "#FBF6EC"
@@ -31,6 +31,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Nestory accesses your photos so you can add them to your child's memories.",
+          "cameraPermission": "Nestory uses your camera so you can take a photo to add to your child's memories."
+        }
+      ],
       [
         "expo-build-properties",
         {

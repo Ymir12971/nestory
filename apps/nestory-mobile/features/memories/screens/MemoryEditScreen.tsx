@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,8 +7,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Memory, MemoryFile } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
-import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
+import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
+import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { showToast } from '@/features/ui/toast';
+
+const MAX_PHOTOS = 10;
 import {
   ApiClientError,
   uploadPhoto,
@@ -65,7 +68,8 @@ function EditForm({ memory }: { memory: Memory }) {
   const deleteAsset     = useDeleteAsset();
   const createHighlight = useCreateHighlight();
   const deleteHighlight = useDeleteHighlight();
-  const pickPhotos      = usePhotoPicker({ multiple: true });
+  const pickFromLibrary = usePhotoPicker({ multiple: true });
+  const takePhoto       = usePhotoCamera();
 
   const [noteText, setNoteText]               = useState(memory.textNote ?? '');
   const [removedFileIds, setRemovedFileIds]   = useState<Set<string>>(new Set());
@@ -76,9 +80,11 @@ function EditForm({ memory }: { memory: Memory }) {
   // Defaults to the first photo (matches the prior implicit behaviour).
   const [coverFileId, setCoverFileId] = useState<string | undefined>(memory.files[0]?.id);
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
   const [deleting, setDeleting]   = useState(false);
+  const photoStripRef = useRef<ScrollView>(null);
 
   const remainingFiles = useMemo(
     () => memory.files.filter(f => !removedFileIds.has(f.id)),
@@ -86,9 +92,36 @@ function EditForm({ memory }: { memory: Memory }) {
   );
   const totalPhotos = remainingFiles.length + newPhotos.length;
 
-  const handleAddPhoto = async () => {
-    const picked = await pickPhotos();
-    if (picked.length > 0) setNewPhotos(prev => [...prev, ...picked]);
+  // Auto-scroll the photo strip so the "+" button stays visible as photos are added.
+  useEffect(() => {
+    photoStripRef.current?.scrollToEnd({ animated: true });
+  }, [totalPhotos]);
+
+  const addPickedPhotos = (picked: PickedPhoto[]) => {
+    if (picked.length === 0) return;
+    setNewPhotos(prev => {
+      const room = MAX_PHOTOS - remainingFiles.length - prev.length;
+      const accepted = picked.slice(0, room);
+      if (accepted.length < picked.length) {
+        showToast({ type: 'warning', message: 'Maximum 10 photos per memory.' });
+      }
+      return [...prev, ...accepted];
+    });
+  };
+
+  const handleOpenAddPhoto = () => {
+    if (totalPhotos >= MAX_PHOTOS) return;
+    setPhotoSourceVisible(true);
+  };
+
+  const handleTakePhoto = async () => {
+    setPhotoSourceVisible(false);
+    addPickedPhotos(await takePhoto());
+  };
+
+  const handleChooseFromLibrary = async () => {
+    setPhotoSourceVisible(false);
+    addPickedPhotos(await pickFromLibrary({ selectionLimit: MAX_PHOTOS - totalPhotos }));
   };
 
   const handleRemoveExisting = (file: MemoryFile) => {
@@ -180,6 +213,7 @@ function EditForm({ memory }: { memory: Memory }) {
       >
         {/* Photo Strip — existing files first, then newly picked */}
         <ScrollView
+          ref={photoStripRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.photoStrip}
@@ -208,9 +242,11 @@ function EditForm({ memory }: { memory: Memory }) {
               </Pressable>
             </View>
           ))}
-          <Pressable style={styles.photoAdd} onPress={handleAddPhoto}>
-            <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
-          </Pressable>
+          {totalPhotos < MAX_PHOTOS && (
+            <Pressable style={styles.photoAdd} onPress={handleOpenAddPhoto}>
+              <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
+            </Pressable>
+          )}
         </ScrollView>
 
         {/* Note Input */}
@@ -349,6 +385,13 @@ function EditForm({ memory }: { memory: Memory }) {
         variant="B"
         onSubscribe={() => setPaywallVisible(false)}
         onDismiss={() => setPaywallVisible(false)}
+      />
+
+      <PhotoSourceSheet
+        visible={photoSourceVisible}
+        onTakePhoto={() => void handleTakePhoto()}
+        onChooseLibrary={() => void handleChooseFromLibrary()}
+        onDismiss={() => setPhotoSourceVisible(false)}
       />
     </>
   );

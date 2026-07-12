@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
@@ -7,9 +7,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { SubscriptionStatus } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
-import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
+import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
+import { TagPickerSheet } from '@/shared/components/TagPickerSheet';
+import { DateTimePickerSheet } from '@/shared/components/DateTimePickerSheet';
+import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { ApiClientError, uploadPhoto, useChildren, useCreateAsset, useCreateHighlight, useSubscription } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { showToast } from '@/features/ui/toast';
+
+const MAX_PHOTOS = 10;
+
+function formatCapturedAt(d: Date): string {
+  const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${datePart} · ${timePart}`;
+}
 
 type SaveState = 'both_empty' | 'need_photos' | 'need_note' | 'active';
 
@@ -37,7 +49,8 @@ function getHlCaption(sub: SubscriptionStatus, count: number, limit: number): st
 export function AddMemoryScreen() {
   const router = useRouter();
   const goBack = useGoBack();
-  const pickPhotos = usePhotoPicker({ multiple: true });
+  const pickFromLibrary = usePhotoPicker({ multiple: true });
+  const takePhoto       = usePhotoCamera();
   const childrenQ = useChildren();
   const subQ      = useSubscription();
   const createAsset     = useCreateAsset();
@@ -45,9 +58,15 @@ export function AddMemoryScreen() {
   const [noteText, setNoteText]       = useState('');
   const [isHighlight, setIsHighlight] = useState(false);
   const [photos, setPhotos]           = useState<PickedPhoto[]>([]);
+  const [tags, setTags]               = useState<string[]>([]);
+  const [capturedAt, setCapturedAt]   = useState(() => new Date());
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
+  const [tagSheetVisible, setTagSheetVisible] = useState(false);
+  const [dateSheetVisible, setDateSheetVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const photoStripRef = useRef<ScrollView>(null);
 
   const sub = subQ.data;
   const hlCount = sub?.highlightCount ?? 0;
@@ -81,8 +100,9 @@ export function AddMemoryScreen() {
 
       const memory = await createAsset.mutateAsync({
         childId:    activeChildId,
-        capturedAt: new Date().toISOString(),
+        capturedAt: capturedAt.toISOString(),
         ...(noteText.trim() ? { textNote: noteText.trim() } : {}),
+        ...(tags.length > 0 ? { tagValues: tags } : {}),
         files: uploaded,
       });
 
@@ -114,9 +134,36 @@ export function AddMemoryScreen() {
     }
   };
 
-  const handleAddPhoto = async () => {
-    const picked = await pickPhotos();
-    if (picked.length > 0) setPhotos(prev => [...prev, ...picked]);
+  // Auto-scroll the photo strip so the "+" button stays visible as photos are added.
+  useEffect(() => {
+    photoStripRef.current?.scrollToEnd({ animated: true });
+  }, [photos.length]);
+
+  const addPickedPhotos = (picked: PickedPhoto[]) => {
+    if (picked.length === 0) return;
+    setPhotos(prev => {
+      const room = MAX_PHOTOS - prev.length;
+      const accepted = picked.slice(0, room);
+      if (accepted.length < picked.length) {
+        showToast({ type: 'warning', message: 'Maximum 10 photos per memory.' });
+      }
+      return [...prev, ...accepted];
+    });
+  };
+
+  const handleOpenAddPhoto = () => {
+    if (photos.length >= MAX_PHOTOS) return;
+    setPhotoSourceVisible(true);
+  };
+
+  const handleTakePhoto = async () => {
+    setPhotoSourceVisible(false);
+    addPickedPhotos(await takePhoto());
+  };
+
+  const handleChooseFromLibrary = async () => {
+    setPhotoSourceVisible(false);
+    addPickedPhotos(await pickFromLibrary({ selectionLimit: MAX_PHOTOS - photos.length }));
   };
 
   const handleRemovePhoto = (index: number) => {
@@ -142,6 +189,7 @@ export function AddMemoryScreen() {
       >
         {/* Photo Strip */}
         <ScrollView
+          ref={photoStripRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.photoStrip}
@@ -158,9 +206,11 @@ export function AddMemoryScreen() {
               </Pressable>
             </View>
           ))}
-          <Pressable style={styles.photoAdd} onPress={handleAddPhoto}>
-            <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
-          </Pressable>
+          {photos.length < MAX_PHOTOS && (
+            <Pressable style={styles.photoAdd} onPress={handleOpenAddPhoto}>
+              <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
+            </Pressable>
+          )}
         </ScrollView>
 
         {/* Note Input */}
@@ -174,9 +224,41 @@ export function AddMemoryScreen() {
           onChangeText={setNoteText}
         />
 
-        {/* Details List — Tags / Date / Cover are editable from MemoryEditScreen after the
-            memory is saved (no draft store yet to thread state through sub-screens). */}
+        {/* Details List — Cover is chosen via the Highlight cover sheet after Save. */}
         <View style={styles.detailsList}>
+          <Pressable style={styles.detailRow} onPress={() => setTagSheetVisible(true)}>
+            <Text style={styles.detailLabel}>Tags</Text>
+            <View style={styles.detailRight}>
+              {tags.length > 0 ? (
+                <>
+                  {tags.slice(0, 3).map(tag => (
+                    <View key={tag} style={styles.miniChip}>
+                      <Text style={styles.miniChipLabel}>{tag}</Text>
+                    </View>
+                  ))}
+                  {tags.length > 3 && (
+                    <Text style={styles.detailValue}>+{tags.length - 3} more</Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.detailValue}>Add tags</Text>
+              )}
+              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+            </View>
+          </Pressable>
+
+          <View style={styles.rowDivider} />
+
+          <Pressable style={styles.detailRow} onPress={() => setDateSheetVisible(true)}>
+            <Text style={styles.detailLabel}>Date & Time</Text>
+            <View style={styles.detailRight}>
+              <Text style={styles.detailValue}>{formatCapturedAt(capturedAt)}</Text>
+              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+            </View>
+          </Pressable>
+
+          <View style={styles.rowDivider} />
+
           <Pressable
             style={styles.detailRow}
             onPress={hlLocked ? () => setPaywallVisible(true) : undefined}
@@ -205,6 +287,27 @@ export function AddMemoryScreen() {
         variant="B"
         onSubscribe={() => setPaywallVisible(false)}
         onDismiss={() => setPaywallVisible(false)}
+      />
+
+      <PhotoSourceSheet
+        visible={photoSourceVisible}
+        onTakePhoto={() => void handleTakePhoto()}
+        onChooseLibrary={() => void handleChooseFromLibrary()}
+        onDismiss={() => setPhotoSourceVisible(false)}
+      />
+
+      <TagPickerSheet
+        visible={tagSheetVisible}
+        selected={tags}
+        onDone={setTags}
+        onDismiss={() => setTagSheetVisible(false)}
+      />
+
+      <DateTimePickerSheet
+        visible={dateSheetVisible}
+        value={capturedAt}
+        onConfirm={setCapturedAt}
+        onDismiss={() => setDateSheetVisible(false)}
       />
 
       {/* Save CTA */}
@@ -362,11 +465,24 @@ const styles = StyleSheet.create({
   detailRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     gap: 4,
   },
   detailValue: {
     ...theme.typography.body,
     color: theme.text.secondary,
+  },
+  miniChip: {
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: 3,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.surface.brandSubtle,
+  },
+  miniChipLabel: {
+    ...theme.typography.tagBadge,
+    color: theme.text.brand,
   },
 
   // CTA

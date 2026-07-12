@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "398315112615",
+    "project_id": "nestory-496722",
+    "storage_bucket": "nestory-496722.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:398315112615:android:90cca2359434ec08adf382",
+        "android_client_info": {
+          "package_name": "com.blakard.nestory"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "398315112615-bt3mo5jigjahso7dges54rs207ssnevf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAX9LwpUF0E7VqhX7dV2cMiQfslviQeJH8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "398315112615-bt3mo5jigjahso7dges54rs207ssnevf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

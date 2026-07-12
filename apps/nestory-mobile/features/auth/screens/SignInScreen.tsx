@@ -78,9 +78,12 @@ export function SignInScreen() {
       // Native: open the URL Supabase returned and wait for the deep-link back.
       if (!data?.url) throw new Error('Supabase returned no auth URL');
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      if (result.type !== 'success' || !result.url) {
-        setPendingProvider(null);
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        // User closed the browser — silent, no error needed.
         return;
+      }
+      if (result.type !== 'success' || !result.url) {
+        throw new Error(`OAuth browser session ended unexpectedly (${result.type}). Check that the redirect URL is allowlisted in Supabase Dashboard.`);
       }
       // PKCE: extract the ?code= from the deep link and exchange it for a session.
       const code = new URL(result.url).searchParams.get('code');

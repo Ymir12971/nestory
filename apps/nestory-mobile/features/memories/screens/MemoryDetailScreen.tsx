@@ -7,6 +7,7 @@ import type { Memory } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { useAsset } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { FullscreenPhotoViewer } from '@/shared/components/FullscreenPhotoViewer';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -67,6 +68,7 @@ function Body({ memory }: { memory: Memory }) {
   const goBack = useGoBack();
   const dotCount = memory.files.length;
   const [activeIndex, setActiveIndex] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / (PHOTO_CENTER_W + PHOTO_GAP));
@@ -121,14 +123,15 @@ function Body({ memory }: { memory: Memory }) {
               ]}
             >
               {memory.files.map((f, i) => (
-                <Image
-                  key={f.id}
-                  source={{ uri: f.fileUrl }}
-                  style={[
-                    styles.photoCenter,
-                    i < memory.files.length - 1 ? { marginRight: PHOTO_GAP } : null,
-                  ]}
-                />
+                <Pressable key={f.id} onPress={() => setViewerIndex(i)}>
+                  <Image
+                    source={{ uri: f.fileUrl }}
+                    style={[
+                      styles.photoCenter,
+                      i < memory.files.length - 1 ? { marginRight: PHOTO_GAP } : null,
+                    ]}
+                  />
+                </Pressable>
               ))}
             </ScrollView>
 
@@ -187,6 +190,13 @@ function Body({ memory }: { memory: Memory }) {
           </View>
         </View>
       </ScrollView>
+
+      <FullscreenPhotoViewer
+        visible={viewerIndex !== null}
+        photoUrls={memory.files.map(f => f.fileUrl)}
+        initialIndex={viewerIndex ?? 0}
+        onDismiss={() => setViewerIndex(null)}
+      />
     </>
   );
 }

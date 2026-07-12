@@ -21,6 +21,16 @@ function normalizeMime(raw: string | null | undefined, uri: string): PickedMime 
   return 'image/jpeg'; // picker re-encodes to JPEG at quality 0.85 by default
 }
 
+function toPickedPhotos(assets: ImagePicker.ImagePickerAsset[]): PickedPhoto[] {
+  return assets.map(a => ({
+    uri:      a.uri,
+    width:    a.width,
+    height:   a.height,
+    mimeType: normalizeMime(a.mimeType, a.uri),
+    byteSize: a.fileSize,
+  }));
+}
+
 /**
  * Returns a launcher function that requests media-library permission then opens
  * the image picker. Single-photo mode by default; pass `multiple: true` for
@@ -29,7 +39,7 @@ function normalizeMime(raw: string | null | undefined, uri: string): PickedMime 
 export function usePhotoPicker(options?: { multiple?: boolean }) {
   const multiple = options?.multiple ?? false;
 
-  const launch = async (): Promise<PickedPhoto[]> => {
+  const launch = async (opts?: { selectionLimit?: number }): Promise<PickedPhoto[]> => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return [];
 
@@ -38,16 +48,34 @@ export function usePhotoPicker(options?: { multiple?: boolean }) {
       allowsMultipleSelection: multiple,
       allowsEditing: !multiple,
       quality: 0.85,
+      ...(multiple && opts?.selectionLimit ? { selectionLimit: opts.selectionLimit } : {}),
     });
 
     if (result.canceled) return [];
-    return result.assets.map(a => ({
-      uri:      a.uri,
-      width:    a.width,
-      height:   a.height,
-      mimeType: normalizeMime(a.mimeType, a.uri),
-      byteSize: a.fileSize,
-    }));
+    return toPickedPhotos(result.assets);
+  };
+
+  return launch;
+}
+
+/**
+ * Returns a launcher function that requests camera permission then opens the
+ * native camera to capture a single photo (used alongside `usePhotoPicker` in
+ * the H-02 / H-04 "add photo" source sheet).
+ */
+export function usePhotoCamera() {
+  const launch = async (): Promise<PickedPhoto[]> => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return [];
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.85,
+    });
+
+    if (result.canceled) return [];
+    return toPickedPhotos(result.assets);
   };
 
   return launch;
