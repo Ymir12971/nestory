@@ -1,58 +1,32 @@
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { theme, palette } from '@/shared/theme';
 
-export type PaywallVariant = 'A' | 'B' | 'C' | 'D';
+// global-Paywall (Figma 775:1819) — the single paywall for the whole app.
+// The old contextual A/B/C/D variants are gone (2026-07 redesign, 模型 X 废弃);
+// every "View Premium benefits" entry point opens this same sheet.
+
 export type PaywallCycle = 'year' | 'month';
 
-const HEADLINES: Record<PaywallVariant, string> = {
-  A: "Your baby's first year only comes once",
-  B: "Don't miss a single milestone",
-  C: "Keep the story going",
-  D: "Your family is growing",
-};
-
-const BENEFITS: Record<PaywallVariant, string[]> = {
-  A: [
-    'Unlimited monthly Stories — never miss a chapter',
-    'Watermark-Free Sharing',
-    'Unlimited Highlights',
-    'Extra Features like Birthday Celebrations',
-  ],
-  B: [
-    'Unlimited Highlights — capture every milestone',
-    'Unlimited monthly Stories',
-    'Watermark-Free Sharing',
-    'Extra Features like Birthday Celebrations',
-  ],
-  C: [
-    'Unlimited monthly Stories — never miss a chapter',
-    'Watermark-Free Sharing',
-    'Unlimited Highlights',
-    'Extra Features like Birthday Celebrations',
-  ],
-  D: [
-    'Unlimited child profiles — one place for every child',
-    'Unlimited monthly Stories',
-    'Unlimited Highlights',
-    'Watermark-Free Sharing',
-  ],
-};
+const BENEFITS = [
+  'Unlimited child profiles',
+  'Unlimited monthly Stories',
+  'Watermark-Free Sharing',
+  'Access to regenerate past Stories',
+  'Annual Recap and more features',
+];
 
 interface PaywallModalProps {
   visible: boolean;
-  variant?: PaywallVariant;
   onSubscribe: (cycle: PaywallCycle) => void;
   onDismiss: () => void;
 }
 
-export function PaywallModal({
-  visible,
-  variant = 'A',
-  onSubscribe,
-  onDismiss,
-}: PaywallModalProps) {
+export function PaywallModal({ visible, onSubscribe, onDismiss }: PaywallModalProps) {
+  const [cycle, setCycle] = useState<PaywallCycle>('year');
+
   return (
     <Modal
       visible={visible}
@@ -63,42 +37,42 @@ export function PaywallModal({
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onDismiss} />
         <View style={styles.sheet}>
-          {/* Handle */}
           <View style={styles.handleWrap}>
             <View style={styles.handleBar} />
           </View>
 
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headline}>{HEADLINES[variant]}</Text>
-          </View>
+          <Text style={styles.headline}>Upgrade to enjoy more!</Text>
 
-          {/* Benefits */}
-          <View style={styles.benefits}>
-            {BENEFITS[variant].map((text, i) => (
-              <View key={i} style={styles.benefit}>
-                <RemixIcon name="vip-crown-2-line" size={16} color={theme.text.premium} />
-                <Text style={styles.benefitText}>{text}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Pricing */}
-          <View style={styles.pricing}>
-            <View style={styles.segmented}>
-              <View style={styles.segSelected}>
-                <Text style={styles.segSelectedLabel}>Yearly</Text>
-                <View style={styles.saveBadge}>
-                  <Text style={styles.saveBadgeLabel}>Save $19</Text>
-                </View>
-              </View>
-              <View style={styles.segUnselected}>
-                <Text style={styles.segUnselectedLabel}>Monthly</Text>
-              </View>
+          {/* Premium card: benefits + plan picker */}
+          <View style={styles.premiumCard}>
+            <View style={styles.premiumHeader}>
+              <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+              <Text style={styles.premiumTitle}>Premium</Text>
             </View>
-            <View style={styles.priceDetails}>
-              <Text style={styles.price}>$99.99/year</Text>
-              <Text style={styles.priceSub}>~$8.33/mo · First month free</Text>
+
+            <View style={styles.benefits}>
+              {BENEFITS.map(text => (
+                <View key={text} style={styles.benefit}>
+                  <Text style={styles.benefitBullet}>•</Text>
+                  <Text style={styles.benefitText}>{text}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.planRow}>
+              <PlanOption
+                selected={cycle === 'year'}
+                price="$100"
+                caption="Billed annually"
+                badge="~17% Off"
+                onPress={() => setCycle('year')}
+              />
+              <PlanOption
+                selected={cycle === 'month'}
+                price="$10"
+                caption="Billed monthly"
+                onPress={() => setCycle('month')}
+              />
             </View>
           </View>
 
@@ -106,7 +80,7 @@ export function PaywallModal({
           <View style={styles.cta}>
             <Pressable
               style={({ pressed }) => [styles.ctaBtnWrap, pressed && { opacity: 0.88 }]}
-              onPress={() => onSubscribe('year')}
+              onPress={() => onSubscribe(cycle)}
             >
               <LinearGradient
                 colors={[palette.accent[500], palette.accent[400]]}
@@ -114,16 +88,50 @@ export function PaywallModal({
                 end={{ x: 1, y: 0 }}
                 style={styles.ctaBtn}
               >
-                <Text style={styles.ctaBtnLabel}>Start Free Trial</Text>
+                <Text style={styles.ctaBtnLabel}>Upgrade to Premium</Text>
               </LinearGradient>
             </Pressable>
             <Pressable style={styles.dismissBtn} onPress={onDismiss}>
-              <Text style={styles.dismissBtnLabel}>Maybe Later</Text>
+              <Text style={styles.dismissBtnLabel}>Back</Text>
             </Pressable>
           </View>
         </View>
       </View>
     </Modal>
+  );
+}
+
+function PlanOption({
+  selected,
+  price,
+  caption,
+  badge,
+  onPress,
+}: {
+  selected: boolean;
+  price: string;
+  caption: string;
+  badge?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={[styles.planCard, selected ? styles.planCardSelected : styles.planCardUnselected]}
+      onPress={onPress}
+    >
+      <View style={styles.planTop}>
+        <Text style={styles.planPrice}>{price}</Text>
+        {selected ? (
+          <View style={styles.radioChecked}>
+            <RemixIcon name="check-line" size={12} color={theme.text.onColor} />
+          </View>
+        ) : (
+          <View style={styles.radioUnchecked} />
+        )}
+      </View>
+      <Text style={styles.planCaption}>{caption}</Text>
+      {badge ? <Text style={styles.planBadge}>{badge}</Text> : null}
+    </Pressable>
   );
 }
 
@@ -137,7 +145,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
 
-  // Sheet
   sheet: {
     backgroundColor: theme.surface.card,
     borderTopLeftRadius: theme.radius.l,
@@ -149,7 +156,6 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
 
-  // Handle
   handleWrap: {
     height: 28,
     alignItems: 'center',
@@ -162,108 +168,113 @@ const styles = StyleSheet.create({
     backgroundColor: theme.border.default,
   },
 
-  // Header
-  header: {
-    paddingTop: 24,
-    paddingBottom: 16,
-    paddingHorizontal: theme.spacing.l,
-  },
   headline: {
     fontFamily: 'Manrope_700Bold',
     fontSize: 28,
     lineHeight: 38,
     color: theme.text.primary,
-  },
-
-  // Benefits
-  benefits: {
+    paddingTop: 12,
+    paddingBottom: 16,
     paddingHorizontal: theme.spacing.l,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  benefit: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 4,
-  },
-  benefitText: {
-    flex: 1,
-    ...theme.typography.caption,
-    color: theme.text.primary,
   },
 
-  // Pricing
-  pricing: {
+  // Premium card
+  premiumCard: {
+    marginHorizontal: theme.spacing.l,
+    borderWidth: 1,
+    borderColor: theme.text.premium,
+    borderRadius: theme.radius.l,
     backgroundColor: palette.accent[50],
     padding: theme.spacing.l,
     gap: 12,
   },
-  segmented: {
-    flexDirection: 'row',
-    height: 40,
-    borderWidth: 1,
-    borderColor: theme.text.premium,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.card,
-    padding: 3,
-  },
-  segSelected: {
-    flex: 1,
+  premiumHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.surface.premium,
-    borderRadius: theme.radius.full,
     gap: 8,
   },
-  segSelectedLabel: {
-    fontFamily: 'Manrope_600SemiBold',
-    fontSize: 16,
-    lineHeight: 22,
+  premiumTitle: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: 18,
+    lineHeight: 24,
     color: theme.text.premium,
   },
-  saveBadge: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: theme.radius.full,
+  benefits: {
+    gap: 8,
   },
-  saveBadgeLabel: {
-    fontFamily: 'Manrope_600SemiBold',
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.text.premium,
+  benefit: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
   },
-  segUnselected: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.full,
-  },
-  segUnselectedLabel: {
-    fontFamily: 'Manrope_600SemiBold',
-    fontSize: 14,
-    lineHeight: 20,
+  benefitBullet: {
+    ...theme.typography.body,
     color: theme.text.primary,
   },
-  priceDetails: {
-    alignItems: 'center',
+  benefitText: {
+    flex: 1,
+    ...theme.typography.body,
+    color: theme.text.primary,
+  },
+
+  // Plan picker
+  planRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  planCard: {
+    flex: 1,
+    borderRadius: theme.radius.m,
+    backgroundColor: theme.surface.card,
+    padding: theme.spacing.m,
     gap: 2,
   },
-  price: {
+  planCardSelected: {
+    borderWidth: 2,
+    borderColor: theme.text.premium,
+  },
+  planCardUnselected: {
+    borderWidth: 1,
+    borderColor: theme.border.default,
+  },
+  planTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  planPrice: {
     fontFamily: 'Manrope_700Bold',
-    fontSize: 28,
-    lineHeight: 38,
+    fontSize: 22,
+    lineHeight: 30,
     color: theme.text.primary,
   },
-  priceSub: {
+  radioChecked: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.text.premium,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioUnchecked: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: theme.border.strong,
+  },
+  planCaption: {
     ...theme.typography.caption,
     color: theme.text.secondary,
+  },
+  planBadge: {
+    ...theme.typography.caption,
+    color: theme.text.premium,
   },
 
   // CTA
   cta: {
-    paddingTop: 16,
+    paddingTop: 20,
     paddingBottom: theme.spacing.safeBtm,
     paddingHorizontal: theme.spacing.l,
     gap: 12,
@@ -272,8 +283,6 @@ const styles = StyleSheet.create({
   ctaBtnWrap: {
     width: '100%',
     borderRadius: theme.radius.full,
-    borderWidth: 2,
-    borderColor: palette.accent[50],
     overflow: 'hidden',
   },
   ctaBtn: {

@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MEMORY_CONSTRAINTS, type SubscriptionStatus } from '@nestory/types';
+import { MEMORY_CONSTRAINTS } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { PaywallModal } from '@/shared/components/PaywallModal';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { TagPickerSheet } from '@/shared/components/TagPickerSheet';
 import { DateTimePickerSheet } from '@/shared/components/DateTimePickerSheet';
 import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
-import { ApiClientError, uploadPhoto, useChildren, useCreateAsset, useCreateHighlight, useSubscription } from '@/api';
+import { uploadPhoto, useChildren, useCreateAsset } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { showToast } from '@/features/ui/toast';
 
@@ -39,40 +38,23 @@ const SAVE_LABELS: Record<SaveState, string> = {
   active:      'Save',
 };
 
-function getHlCaption(sub: SubscriptionStatus, count: number, limit: number): string {
-  const K = sub === 'trial_ended' ? 'Trial' : 'Premium';
-  return (sub === 'trial_ended' || sub === 'premium_ended')
-    ? `${K} ended · ${count} / ${limit} Highlights used`
-    : `Free plan · ${count} / ${limit} Highlights used`;
-}
-
 export function AddMemoryScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const pickFromLibrary = usePhotoPicker({ multiple: true });
   const takePhoto       = usePhotoCamera();
   const childrenQ = useChildren();
-  const subQ      = useSubscription();
   const createAsset     = useCreateAsset();
-  const createHighlight = useCreateHighlight();
   const [noteText, setNoteText]       = useState('');
-  const [isHighlight, setIsHighlight] = useState(false);
   const [photos, setPhotos]           = useState<PickedPhoto[]>([]);
   const [tags, setTags]               = useState<string[]>([]);
   const [capturedAt, setCapturedAt]   = useState(() => new Date());
-  const [paywallVisible, setPaywallVisible] = useState(false);
   const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
   const [tagSheetVisible, setTagSheetVisible] = useState(false);
   const [dateSheetVisible, setDateSheetVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const photoStripRef = useRef<ScrollView>(null);
-
-  const sub = subQ.data;
-  const hlCount = sub?.highlightCount ?? 0;
-  const hlLimit = sub?.highlightLimit ?? null;
-  const hlSub: SubscriptionStatus = sub?.subscriptionStatus ?? 'never_paid';
-  const hlLocked = hlLimit != null && hlCount >= hlLimit;
 
   const hasPhotos   = photos.length > 0;
   const hasText     = noteText.trim().length > 0;
@@ -98,33 +80,13 @@ export function AddMemoryScreen() {
         ),
       );
 
-      const memory = await createAsset.mutateAsync({
+      await createAsset.mutateAsync({
         childId:    activeChildId,
         capturedAt: capturedAt.toISOString(),
         ...(noteText.trim() ? { textNote: noteText.trim() } : {}),
         ...(tags.length > 0 ? { tagValues: tags } : {}),
         files: uploaded,
       });
-
-      if (isHighlight) {
-        // Server requires coverFileId when memory has multiple files; default to first.
-        const coverFileId = memory.files.length > 1 ? memory.files[0]?.id : undefined;
-        try {
-          await createHighlight.mutateAsync({
-            assetId: memory.id,
-            childId: activeChildId,
-            ...(coverFileId ? { coverFileId } : {}),
-          });
-        } catch (hlErr) {
-          if (hlErr instanceof ApiClientError && hlErr.code === 'HIGHLIGHT_LIMIT_REACHED') {
-            // Memory was saved; surface paywall and keep user on this screen so they can subscribe and retry.
-            setPaywallVisible(true);
-            setSaveError('Highlight limit reached. Memory saved without highlight.');
-            return;
-          }
-          throw hlErr;
-        }
-      }
 
       goBack();
     } catch (e: any) {
@@ -224,7 +186,7 @@ export function AddMemoryScreen() {
           onChangeText={setNoteText}
         />
 
-        {/* Details List — Cover is chosen via the Highlight cover sheet after Save. */}
+        {/* Details List */}
         <View style={styles.detailsList}>
           <Pressable style={styles.detailRow} onPress={() => setTagSheetVisible(true)}>
             <Text style={styles.detailLabel}>Tags</Text>
@@ -256,38 +218,8 @@ export function AddMemoryScreen() {
               <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
             </View>
           </Pressable>
-
-          <View style={styles.rowDivider} />
-
-          <Pressable
-            style={styles.detailRow}
-            onPress={hlLocked ? () => setPaywallVisible(true) : undefined}
-          >
-            <Text style={styles.detailLabel}>Mark as Highlight</Text>
-            <Switch
-              value={isHighlight}
-              onValueChange={hlLocked ? () => setPaywallVisible(true) : setIsHighlight}
-              trackColor={{ true: theme.surface.brand, false: theme.border.strong }}
-              thumbColor={theme.surface.card}
-              disabled={hlLocked}
-            />
-          </Pressable>
-          {hlLocked && hlLimit != null && (
-            <View style={styles.hlCaptionWrap}>
-              <Text style={styles.hlCaption}>
-                {getHlCaption(hlSub, hlCount, hlLimit)}
-              </Text>
-            </View>
-          )}
         </View>
       </ScrollView>
-
-      <PaywallModal
-        visible={paywallVisible}
-        variant="B"
-        onSubscribe={() => setPaywallVisible(false)}
-        onDismiss={() => setPaywallVisible(false)}
-      />
 
       <PhotoSourceSheet
         visible={photoSourceVisible}
@@ -453,14 +385,6 @@ const styles = StyleSheet.create({
   detailLabelBrand: {
     ...theme.typography.body,
     color: theme.text.brand,
-  },
-  hlCaptionWrap: {
-    paddingHorizontal: theme.spacing.l,
-    paddingBottom: 6,
-  },
-  hlCaption: {
-    ...theme.typography.tagBadge,
-    color: theme.text.secondary,
   },
   detailRight: {
     flexDirection: 'row',

@@ -48,11 +48,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="highlights"
+        name="settings"
         options={{
-          title: 'Highlights',
+          title: 'Settings',
           tabBarIcon: ({ color, focused }) => (
-            <RemixIcon name={focused ? 'star-fill' : 'star-line'} size={24} color={color} />
+            <RemixIcon name={focused ? 'settings-3-fill' : 'settings-3-line'} size={24} color={color} />
           ),
         }}
       />

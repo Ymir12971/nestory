@@ -319,7 +319,6 @@ export function HomeScreen() {
 
       <PaywallModal
         visible={paywallVisible}
-        variant="D"
         onSubscribe={() => setPaywallVisible(false)}
         onDismiss={() => setPaywallVisible(false)}
       />

@@ -262,7 +262,6 @@ export function SettingsScreen() {
 
       <PaywallModal
         visible={paywallVisible}
-        variant="C"
         onSubscribe={() => setPaywallVisible(false)}
         onDismiss={() => setPaywallVisible(false)}
       />

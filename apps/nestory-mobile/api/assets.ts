@@ -20,7 +20,6 @@ export interface MemoryCreateInput {
   capturedAt:  string;          // ISO 8601
   textNote?:   string;
   tagValues?:  string[];
-  isHighlight?: boolean;         // 注：当前 API 忽略此字段，is_highlight 必须走 POST /highlights
   files?:      AssetFileInput[];
 }
 
@@ -138,7 +137,6 @@ export function useDeleteAsset() {
     mutationFn: ({ id, hard }: { id: string; hard?: boolean }) => deleteAsset(id, hard),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assets'] });
-      qc.invalidateQueries({ queryKey: ['highlights'] });
     },
   });
 }

@@ -213,12 +213,8 @@ export function StoriesScreen() {
   const thisYear  = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(thisYear);
   const [paywallVisible, setPaywallVisible] = useState(false);
-  const [paywallVariant, setPaywallVariant] = useState<'A' | 'C'>('A');
 
-  const openPaywall = (variant: 'A' | 'C') => {
-    setPaywallVariant(variant);
-    setPaywallVisible(true);
-  };
+  const openPaywall = () => setPaywallVisible(true);
 
   const children = childrenQ.data ?? [];
   const activeChildId =
@@ -292,7 +288,7 @@ export function StoriesScreen() {
           <TopNotify
             type={notifyType}
             kind={notifyKindFor(subStatus)}
-            onPress={() => openPaywall('C')}
+            onPress={openPaywall}
           />
         </View>
       )}
@@ -326,7 +322,7 @@ export function StoriesScreen() {
             <GeneratingCard monthKey={current.monthKey} />
           )}
           {current?.listItemState === 'current_quota_exhausted' && (
-            <LockedCard onUpgrade={() => openPaywall('A')} />
+            <LockedCard onUpgrade={openPaywall} />
           )}
           {current?.listItemState === 'current_generated' && current.storyId && (
             <CurrentGeneratedCard
@@ -351,7 +347,6 @@ export function StoriesScreen() {
 
       <PaywallModal
         visible={paywallVisible}
-        variant={paywallVariant}
         onSubscribe={() => setPaywallVisible(false)}
         onDismiss={() => setPaywallVisible(false)}
       />

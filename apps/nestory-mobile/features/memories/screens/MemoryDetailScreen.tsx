@@ -160,30 +160,6 @@ function Body({ memory }: { memory: Memory }) {
             </View>
           )}
 
-          {memory.isHighlight && memory.linkedHighlight && (
-            <Pressable
-              style={styles.highlightCard}
-              onPress={() => router.push(`/highlight/${memory.linkedHighlight!.id}`)}
-            >
-              {memory.files[0] ? (
-                <Image source={{ uri: memory.files[0].fileUrl }} style={styles.highlightPhoto} />
-              ) : (
-                <View style={styles.highlightPhoto} />
-              )}
-              <View style={styles.highlightBody}>
-                <View style={styles.highlightHeadingRow}>
-                  <RemixIcon name="star-fill" size={20} color={theme.text.brand} />
-                  <Text style={styles.highlightHeading}>Marked as a highlight</Text>
-                </View>
-                {memory.linkedHighlight.title ? (
-                  <Text style={styles.highlightTitle} numberOfLines={2}>
-                    {memory.linkedHighlight.title}
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
-          )}
-
           <View style={styles.metaRow}>
             <RemixIcon name="time-line" size={16} color={theme.text.secondary} />
             <Text style={styles.metaText}>{formatCapturedAt(memory.capturedAt)}</Text>
@@ -330,41 +306,6 @@ const styles = StyleSheet.create({
   tagLabel: {
     ...theme.typography.tagBadge,
     color: theme.text.onColor,
-  },
-
-  highlightCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.m,
-    backgroundColor: theme.surface.brandSubtle,
-    borderWidth: 1,
-    borderColor: theme.border.brand,
-    borderRadius: theme.radius.l,
-    padding: theme.spacing.m,
-  },
-  highlightPhoto: {
-    width: 72,
-    height: 72,
-    borderRadius: theme.radius.m,
-    backgroundColor: theme.border.brand,
-    flexShrink: 0,
-  },
-  highlightBody: {
-    flex: 1,
-    gap: 4,
-  },
-  highlightHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  highlightHeading: {
-    ...theme.typography.h4,
-    color: theme.text.primary,
-  },
-  highlightTitle: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
   },
 
   metaRow: {

@@ -3,7 +3,6 @@ export * from './queryClient';
 export * from './users';
 export * from './children';
 export * from './assets';
-export * from './highlights';
 export * from './stories';
 export * from './subscriptions';
 export * from './shares';

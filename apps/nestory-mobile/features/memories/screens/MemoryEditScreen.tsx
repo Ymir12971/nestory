@@ -1,24 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MEMORY_CONSTRAINTS, type Memory, type MemoryFile } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { PaywallModal } from '@/shared/components/PaywallModal';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { showToast } from '@/features/ui/toast';
 
 const MAX_PHOTOS = MEMORY_CONSTRAINTS.maxPhotos;
 import {
-  ApiClientError,
   uploadPhoto,
   useAsset,
-  useCreateHighlight,
   useDeleteAsset,
-  useDeleteHighlight,
   useUpdateAsset,
 } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
@@ -66,20 +62,12 @@ function EditForm({ memory }: { memory: Memory }) {
   const goBack = useGoBack();
   const updateAsset     = useUpdateAsset(memory.id);
   const deleteAsset     = useDeleteAsset();
-  const createHighlight = useCreateHighlight();
-  const deleteHighlight = useDeleteHighlight();
   const pickFromLibrary = usePhotoPicker({ multiple: true });
   const takePhoto       = usePhotoCamera();
 
   const [noteText, setNoteText]               = useState(memory.textNote ?? '');
   const [removedFileIds, setRemovedFileIds]   = useState<Set<string>>(new Set());
   const [newPhotos, setNewPhotos]             = useState<PickedPhoto[]>([]);
-  // is_highlight has its own quota-checked endpoint (POST /highlights); PATCH /assets ignores it.
-  const [isHighlight, setIsHighlight] = useState(memory.isHighlight);
-  // Cover photo chosen when marking a multi-photo memory as a highlight.
-  // Defaults to the first photo (matches the prior implicit behaviour).
-  const [coverFileId, setCoverFileId] = useState<string | undefined>(memory.files[0]?.id);
-  const [paywallVisible, setPaywallVisible] = useState(false);
   const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
@@ -103,7 +91,7 @@ function EditForm({ memory }: { memory: Memory }) {
       const room = MAX_PHOTOS - remainingFiles.length - prev.length;
       const accepted = picked.slice(0, room);
       if (accepted.length < picked.length) {
-        showToast({ type: 'warning', message: 'Maximum 10 photos per memory.' });
+        showToast({ type: 'warning', message: `Maximum ${MAX_PHOTOS} photos per memory.` });
       }
       return [...prev, ...accepted];
     });
@@ -149,35 +137,11 @@ function EditForm({ memory }: { memory: Memory }) {
         ? await Promise.all(newPhotos.map(p => uploadPhoto(p, 'memories')))
         : [];
 
-      const updated = await updateAsset.mutateAsync({
+      await updateAsset.mutateAsync({
         textNote: noteText.trim(),
         ...(uploaded.length > 0      ? { addFiles:      uploaded } : {}),
         ...(removedFileIds.size > 0  ? { removeFileIds: [...removedFileIds] } : {}),
       });
-
-      // Sync highlight toggle separately (POST /highlights or DELETE /highlights/:id).
-      if (isHighlight && !memory.isHighlight) {
-        // Use the chosen cover if it survived any photo removals; else first photo.
-        const chosenCover = updated.files.length > 1
-          ? (updated.files.find(f => f.id === coverFileId)?.id ?? updated.files[0]?.id)
-          : undefined;
-        try {
-          await createHighlight.mutateAsync({
-            assetId: updated.id,
-            childId: updated.childId,
-            ...(chosenCover ? { coverFileId: chosenCover } : {}),
-          });
-        } catch (hlErr) {
-          if (hlErr instanceof ApiClientError && hlErr.code === 'HIGHLIGHT_LIMIT_REACHED') {
-            setPaywallVisible(true);
-            showToast({ type: 'warning', message: 'Highlight limit reached. Memory saved without highlight.' });
-            return;
-          }
-          throw hlErr;
-        }
-      } else if (!isHighlight && memory.isHighlight && memory.linkedHighlight) {
-        await deleteHighlight.mutateAsync(memory.linkedHighlight.id);
-      }
 
       showToast({ type: 'success', message: 'Memory saved' });
       goBack();
@@ -285,74 +249,6 @@ function EditForm({ memory }: { memory: Memory }) {
             <Text style={styles.detailLabel}>Date</Text>
             <Text style={styles.detailValue}>{formatDate(memory.capturedAt)}</Text>
           </View>
-
-          <View style={styles.rowDivider} />
-
-          {/* Highlight toggle — UI only; persistence goes through POST /highlights with quota check */}
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mark as Highlight</Text>
-            <Switch
-              value={isHighlight}
-              onValueChange={setIsHighlight}
-              trackColor={{ true: theme.surface.brand, false: theme.border.strong }}
-              thumbColor={theme.surface.card}
-            />
-          </View>
-
-          {/* New highlight, multiple photos → pick which one is the cover before saving. */}
-          {isHighlight && !memory.isHighlight && remainingFiles.length >= 2 && (
-            <>
-              <View style={styles.rowDivider} />
-              <View style={styles.coverPicker}>
-                <Text style={styles.coverPickerLabel}>Cover photo — tap to choose</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.coverStrip}
-                >
-                  {remainingFiles.map(f => {
-                    const selected = (coverFileId ?? remainingFiles[0]?.id) === f.id;
-                    return (
-                      <Pressable
-                        key={f.id}
-                        onPress={() => setCoverFileId(f.id)}
-                        style={[styles.coverThumbWrap, selected ? styles.coverThumbSelected : styles.coverThumbDim]}
-                      >
-                        <Image source={{ uri: f.fileUrl }} style={styles.coverThumbImg} />
-                        {selected && (
-                          <>
-                            <View style={styles.coverSelectedOverlay} />
-                            <View style={styles.coverCheck}>
-                              <RemixIcon name="check-line" size={16} color={theme.text.onColor} />
-                            </View>
-                            <View style={styles.coverBadge}>
-                              <Text style={styles.coverBadgeText}>Cover</Text>
-                            </View>
-                          </>
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </>
-          )}
-
-          {/* Existing highlight → change cover on the dedicated screen. */}
-          {isHighlight && memory.isHighlight && totalPhotos >= 2 && memory.linkedHighlight && (
-            <>
-              <View style={styles.rowDivider} />
-              <Pressable
-                style={styles.detailRow}
-                onPress={() => router.push(
-                  `/memory/cover?highlightId=${memory.linkedHighlight!.id}&assetId=${memory.id}`,
-                )}
-              >
-                <Text style={styles.detailLabelBrand}>Change cover photo</Text>
-                <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-              </Pressable>
-            </>
-          )}
         </View>
       </ScrollView>
 
@@ -379,13 +275,6 @@ function EditForm({ memory }: { memory: Memory }) {
           </Text>
         </Pressable>
       </View>
-
-      <PaywallModal
-        visible={paywallVisible}
-        variant="B"
-        onSubscribe={() => setPaywallVisible(false)}
-        onDismiss={() => setPaywallVisible(false)}
-      />
 
       <PhotoSourceSheet
         visible={photoSourceVisible}
@@ -515,10 +404,6 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.text.primary,
   },
-  detailLabelBrand: {
-    ...theme.typography.body,
-    color: theme.text.brand,
-  },
   detailRight: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -527,67 +412,6 @@ const styles = StyleSheet.create({
   detailValue: {
     ...theme.typography.body,
     color: theme.text.secondary,
-  },
-
-  coverPicker: {
-    paddingHorizontal: theme.spacing.l,
-    paddingVertical: theme.spacing.m,
-    gap: theme.spacing.s,
-  },
-  coverPickerLabel: {
-    ...theme.typography.body,
-    color: theme.text.primary,
-  },
-  coverStrip: {
-    gap: theme.spacing.s,
-  },
-  coverThumbWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.m,
-    borderWidth: 3,
-    borderColor: 'transparent',
-    overflow: 'hidden',
-  },
-  coverThumbSelected: {
-    borderColor: theme.surface.brand,
-  },
-  coverThumbDim: {
-    opacity: 0.45,
-  },
-  coverThumbImg: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: theme.border.strong,
-  },
-  coverSelectedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.surface.brand,
-    opacity: 0.18,
-  },
-  coverCheck: {
-    position: 'absolute',
-    top: 3,
-    right: 3,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: theme.surface.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coverBadge: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: theme.surface.brand,
-    alignItems: 'center',
-    paddingVertical: 2,
-  },
-  coverBadgeText: {
-    ...theme.typography.tagBadge,
-    color: theme.text.onColor,
   },
 
   cta: {
