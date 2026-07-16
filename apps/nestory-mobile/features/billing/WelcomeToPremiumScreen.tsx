@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
@@ -27,8 +27,12 @@ function nextBillingLabel(cycle: 'year' | 'month'): string {
 
 export function WelcomeToPremiumScreen() {
   const goBack = useGoBack();
-  const { cycle: cycleParam } = useLocalSearchParams<{ cycle?: string }>();
+  const router = useRouter();
+  const { cycle: cycleParam, from } = useLocalSearchParams<{ cycle?: string; from?: string }>();
   const cycle: 'year' | 'month' = cycleParam === 'month' ? 'month' : 'year';
+  // From onboarding the flow continues into Home; everywhere else "I'm all set"
+  // returns to wherever the purchase started (annotation: 回到原位置).
+  const onAllSet = from === 'onboarding' ? () => router.replace('/') : goBack;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -74,7 +78,7 @@ export function WelcomeToPremiumScreen() {
       <View style={styles.cta}>
         <Pressable
           style={({ pressed }) => [styles.ctaBtnWrap, pressed && { opacity: 0.88 }]}
-          onPress={goBack}
+          onPress={onAllSet}
         >
           <LinearGradient
             colors={[palette.accent[500], palette.accent[400]]}

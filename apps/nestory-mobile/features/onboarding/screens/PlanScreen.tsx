@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showToast } from '@/features/ui/toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,15 +10,22 @@ import { useGoBack } from '@/shared/hooks/useGoBack';
 import { queryClient, queryKeys } from '@/api';
 import { purchasePlan, isPurchasesAvailable } from '@/features/billing/purchases';
 
+// O-Choose plan (Figma 739:1406 yearly / 758:1219 monthly). No trial — the
+// product has no free-trial concept (Handoff §3.1); CTA is a straight purchase.
+// Success → global Welcome-to-Premium page, then on to Home.
+
 const TOTAL_STEPS = 5;
 type Plan = 'yearly' | 'monthly';
 
-const FEATURES: Array<{ name: string; free: string; premium: string }> = [
-  { name: 'AI Stories',             free: '2',          premium: 'Unlimited' },
-  { name: 'Watermark-Free Sharing', free: 'icon-close', premium: 'icon-check' },
-  { name: 'Highlights',             free: '10',         premium: 'Unlimited' },
-  { name: 'Child Profiles',         free: '1',          premium: 'Unlimited' },
+const PREMIUM_BENEFITS = [
+  'Unlimited child profiles',
+  'Unlimited monthly Stories',
+  'Watermark-Free Sharing',
+  'Access to regenerate past Stories',
+  'Annual Recap and more features',
 ];
+
+const FREE_ITEMS = ['One child profile', 'Two Stories', 'Watermarked Sharing'];
 
 export function PlanScreen() {
   const router = useRouter();
@@ -27,9 +34,10 @@ export function PlanScreen() {
   const [purchasing, setPurchasing] = useState(false);
 
   const handleSubscribe = async () => {
-    // On web / dev (no RC key) just continue onboarding — purchases can't run here.
+    const cycle = plan === 'yearly' ? 'year' : 'month';
+    // On web / dev (no RC key) skip the store and land on the welcome page.
     if (!isPurchasesAvailable()) {
-      router.replace('/');
+      router.replace(`/welcome-premium?cycle=${cycle}&from=onboarding`);
       return;
     }
     setPurchasing(true);
@@ -38,10 +46,11 @@ export function PlanScreen() {
       if (res.status === 'purchased') {
         // Webhook updates the backend async; refresh so the app reflects premium.
         await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
-        router.replace('/');
+        router.replace(`/welcome-premium?cycle=${cycle}&from=onboarding`);
       }
       // 'cancelled' → stay on screen, let the user choose again.
     } catch (e) {
+      // Payment failure → toast, stay here (annotation: 支付失败 toast 提示).
       const msg = e instanceof Error ? e.message : 'Please try again.';
       showToast({ type: 'error', message: `Purchase failed: ${msg}` });
     } finally {
@@ -66,93 +75,80 @@ export function PlanScreen() {
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
-        <View style={styles.titleGroup}>
-          <Text style={styles.headline}>Choose your plan</Text>
-          <Text style={styles.subtitle}>Start with a free trial, cancel anytime</Text>
-        </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.headline}>Choose your plan</Text>
 
-        {/* Feature comparison table */}
-        <View style={styles.table}>
-          <View style={[styles.tableRow, styles.tableHeaderRow]}>
-            <View style={styles.colFeature}>
-              <Text style={styles.colHeader}>Feature</Text>
-            </View>
-            <View style={styles.colPlan}>
-              <Text style={styles.colHeader}>Free</Text>
-            </View>
-            <View style={styles.colPlan}>
-              <Text style={[styles.colHeader, styles.colHeaderPremium]}>Premium</Text>
-            </View>
+        {/* Premium card: crown + benefits + plan picker */}
+        <View style={styles.premiumCard}>
+          <View style={styles.premiumHeader}>
+            <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+            <Text style={styles.premiumTitle}>Premium</Text>
           </View>
-          {FEATURES.map((f) => (
-            <View key={f.name} style={styles.tableRow}>
-              <View style={styles.colFeature}>
-                <Text style={styles.featureName}>{f.name}</Text>
+
+          <View style={styles.benefits}>
+            {PREMIUM_BENEFITS.map(text => (
+              <View key={text} style={styles.benefitRow}>
+                <Text style={styles.benefitBullet}>•</Text>
+                <Text style={styles.benefitText}>{text}</Text>
               </View>
-              <View style={styles.colPlan}>
-                {f.free === 'icon-close' ? (
-                  <RemixIcon name="close-circle-line" size={20} color={theme.text.hint} />
+            ))}
+          </View>
+
+          <View style={styles.planRow}>
+            <Pressable
+              style={[styles.planCard, plan === 'yearly' ? styles.planSelected : styles.planUnselected]}
+              onPress={() => setPlan('yearly')}
+            >
+              <View style={styles.planTop}>
+                <Text style={styles.planPrice}>$100</Text>
+                {plan === 'yearly' ? (
+                  <View style={styles.radioChecked}>
+                    <RemixIcon name="check-line" size={12} color={theme.text.onColor} />
+                  </View>
                 ) : (
-                  <Text style={styles.freeValue}>{f.free}</Text>
+                  <View style={styles.radioUnchecked} />
                 )}
               </View>
-              <View style={styles.colPlan}>
-                {f.premium === 'icon-check' ? (
-                  <RemixIcon name="check-line" size={20} color={theme.text.brand} />
+              <Text style={styles.planCaption}>Billed annually</Text>
+              <Text style={styles.planBadge}>~17% Off</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.planCard, plan === 'monthly' ? styles.planSelected : styles.planUnselected]}
+              onPress={() => setPlan('monthly')}
+            >
+              <View style={styles.planTop}>
+                <Text style={styles.planPrice}>$10</Text>
+                {plan === 'monthly' ? (
+                  <View style={styles.radioChecked}>
+                    <RemixIcon name="check-line" size={12} color={theme.text.onColor} />
+                  </View>
                 ) : (
-                  <Text style={styles.premiumValue}>{f.premium}</Text>
+                  <View style={styles.radioUnchecked} />
                 )}
               </View>
-            </View>
-          ))}
+              <Text style={styles.planCaption}>Billed monthly</Text>
+            </Pressable>
+          </View>
         </View>
 
-        {/* Plan selector */}
-        <View style={styles.planCards}>
-          <Pressable
-            style={[styles.planCard, plan === 'yearly' ? styles.cardSelected : styles.cardUnselected]}
-            onPress={() => setPlan('yearly')}
-          >
-            <View style={styles.cardTopRow}>
-              <Text style={styles.cardTitle}>Yearly</Text>
-              <RemixIcon
-                name="checkbox-circle-fill"
-                size={24}
-                color={plan === 'yearly' ? theme.surface.brand : theme.border.default}
-              />
-            </View>
-            <View style={styles.priceRow}>
-              <Text style={styles.yearlyPrice}>$99.99/year</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>$20 Off</Text>
+        {/* Free card */}
+        <View style={styles.freeCard}>
+          <Text style={styles.freeTitle}>Free</Text>
+          <View style={styles.benefits}>
+            {FREE_ITEMS.map(text => (
+              <View key={text} style={styles.benefitRow}>
+                <Text style={styles.benefitBullet}>•</Text>
+                <Text style={styles.freeItemText}>{text}</Text>
               </View>
-            </View>
-            <Text style={styles.promoText}>First month free</Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.planCard,
-              styles.planCardMonthly,
-              plan === 'monthly' ? styles.cardSelected : styles.cardUnselected,
-            ]}
-            onPress={() => setPlan('monthly')}
-          >
-            <View style={styles.cardTopRow}>
-              <Text style={styles.cardTitle}>Monthly</Text>
-              <RemixIcon
-                name={plan === 'monthly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
-                size={24}
-                color={plan === 'monthly' ? theme.surface.brand : theme.text.hint}
-              />
-            </View>
-            <Text style={styles.monthlyPrice}>$9.99/month</Text>
-          </Pressable>
+            ))}
+          </View>
         </View>
-      </View>
-
-      <View style={styles.spacer} />
+      </ScrollView>
 
       {/* CTAs */}
       <View style={styles.cta}>
@@ -168,7 +164,7 @@ export function PlanScreen() {
             style={styles.premiumButton}
           >
             <Text style={styles.premiumLabel}>
-              {purchasing ? 'Processing…' : 'Try Premium Free for 1 Month'}
+              {purchasing ? 'Processing…' : 'Start with Premium'}
             </Text>
           </LinearGradient>
         </Pressable>
@@ -183,11 +179,15 @@ export function PlanScreen() {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>By continuing, you agree to our</Text>
         <Text style={styles.footerText}>
-          <Text style={styles.footerLink}>Terms of Service</Text>
-          {' and '}
-          <Text style={styles.footerLink}>Privacy Policy</Text>
+          Auto-renews until canceled. Manage in Settings.{' '}
+          <Text style={styles.footerLink} onPress={() => router.push('/onboarding/terms')}>
+            Terms of Service
+          </Text>
+          {' · '}
+          <Text style={styles.footerLink} onPress={() => router.push('/onboarding/privacy')}>
+            Privacy Policy
+          </Text>
         </Text>
       </View>
     </SafeAreaView>
@@ -221,130 +221,116 @@ const styles = StyleSheet.create({
   progressActive: {
     backgroundColor: theme.surface.brand,
   },
+
+  scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 8,
-    gap: theme.spacing.xl,
-  },
-  titleGroup: {
-    gap: 12,
+    paddingBottom: 16,
+    gap: theme.spacing.l,
   },
   headline: {
     ...theme.typography.h1,
     color: theme.text.primary,
   },
-  subtitle: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
-  },
-  table: {
+
+  // Premium card
+  premiumCard: {
     borderWidth: 1,
-    borderColor: theme.border.default,
-    borderRadius: theme.radius.m,
-    overflow: 'hidden',
+    borderColor: theme.text.premium,
+    borderRadius: theme.radius.l,
+    backgroundColor: palette.accent[50],
+    padding: theme.spacing.l,
+    gap: 12,
   },
-  tableRow: {
+  premiumHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: theme.surface.default,
-  },
-  tableHeaderRow: {
-    backgroundColor: theme.surface.muted,
-  },
-  colFeature: {
-    flex: 2,
-  },
-  colPlan: {
-    flex: 1,
-  },
-  colHeader: {
-    ...theme.typography.h4,
-    color: theme.text.secondary,
-  },
-  colHeaderPremium: {
-    color: theme.text.premium,
-  },
-  featureName: {
-    ...theme.typography.body,
-    color: theme.text.primary,
-  },
-  freeValue: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
-  },
-  premiumValue: {
-    ...theme.typography.h3,
-    color: theme.text.premium,
-  },
-  planCards: {
-    flexDirection: 'row',
     gap: 8,
+  },
+  premiumTitle: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: 18,
+    lineHeight: 24,
+    color: theme.text.premium,
+  },
+  benefits: { gap: 8 },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  benefitBullet: { ...theme.typography.body, color: theme.text.primary },
+  benefitText: { flex: 1, ...theme.typography.body, color: theme.text.primary },
+
+  planRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   planCard: {
-    flex: 3,
-    backgroundColor: theme.surface.premiumSubtle,
+    flex: 1,
     borderRadius: theme.radius.m,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 8,
+    backgroundColor: theme.surface.card,
+    padding: theme.spacing.m,
+    gap: 2,
   },
-  planCardMonthly: {
-    flex: 2,
-  },
-  cardSelected: {
+  planSelected: {
     borderWidth: 2,
-    borderColor: theme.border.premium,
+    borderColor: theme.text.premium,
   },
-  cardUnselected: {
+  planUnselected: {
     borderWidth: 1,
     borderColor: theme.border.default,
   },
-  cardTopRow: {
+  planTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  cardTitle: {
-    ...theme.typography.h3,
+  planPrice: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: 22,
+    lineHeight: 30,
     color: theme.text.primary,
   },
-  priceRow: {
-    flexDirection: 'row',
+  radioChecked: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.text.premium,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
-  yearlyPrice: {
-    ...theme.typography.caption,
+  radioUnchecked: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: theme.border.strong,
+  },
+  planCaption: { ...theme.typography.caption, color: theme.text.secondary },
+  planBadge: { ...theme.typography.caption, color: theme.text.premium },
+
+  // Free card
+  freeCard: {
+    borderWidth: 1,
+    borderColor: theme.border.default,
+    borderRadius: theme.radius.l,
+    backgroundColor: theme.surface.card,
+    padding: theme.spacing.l,
+    gap: 12,
+  },
+  freeTitle: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: 18,
+    lineHeight: 24,
     color: theme.text.primary,
   },
-  badge: {
-    backgroundColor: theme.surface.premium,
-    borderRadius: theme.radius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    ...theme.typography.tagBadge,
-    color: theme.text.onColor,
-  },
-  promoText: {
-    ...theme.typography.caption,
-    color: theme.text.premium,
-  },
-  monthlyPrice: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
-  },
-  spacer: {
-    flex: 1,
-  },
+  freeItemText: { flex: 1, ...theme.typography.body, color: theme.text.secondary },
+
   cta: {
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: theme.spacing.safeBtm,
     gap: 12,
   },
   premiumWrap: {
@@ -377,9 +363,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 20,
+    paddingTop: 8,
     paddingBottom: theme.spacing.safeBtm,
     alignItems: 'center',
-    gap: 2,
   },
   footerText: {
     ...theme.typography.caption,

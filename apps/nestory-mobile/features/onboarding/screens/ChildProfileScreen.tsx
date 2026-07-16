@@ -12,7 +12,7 @@ import {
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import RemixIcon from 'react-native-remix-icon';
 import type { ChildCreate, ChildGender } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
@@ -20,6 +20,13 @@ import { useCreateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { WheelColumn } from '@/shared/components/WheelColumn';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+
+// 2026-07 redesign (O-Child basic info → O-Child more Details → O-Relationship):
+//   step 0 basic    — avatar + name + birthday, ALL required; Continue → confirm sheet
+//   step 1 details  — gender/height/weight, all optional (Continue or Skip)
+//   step 2 relation — first child only; ?another=1 skips it (defaults to parent,
+//                     Justin 2026-07-15: don't re-ask for additional children)
+// Save → /onboarding/children (children list), which owns the Add-Another loop.
 
 // ─── Progress bar (5 segments, N filled) ─────────────────────────────────────
 
@@ -76,20 +83,35 @@ const nbStyles = StyleSheet.create({
 
 // ─── Primary CTA button ───────────────────────────────────────────────────────
 
-function PrimaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+function PrimaryButton({
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
   return (
     <Pressable
-      style={({ pressed }) => [btnStyles.wrap, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [btnStyles.wrap, pressed && !disabled && { opacity: 0.85 }]}
       onPress={onPress}
+      disabled={disabled}
     >
-      <LinearGradient
-        colors={[palette.primary[500], palette.primary[400]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={btnStyles.gradient}
-      >
-        <Text style={btnStyles.label}>{label}</Text>
-      </LinearGradient>
+      {disabled ? (
+        <View style={[btnStyles.gradient, btnStyles.disabled]}>
+          <Text style={btnStyles.labelDisabled}>{label}</Text>
+        </View>
+      ) : (
+        <LinearGradient
+          colors={[palette.primary[500], palette.primary[400]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={btnStyles.gradient}
+        >
+          <Text style={btnStyles.label}>{label}</Text>
+        </LinearGradient>
+      )}
     </Pressable>
   );
 }
@@ -103,12 +125,14 @@ const btnStyles = StyleSheet.create({
     borderColor: theme.surface.brandSubtle,
   },
   gradient: { height: 52, alignItems: 'center', justifyContent: 'center' },
+  disabled: { backgroundColor: theme.border.default },
   label: { ...theme.typography.buttonLabelM, color: theme.text.onColor },
+  labelDisabled: { ...theme.typography.buttonLabelM, color: theme.text.hint },
 });
 
-// ─── Gender tag ───────────────────────────────────────────────────────────────
+// ─── Selectable tag (gender / relationship) ──────────────────────────────────
 
-function GenderTag({
+function SelectTag({
   label,
   selected,
   onPress,
@@ -221,6 +245,12 @@ const GENDER_TO_API: Record<NonNullable<Gender>, ChildGender> = {
   'Prefer not to say':   'prefer_not_to_say',
 };
 
+// O-Relationship options (Figma 751:1396). "Other..." activates a free-text input.
+const RELATIONSHIPS = [
+  'Mom', 'Dad', 'Grandma', 'Grandpa', 'Auntie', 'Uncle', 'Prefer not to say', 'Other...',
+] as const;
+type Relationship = (typeof RELATIONSHIPS)[number] | null;
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function ChildProfileScreen() {
@@ -228,29 +258,51 @@ export function ChildProfileScreen() {
   const goBack = useGoBack();
   const pickPhoto = usePhotoPicker();
   const createChild = useCreateChild();
+  // ?another=1 → adding an additional child from the children list:
+  // relationship step is skipped (defaults to the first child's answer).
+  const { another } = useLocalSearchParams<{ another?: string }>();
+  const isAnother = another === '1';
   const [step, setStep] = useState<Step>(0);
 
   const [name, setName] = useState('');
   const [avatarPhoto, setAvatarPhoto] = useState<PickedPhoto | null>(null);
 
-  const [monthIdx, setMonthIdx] = useState(2);
-  const [dayIdx, setDayIdx] = useState(14);
-  const [yearIdx, setYearIdx] = useState(Math.max(0, YEARS.indexOf(String(THIS_YEAR - 1))));
+  // Birthday defaults to today (annotation: 缺省显示当天日期); picker capped at today.
+  const today = new Date();
+  const [monthIdx, setMonthIdx] = useState(today.getMonth());
+  const [dayIdx, setDayIdx] = useState(today.getDate() - 1);
+  const [yearIdx, setYearIdx] = useState(YEARS.indexOf(String(THIS_YEAR)));
+  const [birthdayTouched, setBirthdayTouched] = useState(false);
+  const [birthdaySheetVisible, setBirthdaySheetVisible] = useState(false);
 
   const [gender, setGender] = useState<Gender>(null);
   const heightState = useHeightState();
   const [weight, setWeight] = useState('');
   const [weightSystem, setWeightSystem] = useState<UnitSystem>('metric');
+
+  const [relationship, setRelationship] = useState<Relationship>(null);
+  const [customRelationship, setCustomRelationship] = useState('');
+
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [birthdayConfirmVisible, setBirthdayConfirmVisible] = useState(false);
 
   const onBack = () => {
     if (step === 0) goBack();
     else setStep((s) => (s - 1) as Step);
   };
 
-  const [birthdayConfirmVisible, setBirthdayConfirmVisible] = useState(false);
-
   const formattedBirthday = `${MONTHS[monthIdx]} ${DAYS[dayIdx]}, ${YEARS[yearIdx]}`;
+
+  const selectedBirthday = () =>
+    new Date(Number(YEARS[yearIdx]), monthIdx, Number(DAYS[dayIdx] ?? '1'));
+
+  // Basic step gate: avatar + name + birthday all required (annotation: 三项必填).
+  const basicComplete = !!avatarPhoto && name.trim().length > 0 && birthdayTouched;
+
+  // Relationship gate: a non-Other pick, or Other with non-empty custom text.
+  const relationshipComplete =
+    relationship !== null &&
+    (relationship !== 'Other...' || customRelationship.trim().length > 0);
 
   const buildBody = (avatarUrl?: string): ChildCreate => {
     const month = String(monthIdx + 1).padStart(2, '0');
@@ -259,6 +311,8 @@ export function ChildProfileScreen() {
 
     const weightNum = parseFloat(weight);
 
+    // NOTE: relationship (who the user is to the child) has no backend column
+    // yet — captured in UI, not persisted. See WorkPlan §6 backend follow-ups.
     return {
       name:      name.trim(),
       birthDate: `${year}-${month}-${day}`,
@@ -271,7 +325,7 @@ export function ChildProfileScreen() {
     };
   };
 
-  const saveAndGo = async (next: '/onboarding/permissions' | '/onboarding/profile') => {
+  const saveAndGoChildren = async () => {
     if (createChild.isPending) return;
     setSaveError(null);
     try {
@@ -279,37 +333,51 @@ export function ChildProfileScreen() {
         ? (await uploadPhoto(avatarPhoto, 'avatars')).fileUrl
         : undefined;
       await createChild.mutateAsync(buildBody(avatarUrl));
-      router.push(next);
+      router.replace('/onboarding/children');
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to save profile. Please try again.');
     }
   };
 
+  /** Leaving the details step: relationship next for the first child, else save. */
+  const advanceFromDetails = () => {
+    if (isAnother) void saveAndGoChildren();
+    else setStep(2);
+  };
+
   const onContinue = () => {
     if (step === 0) {
-      if (!name.trim()) {
-        setSaveError('Please enter a name to continue.');
+      if (!basicComplete) return;
+      if (selectedBirthday() > new Date()) {
+        setSaveError('Birthday cannot be in the future.');
         return;
       }
       setSaveError(null);
-      setStep(1);
-    } else if (step === 1) {
       setBirthdayConfirmVisible(true);
+    } else if (step === 1) {
+      advanceFromDetails();
     } else {
-      void saveAndGo('/onboarding/permissions');
+      if (!relationshipComplete) return;
+      void saveAndGoChildren();
     }
   };
+
+  const ctaDisabled =
+    (step === 0 && !basicComplete) ||
+    (step === 2 && !relationshipComplete);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <NavBar onBack={onBack} filled={step + 1} />
 
-      {/* ── Step 0: Name + Photo ─────────────────────────────────────────── */}
+      {/* ── Step 0: Basic info — photo + name + birthday ─────────────────── */}
       {step === 0 && (
         <View style={styles.body}>
           <View style={styles.headingGroup}>
-            <Text style={styles.heading}>Tell me about your little one</Text>
-            <Text style={styles.subheading}>Let's start with a photo and a name</Text>
+            <Text style={styles.heading}>Tell us about your little one</Text>
+            <Text style={styles.subheading}>
+              This helps us track milestones and create more appropriate and personal stories.
+            </Text>
           </View>
 
           <View style={styles.photoArea}>
@@ -342,35 +410,21 @@ export function ChildProfileScreen() {
               placeholderTextColor={theme.text.hint}
             />
           </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Birthday</Text>
+            <Pressable style={styles.birthdayField} onPress={() => setBirthdaySheetVisible(true)}>
+              <Text style={birthdayTouched ? styles.birthdayValue : styles.birthdayPlaceholder}>
+                {birthdayTouched ? formattedBirthday : 'e.g. July 15, 2026'}
+              </Text>
+              <Text style={styles.birthdaySelect}>Select</Text>
+            </Pressable>
+          </View>
         </View>
       )}
 
-      {/* ── Step 1: Birthday ─────────────────────────────────────────────── */}
+      {/* ── Step 1: Details (all optional) ───────────────────────────────── */}
       {step === 1 && (
-        <View style={styles.body}>
-          <View style={styles.headingGroup}>
-            <Text style={styles.heading}>
-              {name
-                ? `When did ${name} come into your world?`
-                : 'When did they come into your world?'}
-            </Text>
-            <Text style={styles.subheading}>
-              This helps me track milestones and create age-appropriate stories
-            </Text>
-          </View>
-
-          <View style={styles.datePicker}>
-            <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={setMonthIdx} />
-            <View style={styles.colDivider} />
-            <WheelColumn items={DAYS} selectedIndex={dayIdx} onChange={setDayIdx} />
-            <View style={styles.colDivider} />
-            <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={setYearIdx} />
-          </View>
-        </View>
-      )}
-
-      {/* ── Step 2: Details ──────────────────────────────────────────────── */}
-      {step === 2 && (
         <ScrollView
           style={styles.scrollBody}
           contentContainerStyle={styles.scrollContent}
@@ -379,7 +433,7 @@ export function ChildProfileScreen() {
         >
           <View style={styles.headingGroup}>
             <Text style={styles.heading}>
-              A few more details help me create better stories
+              A few more details help create better stories
             </Text>
             <Text style={styles.subheading}>All optional — share what feels right</Text>
           </View>
@@ -389,7 +443,7 @@ export function ChildProfileScreen() {
               <Text style={styles.fieldLabel}>Gender</Text>
               <View style={styles.tagRow}>
                 {(['Girl', 'Boy', 'Prefer not to say'] as const).map((g) => (
-                  <GenderTag
+                  <SelectTag
                     key={g}
                     label={g}
                     selected={gender === g}
@@ -424,37 +478,106 @@ export function ChildProfileScreen() {
                 onToggle={() => setWeightSystem((u) => (u === 'metric' ? 'imperial' : 'metric'))}
               />
             </View>
-
-            <Pressable
-              style={styles.addChildBtn}
-              onPress={() => void saveAndGo('/onboarding/profile')}
-            >
-              <Text style={styles.addChildLabel}>Add Another Child</Text>
-            </Pressable>
           </View>
         </ScrollView>
       )}
 
-      {/* Step 2 uses a ScrollView (flex:1); steps 0/1 use a static body, so add
+      {/* ── Step 2: Relationship (first child only) ──────────────────────── */}
+      {step === 2 && (
+        <ScrollView
+          style={styles.scrollBody}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.headingGroup}>
+            <Text style={styles.heading}>Who are you to your little one?</Text>
+            <Text style={styles.subheading}>
+              We'll use this to make every Story feel more personal.
+            </Text>
+          </View>
+
+          <View style={styles.tagRow}>
+            {RELATIONSHIPS.map((r) => (
+              <SelectTag
+                key={r}
+                label={r}
+                selected={relationship === r}
+                onPress={() => setRelationship(r)}
+              />
+            ))}
+          </View>
+
+          {/* Custom input: enabled only while "Other..." is selected; switching
+              back to a preset disables it but keeps the text (annotation). */}
+          <TextInput
+            style={[
+              styles.textInput,
+              relationship !== 'Other...' && styles.textInputDisabled,
+            ]}
+            value={customRelationship}
+            onChangeText={setCustomRelationship}
+            placeholder="Tell us who you are"
+            placeholderTextColor={theme.text.hint}
+            editable={relationship === 'Other...'}
+          />
+        </ScrollView>
+      )}
+
+      {/* Steps 1/2 use a ScrollView (flex:1); step 0 uses a static body, so add
           a flex spacer to push the CTA to the bottom. */}
-      {step !== 2 && <View style={styles.spacer} />}
+      {step === 0 && <View style={styles.spacer} />}
 
       {/* CTA ──────────────────────────────────────────────────────────────── */}
       <View style={styles.cta}>
         {saveError && <Text style={styles.errorText}>{saveError}</Text>}
         <PrimaryButton
-          label={createChild.isPending && step === 2 ? 'Saving…' : 'Continue'}
+          label={createChild.isPending ? 'Saving…' : 'Continue'}
           onPress={onContinue}
+          disabled={ctaDisabled}
         />
-        {step === 2 && (
+        {step === 1 && (
           <Pressable
             style={styles.skipBtn}
-            onPress={() => void saveAndGo('/onboarding/permissions')}
+            onPress={() => {
+              // Skip = discard this page's inputs entirely (annotation: 全部当空内容).
+              setGender(null);
+              heightState.setCm('');
+              setWeight('');
+              advanceFromDetails();
+            }}
           >
             <Text style={styles.skipLabel}>Skip</Text>
           </Pressable>
         )}
       </View>
+
+      {/* Birthday picker sheet */}
+      <Modal
+        visible={birthdaySheetVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBirthdaySheetVisible(false)}
+      >
+        <Pressable style={styles.confirmScrim} onPress={() => setBirthdaySheetVisible(false)} />
+        <View style={styles.confirmSheet}>
+          <View style={styles.confirmHandle} />
+          <View style={styles.datePicker}>
+            <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={setMonthIdx} />
+            <View style={styles.colDivider} />
+            <WheelColumn items={DAYS} selectedIndex={dayIdx} onChange={setDayIdx} />
+            <View style={styles.colDivider} />
+            <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={setYearIdx} />
+          </View>
+          <PrimaryButton
+            label="Done"
+            onPress={() => {
+              setBirthdayTouched(true);
+              setBirthdaySheetVisible(false);
+            }}
+          />
+        </View>
+      </Modal>
 
       {/* Birthday confirm sheet */}
       <Modal
@@ -475,7 +598,7 @@ export function ChildProfileScreen() {
             label="Confirm"
             onPress={() => {
               setBirthdayConfirmVisible(false);
-              setStep(2);
+              setStep(1);
             }}
           />
           <Pressable
@@ -513,8 +636,8 @@ const styles = StyleSheet.create({
   photoArea: {
     alignItems: 'center',
     gap: theme.spacing.m,
-    paddingTop: theme.spacing.xxl,
-    paddingBottom: theme.spacing.l,
+    paddingTop: theme.spacing.l,
+    paddingBottom: theme.spacing.s,
   },
   avatarWrap: {
     width: 128,
@@ -556,6 +679,25 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.text.primary,
   },
+  textInputDisabled: {
+    backgroundColor: theme.surface.default,
+    color: theme.text.hint,
+  },
+
+  birthdayField: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: theme.border.default,
+    borderRadius: theme.radius.s,
+    backgroundColor: theme.surface.card,
+    paddingHorizontal: theme.spacing.l,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  birthdayValue: { ...theme.typography.body, color: theme.text.primary },
+  birthdayPlaceholder: { ...theme.typography.body, color: theme.text.hint },
+  birthdaySelect: { ...theme.typography.buttonLabelM, color: theme.text.brand },
 
   datePicker: {
     flexDirection: 'row',
@@ -570,9 +712,6 @@ const styles = StyleSheet.create({
 
   detailFields: { gap: theme.spacing.xl },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.s },
-
-  addChildBtn: { alignItems: 'center', paddingVertical: theme.spacing.m },
-  addChildLabel: { ...theme.typography.buttonLabelM, color: theme.text.brand },
 
   spacer: { flex: 1, minHeight: 1 },
   cta: {
@@ -589,7 +728,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Birthday confirm sheet
+  // Bottom sheets (birthday picker + confirm)
   confirmScrim: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',

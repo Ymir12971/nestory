@@ -32,7 +32,7 @@ export function SignInScreen() {
   // by handleDevSignIn, so they don't trigger this.
   useEffect(() => {
     if (session?.accessToken) {
-      router.replace('/onboarding/profile');
+      router.replace('/onboarding/privacy-claim');
     }
   }, [session?.accessToken, router]);
 
@@ -46,7 +46,7 @@ export function SignInScreen() {
   const handleDevSignIn = () => {
     blurFocus();
     setDevSession({ userId: DEMO_USER_ID });
-    router.replace('/onboarding/profile');
+    router.replace('/onboarding/privacy-claim');
   };
 
   const handleOAuthSignIn = async (provider: 'apple' | 'google') => {
@@ -90,7 +90,7 @@ export function SignInScreen() {
       if (!code) throw new Error('Missing OAuth code in callback URL');
       const { error: exchErr } = await sb.auth.exchangeCodeForSession(code);
       if (exchErr) throw exchErr;
-      router.replace('/onboarding/profile');
+      router.replace('/onboarding/privacy-claim');
     } catch (e: any) {
       setError(e?.message ?? 'Sign-in failed. Please try again.');
     } finally {
