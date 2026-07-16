@@ -136,3 +136,88 @@ export interface StoryStatusPoll {
   status: StoryStatus;
   estimatedSecondsRemaining: number | null; // non-null only while 'generating'
 }
+
+// ─── Story document v3 (two-phase pipeline) ─────────────────────────────────
+//
+// The block/chapter structure from StoryH5Design v1.2 §4.3 + StoryGenPrompts
+// v1.0. Coexists with the v2 `StoryDocument` above (flat `sections[]`, still
+// the shipped format). A stored document is v3 iff `renderVersion === 3`;
+// anything else is read as v2. Field names follow the codebase's camelCase
+// convention, not the docs' snake_case JSON.
+
+/** width:height. 16:9 is S-01 card only, never inside a Story (§3.6.3). */
+export type PhotoRatio = '1:1' | '4:3' | '3:4';
+
+export type BlockLayout =
+  | 'Block-Text'        // 0 photos (all filtered out)
+  | 'Block-Single-H'    // 1 landscape (4:3)
+  | 'Block-Single-V-v1' // 1 portrait (3:4), short text
+  | 'Block-Single-V-v2' // 1 portrait (3:4), long text
+  | 'Block-Duo'         // 2 photos
+  | 'Block-Grid';       // 3 photos (Hero + Duo slot)
+
+export type CoverLayout = 'Cover-A' | 'Cover-B';
+
+// A narrative unit = one Block. Photos are already filtered + cropped by the
+// image layer; text comes from Prompt 2. `memoryIds` may be >1 (merged unit).
+export interface StoryBlock {
+  memoryIds:   string[];
+  text:        string;                 // 30-50 words; empty allowed for Block-Text
+  photos:      { url: string; ratio: PhotoRatio }[]; // ≤ 3, source-agnostic
+  blockLayout: BlockLayout;
+}
+
+export interface StoryCoverSection {
+  type:         'cover';
+  layout:       CoverLayout;
+  month:        string;                // "MAY 2026"
+  childName:    string;
+  subtitle:     string;                // ≤ 12 words (Prompt 2)
+  coverPhotoUrl: string | null;        // Gold vertical for Cover-A; null for Cover-B
+}
+
+export interface StoryOpeningSection {
+  type:       'opening';
+  paragraphs: string[];                // 1-2 paragraphs
+}
+
+export interface StoryBodyChapter {
+  type:            'body';
+  chapterTitle:    string;             // ≤ 8 words
+  narrativeThread: string;             // internal cohesion aid; not rendered
+  blocks:          StoryBlock[];
+}
+
+export interface StoryClosingSection {
+  type:     'closing';
+  headline: string;                    // fixed product copy, NOT LLM-generated
+  stats:    { memories: number; photos: number }; // month totals, incl. non-shown
+}
+
+// StoryDocument v3 — stored in stories.document JSONB when pipeline = two-phase-v3
+export interface StoryDocumentV3 {
+  renderVersion: 3;
+  storyId:  string;
+  childId:  string;
+  monthKey: string;
+  locale:   string;
+  meta: {
+    title:          string;
+    childAgeMonths: number;
+  };
+  theme:     StoryTheme;
+  watermark: StoryWatermark;
+  shareMeta: StoryShareMeta;
+  qualityLevel: 'low' | 'medium' | 'rich';
+  cover:    StoryCoverSection;
+  opening:  StoryOpeningSection;
+  body:     StoryBodyChapter[];        // 1-5 chapters (= themes)
+  closing:  StoryClosingSection;
+}
+
+/** Either format may be stored; discriminate on `renderVersion`. */
+export type AnyStoryDocument = StoryDocument | StoryDocumentV3;
+
+export function isStoryDocumentV3(doc: AnyStoryDocument): doc is StoryDocumentV3 {
+  return (doc as StoryDocumentV3).renderVersion === 3;
+}
