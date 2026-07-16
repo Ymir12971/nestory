@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { Memory, MemoryFile, MimeType } from '@nestory/types';
+import { MEMORY_CONSTRAINTS, type Memory, type MemoryFile, type MimeType } from '@nestory/types';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
 import { parseBody, parseParams, parseQuery, uuidParam, cursorPagination } from '../lib/validation';
@@ -14,22 +14,22 @@ const fileInputSchema = z.object({
   mimeType:     z.enum(['image/jpeg', 'image/png', 'image/heif']),
   widthPx:      z.number().int().positive().nullish(),
   heightPx:     z.number().int().positive().nullish(),
-  byteSize:     z.number().int().positive().max(10 * 1024 * 1024), // R-07 ≤ 10 MB
-  displayOrder: z.number().int().min(0).max(9).optional(),
+  byteSize:     z.number().int().positive().max(MEMORY_CONSTRAINTS.maxPhotoBytes), // ≤ 10 MB
+  displayOrder: z.number().int().min(0).max(MEMORY_CONSTRAINTS.maxPhotos - 1).optional(),
 });
 
 const memoryCreateSchema = z.object({
   childId:     z.string().uuid(),
   capturedAt:  z.string().datetime(),
-  textNote:    z.string().max(500).optional(),
+  textNote:    z.string().max(MEMORY_CONSTRAINTS.maxTextChars).optional(),
   tagValues:   z.array(z.string().min(1).max(50)).max(20).optional(),
   isHighlight: z.boolean().optional(),
-  files:       z.array(fileInputSchema).max(10).optional(), // R-07 ≤ 10 张
+  files:       z.array(fileInputSchema).max(MEMORY_CONSTRAINTS.maxPhotos).optional(),
 });
 
 // Highlight toggle 走 POST /highlights（配额校验），不在 PATCH 里处理
 const memoryPatchSchema = z.object({
-  textNote:        z.string().max(500).optional(),
+  textNote:        z.string().max(MEMORY_CONSTRAINTS.maxTextChars).optional(),
   tagValues:       z.array(z.string().min(1).max(50)).max(20).optional(),
   addFiles:        z.array(fileInputSchema).optional(),
   removeFileIds:   z.array(z.string().uuid()).optional(),

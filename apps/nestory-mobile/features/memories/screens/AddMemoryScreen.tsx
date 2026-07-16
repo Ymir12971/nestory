@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import type { SubscriptionStatus } from '@nestory/types';
+import { MEMORY_CONSTRAINTS, type SubscriptionStatus } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
@@ -15,7 +15,7 @@ import { ApiClientError, uploadPhoto, useChildren, useCreateAsset, useCreateHigh
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { showToast } from '@/features/ui/toast';
 
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = MEMORY_CONSTRAINTS.maxPhotos;
 
 function formatCapturedAt(d: Date): string {
   const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

@@ -4,14 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import type { Memory, MemoryFile } from '@nestory/types';
+import { MEMORY_CONSTRAINTS, type Memory, type MemoryFile } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { showToast } from '@/features/ui/toast';
 
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = MEMORY_CONSTRAINTS.maxPhotos;
 import {
   ApiClientError,
   uploadPhoto,

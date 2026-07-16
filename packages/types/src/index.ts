@@ -9,3 +9,4 @@ export * from './story';
 export * from './subscription';
 export * from './permission';
 export * from './topNotify';
+export * from './productConfig';
