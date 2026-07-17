@@ -8,7 +8,17 @@ import type { Child } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMemoryEntrySheet } from '@/shared/components/AddMemoryEntrySheet';
+import { formatAge } from '@/shared/lib/formatAge';
 import { useAssets, useChildren, useSubscription, useStories, useSetActiveChild } from '@/api';
+
+const SWITCHER_GENDER_LABEL: Record<string, string> = { girl: 'Girl', boy: 'Boy' };
+
+/** "2y 4mo old, Girl" — gender omitted for prefer_not_to_say (Figma). */
+function profileSubtitle(child: Child): string {
+  const age = formatAge(child.birthDate);
+  const gender = child.gender ? SWITCHER_GENDER_LABEL[child.gender] : undefined;
+  return gender ? `${age}, ${gender}` : age;
+}
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -21,12 +31,6 @@ const PHOTO_GAP      = 12;
 // Horizontal padding to center the active (center) photo
 const CAROUSEL_PADDING = (SCREEN_W - PHOTO_CENTER_W) / 2;
 
-// "1 yr 4 mo" → "1.4"; "6 mo" → "0.6". Single template for now.
-function formatAge(ageMonths: number): string {
-  const years = Math.floor(ageMonths / 12);
-  const months = ageMonths % 12;
-  return `${years}.${months}`;
-}
 
 export function HomeScreen() {
   const router = useRouter();
@@ -202,8 +206,9 @@ export function HomeScreen() {
           onPress={() => router.push(`/settings/profiles/${activeChild.id}`)}
         >
           <View style={styles.statCol}>
-            <Text style={styles.statValue}>{formatAge(activeChild.ageMonths)}</Text>
-            <Text style={styles.statLabel}>years old</Text>
+            {/* Product-wide age rule: "2y 4mo old" — tile splits value/suffix */}
+            <Text style={styles.statValue}>{formatAge(activeChild.birthDate).replace(/ old$/, '')}</Text>
+            <Text style={styles.statLabel}>old</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statCol}>
@@ -266,35 +271,42 @@ export function HomeScreen() {
         <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
           {/* Drag handle */}
           <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Switch Child</Text>
+          <Text style={styles.sheetTitle}>Switch Profile</Text>
+          {!isPremium && (
+            <Text style={styles.sheetSubtitle}>
+              Free plan supports one active profile. Upgrade to switch between them.
+            </Text>
+          )}
           {profiles.map((profile: Child) => {
-            const isActive  = profile.isActive;
-            const isLocked  = !isActive && !isPremium;
-            const isDimmed  = isLocked;
+            const isActive = profile.isActive;
+            // Free: non-active rows are dimmed and NOT tappable (annotation —
+            // the only actions are the Upgrade CTA or dismissing the sheet).
+            const isLocked = !isActive && !isPremium;
             return (
               <Pressable
                 key={profile.id}
-                style={[styles.profileRow, isDimmed && styles.profileRowDimmed]}
-                onPress={
-                  isLocked
-                    ? () => { setSwitcherVisible(false); setPaywallVisible(true); }
-                    : () => handleSwitch(profile.id)
-                }
-                disabled={isActive}
+                style={[styles.profileRow, isLocked && styles.profileRowDimmed]}
+                onPress={() => handleSwitch(profile.id)}
+                disabled={isActive || isLocked}
               >
-                <View style={[styles.profileAvatar, isDimmed && styles.profileAvatarDimmed]} />
-                <Text style={[styles.profileName, isDimmed && styles.profileNameDimmed]}>
-                  {profile.name}
-                </Text>
+                {profile.avatarUrl ? (
+                  <Image
+                    source={{ uri: profile.avatarUrl }}
+                    style={[styles.profileAvatar, isLocked && styles.profileAvatarDimmed]}
+                  />
+                ) : (
+                  <View style={[styles.profileAvatar, isLocked && styles.profileAvatarDimmed]} />
+                )}
+                <View style={styles.profileTextCol}>
+                  <Text style={[styles.profileName, isLocked && styles.profileNameDimmed]}>
+                    {profile.name}
+                  </Text>
+                  <Text style={styles.profileSub}>{profileSubtitle(profile)}</Text>
+                </View>
                 {isActive && (
                   <View style={styles.currentBadge}>
-                    <Text style={styles.currentBadgeLabel}>Current</Text>
-                  </View>
-                )}
-                {isLocked && (
-                  <View style={styles.premiumBadge}>
-                    <RemixIcon name="lock-line" size={12} color={theme.text.onColor} />
-                    <Text style={styles.premiumBadgeLabel}>Premium</Text>
+                    {/* 决策7: Free variant says "Active", Premium says "Current" (per Figma) */}
+                    <Text style={styles.currentBadgeLabel}>{isPremium ? 'Current' : 'Active'}</Text>
                   </View>
                 )}
               </Pressable>
@@ -302,19 +314,27 @@ export function HomeScreen() {
           })}
 
           {!isPremium && (
-            <Pressable
-              style={({ pressed }) => [styles.upgradeCta, pressed && { opacity: 0.85 }]}
-              onPress={() => { setSwitcherVisible(false); setPaywallVisible(true); }}
-            >
-              <LinearGradient
-                colors={[palette.primary[500], palette.primary[400]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.upgradeBtn}
+            <>
+              <Pressable
+                style={({ pressed }) => [styles.upgradeCta, pressed && { opacity: 0.85 }]}
+                onPress={() => { setSwitcherVisible(false); setPaywallVisible(true); }}
               >
-                <Text style={styles.upgradeBtnLabel}>Upgrade to Premium</Text>
-              </LinearGradient>
-            </Pressable>
+                <LinearGradient
+                  colors={[palette.accent[500], palette.accent[400]]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.upgradeBtn}
+                >
+                  <Text style={styles.upgradeBtnLabel}>Upgrade to Premium</Text>
+                </LinearGradient>
+              </Pressable>
+              <Pressable
+                style={styles.benefitsLink}
+                onPress={() => { setSwitcherVisible(false); setPaywallVisible(true); }}
+              >
+                <Text style={styles.benefitsLinkLabel}>View Premium benefits</Text>
+              </Pressable>
+            </>
           )}
         </View>
       </Modal>
@@ -549,6 +569,11 @@ const styles = StyleSheet.create({
     color: theme.text.primary,
     marginBottom: theme.spacing.xs,
   },
+  sheetSubtitle: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+    marginBottom: theme.spacing.s,
+  },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -567,12 +592,19 @@ const styles = StyleSheet.create({
   profileAvatarDimmed: {
     backgroundColor: theme.surface.disabled,
   },
+  profileTextCol: {
+    flex: 1,
+    gap: 2,
+  },
   profileName: {
     ...theme.typography.h3,
     color: theme.text.primary,
-    flex: 1,
   },
   profileNameDimmed: {
+    color: theme.text.secondary,
+  },
+  profileSub: {
+    ...theme.typography.caption,
     color: theme.text.secondary,
   },
   currentBadge: {
@@ -582,19 +614,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.brand,
   },
   currentBadgeLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.onColor,
-  },
-  premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.premium,
-  },
-  premiumBadgeLabel: {
     ...theme.typography.tagBadge,
     color: theme.text.onColor,
   },
@@ -632,6 +651,15 @@ const styles = StyleSheet.create({
   },
   upgradeBtnLabel: {
     ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
+    color: theme.text.premium,
+  },
+  benefitsLink: {
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitsLinkLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
   },
 });
