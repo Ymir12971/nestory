@@ -4,7 +4,7 @@ import { MEMORY_CONSTRAINTS, type Memory, type MemoryFile, type MimeType } from 
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
 import { parseBody, parseParams, parseQuery, uuidParam, cursorPagination } from '../lib/validation';
-import { isCurrentMonth } from '../lib/month';
+import { isCurrentMonth, toMonthKey } from '../lib/month';
 
 // ---------- Schemas ----------
 
@@ -279,6 +279,33 @@ export async function assetsRoutes(app: FastifyInstance) {
         hasMore,
         nextCursor: hasMore ? trimmed[trimmed.length - 1]!.id : null,
       },
+    };
+  });
+
+  // GET /assets/months — 月份摘要（哪些月有 memory + 数量），驱动 H-01 月份筛选条
+  // （只显示有 memory 的过往月;当前月由前端恒显）。必须注册在 /:id 之前。
+  app.get('/months', async (req) => {
+    const q = parseQuery(z.object({ childId: z.string().uuid() }), req);
+    await ensureChildOwned(q.childId, req.userId);
+    const tz = await getUserTimezone(req.userId);
+
+    // 只取时间戳，按用户时区精确归月。MVP 规模下全量拉取无压力；
+    // 数据量大后改 SQL date_trunc + generated month_key 列。
+    const rows = await prisma.rawAsset.findMany({
+      where:  { ...whereNotDeleted, childId: q.childId },
+      select: { capturedAt: true },
+    });
+
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      const key = toMonthKey(r.capturedAt, tz);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    return {
+      data: [...counts.entries()]
+        .sort(([a], [b]) => (a < b ? 1 : -1)) // DESC — newest first
+        .map(([monthKey, count]) => ({ monthKey, count })),
     };
   });
 

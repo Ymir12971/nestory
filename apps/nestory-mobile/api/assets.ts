@@ -57,6 +57,18 @@ export async function listAssetsTrash(args: {
   return apiFetch<PaginatedResponse<Memory>>('/assets/trash', { query: args });
 }
 
+export interface MemoryMonthSummary {
+  monthKey: string; // "YYYY-MM", user-timezone bucketed, DESC from server
+  count:    number;
+}
+
+export async function listAssetMonths(childId: string): Promise<MemoryMonthSummary[]> {
+  const res = await apiFetch<{ data: MemoryMonthSummary[] }>('/assets/months', {
+    query: { childId },
+  });
+  return res.data;
+}
+
 export async function getAsset(id: string): Promise<Memory> {
   const res = await apiFetch<{ data: Memory }>(`/assets/${id}`);
   return res.data;
@@ -91,6 +103,14 @@ export function useAssets(args: { childId: string; month?: string }) {
     queryKey: queryKeys.assets(args.childId, args.month),
     queryFn:  () => listAssets(args),
     enabled:  !!args.childId,
+  });
+}
+
+export function useAssetMonths(childId: string) {
+  return useQuery({
+    queryKey: queryKeys.assetMonths(childId),
+    queryFn:  () => listAssetMonths(childId),
+    enabled:  !!childId,
   });
 }
 

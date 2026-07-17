@@ -5,7 +5,7 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import type { Memory } from '@nestory/types';
 import { theme } from '@/shared/theme';
-import { useAssets, useChildren } from '@/api';
+import { useAssetMonths, useAssets, useChildren } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -63,17 +63,23 @@ export function MemoryListScreen() {
   const activeChildId = activeChild?.id ?? '';
   const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
-  // Year picker range: from the active child's birth year (or 5 years back as
-  // a sensible fallback) up to the current year.
-  const availableYears = (() => {
-    const maxYear = now.getFullYear();
-    const minYear = activeChild?.birthDate
-      ? new Date(activeChild.birthDate).getFullYear()
-      : maxYear - 5;
-    const ys: number[] = [];
-    for (let y = maxYear; y >= minYear; y--) ys.push(y);
-    return ys;
-  })();
+  // Redesign filter rules (H-First Memory / Normal list annotations):
+  // months shown = months that HAVE memories + the current month (always),
+  // newest first (current month leftmost); gap months are hidden entirely,
+  // so the timeline implicitly starts at the first memory's month.
+  const monthsQ = useAssetMonths(activeChildId);
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const filterKeys = useMemo(() => {
+    const keys = new Set<string>([currentKey]);
+    for (const m of monthsQ.data ?? []) keys.add(m.monthKey);
+    return [...keys].sort((a, b) => (a < b ? 1 : -1)); // DESC
+  }, [monthsQ.data, currentKey]);
+
+  const availableYears = useMemo(
+    () => [...new Set(filterKeys.map(k => Number(k.slice(0, 4))))],
+    [filterKeys],
+  );
+  const yearKeys = filterKeys.filter(k => Number(k.slice(0, 4)) === selectedYear);
 
   const assetsQ = useAssets({ childId: activeChildId, month: monthKey });
   const groups  = useMemo(() => groupByDay(assetsQ.data?.data ?? []), [assetsQ.data]);
@@ -103,12 +109,13 @@ export function MemoryListScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.monthPills}
         >
-          {MONTH_LABELS.map((label, i) => {
-            const monthNum = i + 1;
+          {yearKeys.map((key) => {
+            const monthNum = Number(key.slice(5, 7));
+            const label    = MONTH_LABELS[monthNum - 1]!;
             const active   = monthNum === selectedMonth;
             return (
               <Pressable
-                key={label}
+                key={key}
                 style={[styles.monthPill, active && styles.monthPillActive]}
                 onPress={() => setSelectedMonth(monthNum)}
               >
@@ -209,7 +216,13 @@ export function MemoryListScreen() {
             <Pressable
               key={y}
               style={styles.yearRow}
-              onPress={() => { setSelectedYear(y); setYearPickerVisible(false); }}
+              onPress={() => {
+                setSelectedYear(y);
+                // Land on that year's newest visible month (pills are DESC).
+                const first = filterKeys.find(k => Number(k.slice(0, 4)) === y);
+                if (first) setSelectedMonth(Number(first.slice(5, 7)));
+                setYearPickerVisible(false);
+              }}
             >
               <Text style={[styles.yearRowLabel, y === selectedYear && styles.yearRowLabelActive]}>{y}</Text>
               {y === selectedYear && (

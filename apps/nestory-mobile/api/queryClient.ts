@@ -27,6 +27,7 @@ export const queryKeys = {
   assets:         (childId: string, month?: string) => ['assets', childId, month ?? null] as const,
   asset:          (id: string) => ['asset', id] as const,
   assetsTrash:    (childId?: string) => ['assets', 'trash', childId ?? null] as const,
+  assetMonths:    (childId: string) => ['assets', 'months', childId] as const,
   stories:        (childId: string, year?: number) => ['stories', childId, year ?? null] as const,
   story:          (id: string) => ['story', id] as const,
   storyStatus:    (id: string) => ['story', id, 'status'] as const,
