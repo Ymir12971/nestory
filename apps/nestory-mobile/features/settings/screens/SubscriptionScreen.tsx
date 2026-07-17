@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
@@ -206,11 +206,32 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
   const benefits = sub.benefits.length > 0
     ? sub.benefits
     : [
-        'Unlimited AI Stories',
-        'Watermark-free sharing',
-        'Unlimited Highlights',
         'Unlimited child profiles',
+        'Unlimited monthly Stories',
+        'Watermark-Free Sharing',
+        'Access to regenerate past Stories',
+        'Annual Recap and more features',
       ];
+
+  // Two-step cancel flow (ST-02 sheets). 方案A (Justin 2026-07-16): we collect
+  // the reason, then DEEP-LINK to the platform's subscription management —
+  // iOS/Android don't allow true in-app cancellation. The Plan-cancelled page
+  // shows on a later visit once the RevenueCat webhook flips the status.
+  const [cancelStep, setCancelStep] = useState<0 | 1 | 2>(0);
+  const [reason, setReason] = useState<string | null>(null);
+  const [otherText, setOtherText] = useState('');
+
+  const confirmCancel = async () => {
+    // TODO(P5): analytics `subscription_cancelled` with { reason, otherText }.
+    console.log('[cancel-survey]', { reason, otherText: otherText.trim() || undefined });
+    setCancelStep(0);
+    await openManageSubscriptions();
+    showToast({
+      type: 'info',
+      message: 'Finish canceling in your store settings. Premium stays active until the end of the billing period.',
+      duration: 6000,
+    });
+  };
 
   return (
     <>
@@ -263,26 +284,89 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
 
       {/* CTA */}
       <View style={styles.ctaPremium}>
-        <Pressable
-          style={styles.cancelBtn}
-          onPress={() => {
-            // Android subscriptions are cancelled in the Play Store, not in-app.
-            Alert.alert(
-              'Cancel subscription',
-              'Subscriptions are managed in the Google Play Store. Open it now?',
-              [
-                { text: 'Not now', style: 'cancel' },
-                { text: 'Open Play Store', onPress: () => { openManageSubscriptions(); } },
-              ],
-            );
-          }}
-        >
+        <Pressable style={styles.cancelBtn} onPress={() => setCancelStep(1)}>
           <Text style={styles.cancelBtnLabel}>Cancel Subscription</Text>
         </Pressable>
       </View>
+
+      {/* ST-02 / Sheet · Cancel Step 1 — loss list */}
+      <Modal
+        visible={cancelStep === 1}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCancelStep(0)}
+      >
+        <Pressable style={styles.sheetScrim} onPress={() => setCancelStep(0)} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Your little one's story isn't finished yet</Text>
+          <Text style={styles.sheetBody}>Cancel now and you'll lose:</Text>
+          <View style={styles.lossList}>
+            {benefits.map(b => (
+              <View key={b} style={styles.lossRow}>
+                <Text style={styles.lossX}>✕</Text>
+                <Text style={styles.lossText}>{b}</Text>
+              </View>
+            ))}
+          </View>
+          <Pressable style={styles.keepBtn} onPress={() => setCancelStep(0)}>
+            <Text style={styles.keepBtnLabel}>Keep my plan</Text>
+          </Pressable>
+          <Pressable style={styles.continueCancelBtn} onPress={() => setCancelStep(2)}>
+            <Text style={styles.continueCancelLabel}>Continue to cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
+
+      {/* ST-02 / Sheet · Cancel Step 2 — reason survey (optional) */}
+      <Modal
+        visible={cancelStep === 2}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCancelStep(0)}
+      >
+        <Pressable style={styles.sheetScrim} onPress={() => setCancelStep(0)} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>We'd love to know why you're leaving</Text>
+          <Text style={styles.sheetBody}>Optional — your feedback helps us improve.</Text>
+          {CANCEL_REASONS.map(r => (
+            <Pressable key={r} style={styles.reasonRow} onPress={() => setReason(r)}>
+              <View style={reason === r ? styles.radioOn : styles.radioOff}>
+                {reason === r && <View style={styles.radioDot} />}
+              </View>
+              <Text style={styles.reasonLabel}>{r}</Text>
+            </Pressable>
+          ))}
+          {reason === 'Other' && (
+            <>
+              <TextInput
+                style={styles.otherInput}
+                value={otherText}
+                onChangeText={t => setOtherText(t.slice(0, 200))}
+                placeholder="Tell us more (optional)"
+                placeholderTextColor={theme.text.hint}
+                multiline
+              />
+              <Text style={styles.otherCount}>{otherText.length} / 200</Text>
+            </>
+          )}
+          <Pressable style={styles.confirmCancelBtn} onPress={() => void confirmCancel()}>
+            <Text style={styles.confirmCancelLabel}>Confirm to Cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </>
   );
 }
+
+const CANCEL_REASONS = [
+  'Too expensive',
+  'Not using it enough',
+  'Missing a feature I need',
+  'Switching to another app',
+  'Other',
+] as const;
 
 // ---------- Screen ----------
 
@@ -598,6 +682,140 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelBtnLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.error,
+  },
+
+  // Cancel-flow sheets (ST-02 Step 1 / Step 2)
+  sheetScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheet: {
+    backgroundColor: theme.surface.card,
+    borderTopLeftRadius: theme.radius.l,
+    borderTopRightRadius: theme.radius.l,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.m,
+    paddingBottom: theme.spacing.safeBtm + theme.spacing.l,
+    gap: theme.spacing.m,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.border.strong,
+    alignSelf: 'center',
+    marginBottom: theme.spacing.s,
+  },
+  sheetTitle: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: 24,
+    lineHeight: 32,
+    color: theme.text.primary,
+  },
+  sheetBody: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  lossList: {
+    gap: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+  },
+  lossRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
+  },
+  lossX: {
+    ...theme.typography.body,
+    color: theme.text.error,
+  },
+  lossText: {
+    flex: 1,
+    ...theme.typography.body,
+    color: theme.text.primary,
+  },
+  keepBtn: {
+    height: 52,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.surface.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.s,
+  },
+  keepBtnLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.onColor,
+  },
+  continueCancelBtn: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueCancelLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.secondary,
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+  },
+  radioOff: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: theme.border.strong,
+  },
+  radioOn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: theme.surface.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.surface.brand,
+  },
+  reasonLabel: {
+    flex: 1,
+    ...theme.typography.body,
+    color: theme.text.primary,
+  },
+  otherInput: {
+    minHeight: 72,
+    borderWidth: 1,
+    borderColor: theme.border.default,
+    borderRadius: theme.radius.s,
+    paddingHorizontal: theme.spacing.l,
+    paddingTop: theme.spacing.s,
+    ...theme.typography.body,
+    color: theme.text.primary,
+    textAlignVertical: 'top',
+  },
+  otherCount: {
+    ...theme.typography.caption,
+    color: theme.text.hint,
+    textAlign: 'right',
+  },
+  confirmCancelBtn: {
+    height: 52,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.text.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.s,
+  },
+  confirmCancelLabel: {
     ...theme.typography.buttonLabelM,
     color: theme.text.error,
   },
