@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import type { SubscriptionStatus } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
@@ -11,7 +12,11 @@ import { useGoBack } from '@/shared/hooks/useGoBack';
 
 // ---------- Subscription entry derivation ----------
 
-function getSubEntry(sub: SubscriptionStatus, expiresAt: string | null): {
+function getSubEntry(
+  sub: SubscriptionStatus,
+  expiresAt: string | null,
+  quotaRemaining: number | null,
+): {
   label: string;
   subtitle: string;
   badge: string;
@@ -26,7 +31,15 @@ function getSubEntry(sub: SubscriptionStatus, expiresAt: string | null): {
   if (sub === 'trial_ended' || sub === 'premium_ended') {
     return { label: 'Premium', subtitle: `Expired ${dateStr}`, badge: 'Renew', badgeVariant: 'renew' };
   }
-  return { label: 'Free Plan', subtitle: 'Tap to upgrade', badge: 'Upgrade', badgeVariant: 'upgrade' };
+  // Free: card shows how many of the 2 story credits remain (annotation:
+  // "0 Stories remaining" when exhausted).
+  const remaining = quotaRemaining ?? 0;
+  return {
+    label: 'Free Plan',
+    subtitle: `${remaining} ${remaining === 1 ? 'Story' : 'Stories'} remaining`,
+    badge: 'Upgrade',
+    badgeVariant: 'upgrade',
+  };
 }
 
 // ---------- Sub-components ----------
@@ -111,10 +124,20 @@ export function SettingsScreen() {
   const subQ       = useSubscription();
   const childrenQ  = useChildren();
 
-  const [storyNotif, setStoryNotif]     = useState(true);
-  const [uploadRemind, setUploadRemind] = useState(false);
+  // Story Notifications default follows the system permission granted (or not)
+  // during onboarding; Upload Reminders default ON (annotations).
+  const [storyNotif, setStoryNotif]     = useState(false);
+  const [uploadRemind, setUploadRemind] = useState(true);
+  // TODO: Story Location should follow the OS location permission once the
+  // location capture feature lands (annotation: 系统定位打开则跟随打开).
   const [location, setLocation]         = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
+
+  useEffect(() => {
+    void Notifications.getPermissionsAsync().then(res => {
+      setStoryNotif(res.granted);
+    });
+  }, []);
 
   if (meQ.isLoading || subQ.isLoading || childrenQ.isLoading) {
     return (
@@ -140,7 +163,7 @@ export function SettingsScreen() {
   const childrenList = childrenQ.data;
   const activeChild  = childrenList?.find(c => c.isActive) ?? childrenList?.[0];
 
-  const subEntry = getSubEntry(sub.subscriptionStatus, sub.expiresAt);
+  const subEntry = getSubEntry(sub.subscriptionStatus, sub.expiresAt, sub.storyQuotaRemaining);
 
   const handleSubEntryPress = () => {
     if (sub.subscriptionStatus === 'trial_ended' || sub.subscriptionStatus === 'premium_ended') {
@@ -166,6 +189,19 @@ export function SettingsScreen() {
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
+        {/* Promo banner — 10% off feedback program (annotation: 后续可能会调整) */}
+        <Pressable
+          style={({ pressed }) => [styles.promoBanner, pressed && { opacity: 0.9 }]}
+          onPress={() => router.push('/settings/feedback')}
+        >
+          <RemixIcon name="lightbulb-flash-line" size={22} color={theme.text.premium} />
+          <View style={styles.promoText}>
+            <Text style={styles.promoTitle}>Share an idea, earn 10% off</Text>
+            <Text style={styles.promoBody}>If we ship your idea, your next Premium bill is 10% off.</Text>
+          </View>
+          <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+        </Pressable>
+
         {/* ACCOUNT */}
         <View style={styles.group}>
           <SectionLabel label="ACCOUNT" />
@@ -395,4 +431,24 @@ const styles = StyleSheet.create({
   },
   toggleLabelOn:  { color: theme.text.success },
   toggleLabelOff: { color: theme.text.secondary },
+
+  promoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.m,
+    backgroundColor: theme.surface.premiumSubtle,
+    borderWidth: 1,
+    borderColor: theme.border.premium,
+    borderRadius: theme.radius.l,
+    padding: theme.spacing.l,
+  },
+  promoText: { flex: 1, gap: 2 },
+  promoTitle: {
+    ...theme.typography.h4,
+    color: theme.text.primary,
+  },
+  promoBody: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+  },
 });

@@ -7,7 +7,7 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Child, ChildGender, ChildPatch } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { useChild, useUpdateChild, uploadPhoto } from '@/api';
+import { useChild, useSubscription, useUpdateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
@@ -68,6 +68,10 @@ export function ChildProfileEditScreen() {
   const goBack = useGoBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const childQ = useChild(id ?? null);
+  const subQ = useSubscription();
+  const isPremium =
+    subQ.data?.subscriptionStatus === 'premium_active' ||
+    subQ.data?.subscriptionStatus === 'trial_active';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -78,6 +82,16 @@ export function ChildProfileEditScreen() {
         <Text style={styles.navTitle}>Edit Profile</Text>
         <View style={styles.navSpacer} />
       </View>
+
+      {/* ST-Child Profile Edit (free): persistent one-active-profile notice */}
+      {!isPremium && subQ.data && (
+        <View style={styles.freeNotice}>
+          <RemixIcon name="information-line" size={16} color={theme.text.info} />
+          <Text style={styles.freeNoticeText}>
+            Free plan supports one active profile. Upgrade to switch between them.
+          </Text>
+        </View>
+      )}
 
       {childQ.isLoading ? (
         <View style={styles.center}>
@@ -293,6 +307,23 @@ const styles = StyleSheet.create({
   },
   navTitle:  { ...theme.typography.h2, color: theme.text.primary },
   navSpacer: { width: 24 },
+
+  freeNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.xs,
+    marginHorizontal: theme.spacing.xl,
+    marginBottom: theme.spacing.s,
+    backgroundColor: theme.surface.infoSubtle,
+    borderRadius: theme.radius.s,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.s,
+  },
+  freeNoticeText: {
+    flex: 1,
+    ...theme.typography.caption,
+    color: theme.text.info,
+  },
 
   center: {
     flex: 1,
