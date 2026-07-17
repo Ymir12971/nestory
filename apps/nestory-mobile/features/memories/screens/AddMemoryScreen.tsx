@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MEMORY_CONSTRAINTS } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
@@ -22,22 +22,6 @@ function formatCapturedAt(d: Date): string {
   return `${datePart} · ${timePart}`;
 }
 
-type SaveState = 'both_empty' | 'need_photos' | 'need_note' | 'active';
-
-function getSaveState(hasPhotos: boolean, hasText: boolean): SaveState {
-  if (hasPhotos && hasText)  return 'active';
-  if (hasPhotos && !hasText) return 'need_note';
-  if (!hasPhotos && hasText) return 'need_photos';
-  return 'both_empty';
-}
-
-const SAVE_LABELS: Record<SaveState, string> = {
-  both_empty:  'Save',
-  need_photos: 'Add photos to Save',
-  need_note:   'Add a note to Save',
-  active:      'Save',
-};
-
 export function AddMemoryScreen() {
   const router = useRouter();
   const goBack = useGoBack();
@@ -45,6 +29,9 @@ export function AddMemoryScreen() {
   const takePhoto       = usePhotoCamera();
   const childrenQ = useChildren();
   const createAsset     = useCreateAsset();
+  // Entry mode from the Add Memory popup: note (keyboard fast path), camera
+  // (launch camera first), album (launch picker first). Undefined = plain open.
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const [noteText, setNoteText]       = useState('');
   const [photos, setPhotos]           = useState<PickedPhoto[]>([]);
   const [tags, setTags]               = useState<string[]>([]);
@@ -56,10 +43,20 @@ export function AddMemoryScreen() {
   const [saving, setSaving] = useState(false);
   const photoStripRef = useRef<ScrollView>(null);
 
-  const hasPhotos   = photos.length > 0;
+  // Redesign save rule: text is the ONLY activation condition — photos alone
+  // can't save, text alone can (MEMORY_CONSTRAINTS.textRequiredToSave).
   const hasText     = noteText.trim().length > 0;
-  const saveState   = getSaveState(hasPhotos, hasText);
-  const canSave     = saveState === 'active' && !saving;
+  const canSave     = (MEMORY_CONSTRAINTS.textRequiredToSave ? hasText : hasText || photos.length > 0) && !saving;
+
+  // Cap note length; exceeding shows a 2s toast (H-Add "Just a note" annotation).
+  const onChangeNote = (text: string) => {
+    if (text.length > MEMORY_CONSTRAINTS.maxTextChars) {
+      showToast({ type: 'warning', message: `Notes are limited to ${MEMORY_CONSTRAINTS.maxTextChars} characters.` });
+      setNoteText(text.slice(0, MEMORY_CONSTRAINTS.maxTextChars));
+      return;
+    }
+    setNoteText(text);
+  };
 
   const children = childrenQ.data ?? [];
   const activeChildId =
@@ -101,13 +98,26 @@ export function AddMemoryScreen() {
     photoStripRef.current?.scrollToEnd({ animated: true });
   }, [photos.length]);
 
+  // camera / album entry modes launch their picker once on mount ('note' is
+  // handled by autoFocus on the text input).
+  const modeLaunched = useRef(false);
+  useEffect(() => {
+    if (modeLaunched.current) return;
+    modeLaunched.current = true;
+    if (mode === 'camera') void takePhoto().then(addPickedPhotos);
+    else if (mode === 'album') {
+      void pickFromLibrary({ selectionLimit: MAX_PHOTOS }).then(addPickedPhotos);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const addPickedPhotos = (picked: PickedPhoto[]) => {
     if (picked.length === 0) return;
     setPhotos(prev => {
       const room = MAX_PHOTOS - prev.length;
       const accepted = picked.slice(0, room);
       if (accepted.length < picked.length) {
-        showToast({ type: 'warning', message: 'Maximum 10 photos per memory.' });
+        showToast({ type: 'warning', message: `Maximum ${MAX_PHOTOS} photos per memory.` });
       }
       return [...prev, ...accepted];
     });
@@ -175,7 +185,8 @@ export function AddMemoryScreen() {
           )}
         </ScrollView>
 
-        {/* Note Input */}
+        {/* Note Input — autoFocus on the "Just a Note" fast path so the
+            keyboard slides up immediately (annotation) */}
         <TextInput
           style={styles.noteInput}
           placeholder="What happened today…"
@@ -183,7 +194,8 @@ export function AddMemoryScreen() {
           multiline
           textAlignVertical="top"
           value={noteText}
-          onChangeText={setNoteText}
+          onChangeText={onChangeNote}
+          autoFocus={mode === 'note'}
         />
 
         {/* Details List */}
@@ -258,13 +270,13 @@ export function AddMemoryScreen() {
               style={styles.saveButton}
             >
               <Text style={styles.saveLabel}>
-                {saving ? 'Saving…' : SAVE_LABELS[saveState]}
+                {saving ? 'Saving…' : 'Save'}
               </Text>
             </LinearGradient>
           ) : (
             <View style={[styles.saveButton, styles.saveButtonDisabled]}>
               <Text style={[styles.saveLabel, styles.saveLabelDisabled]}>
-                {saving ? 'Saving…' : SAVE_LABELS[saveState]}
+                {saving ? 'Saving…' : 'Save'}
               </Text>
             </View>
           )}

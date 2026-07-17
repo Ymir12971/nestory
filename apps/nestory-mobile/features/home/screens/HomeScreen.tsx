@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import type { Child } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
+import { AddMemoryEntrySheet } from '@/shared/components/AddMemoryEntrySheet';
 import { useAssets, useChildren, useSubscription, useStories, useSetActiveChild } from '@/api';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -32,6 +33,7 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [switcherVisible, setSwitcherVisible] = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [addEntryVisible, setAddEntryVisible] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
   const childrenQ    = useChildren();
@@ -240,7 +242,7 @@ export function HomeScreen() {
         <Text style={styles.ctaPrompt}>Did your little one smile today?</Text>
         <Pressable
           style={({ pressed }) => [styles.buttonWrap, pressed && { opacity: 0.85 }]}
-          onPress={() => router.push('/memory/add')}
+          onPress={() => setAddEntryVisible(true)}
         >
           <LinearGradient
             colors={[palette.primary[500], palette.primary[400]]}
@@ -321,6 +323,15 @@ export function HomeScreen() {
         visible={paywallVisible}
         onSubscribe={() => setPaywallVisible(false)}
         onDismiss={() => setPaywallVisible(false)}
+      />
+
+      <AddMemoryEntrySheet
+        visible={addEntryVisible}
+        onSelect={(entryMode) => {
+          setAddEntryVisible(false);
+          router.push(`/memory/add?mode=${entryMode}`);
+        }}
+        onDismiss={() => setAddEntryVisible(false)}
       />
     </View>
   );

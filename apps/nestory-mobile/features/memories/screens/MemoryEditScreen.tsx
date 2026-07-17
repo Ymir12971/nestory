@@ -124,10 +124,20 @@ function EditForm({ memory }: { memory: Memory }) {
     setNewPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Redesign save rule: text required (photos optional) — same as Add Memory.
+  const onChangeNote = (text: string) => {
+    if (text.length > MEMORY_CONSTRAINTS.maxTextChars) {
+      showToast({ type: 'warning', message: `Notes are limited to ${MEMORY_CONSTRAINTS.maxTextChars} characters.` });
+      setNoteText(text.slice(0, MEMORY_CONSTRAINTS.maxTextChars));
+      return;
+    }
+    setNoteText(text);
+  };
+
   const handleSave = async () => {
     if (saving) return;
-    if (totalPhotos === 0 && noteText.trim().length === 0) {
-      setSaveError('Add a photo or note before saving.');
+    if (MEMORY_CONSTRAINTS.textRequiredToSave && noteText.trim().length === 0) {
+      setSaveError('Add a note before saving.');
       return;
     }
     setSaveError(null);
@@ -221,7 +231,7 @@ function EditForm({ memory }: { memory: Memory }) {
           multiline
           textAlignVertical="top"
           value={noteText}
-          onChangeText={setNoteText}
+          onChangeText={onChangeNote}
         />
 
         {/* Details List */}

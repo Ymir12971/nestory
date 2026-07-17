@@ -7,6 +7,7 @@ import type { CurrentMonthStatus, StoryListItem, SubscriptionStatus } from '@nes
 import { theme, palette } from '@/shared/theme';
 import { TopNotify, type TopNotifyStatus } from '@/shared/components/TopNotify';
 import { PaywallModal } from '@/shared/components/PaywallModal';
+import { AddMemoryEntrySheet } from '@/shared/components/AddMemoryEntrySheet';
 import { useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
 import { showToast } from '@/features/ui/toast';
 
@@ -213,6 +214,7 @@ export function StoriesScreen() {
   const thisYear  = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(thisYear);
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [addEntryVisible, setAddEntryVisible] = useState(false);
 
   const openPaywall = () => setPaywallVisible(true);
 
@@ -313,7 +315,7 @@ export function StoriesScreen() {
           {current?.listItemState === 'current_collecting' && (
             <CollectingCard
               data={current}
-              onAddMemory={() => router.push('/memory/add')}
+              onAddMemory={() => setAddEntryVisible(true)}
               onGenerateNow={handleGenerateNow}
               generating={generateNow.isPending}
             />
@@ -349,6 +351,15 @@ export function StoriesScreen() {
         visible={paywallVisible}
         onSubscribe={() => setPaywallVisible(false)}
         onDismiss={() => setPaywallVisible(false)}
+      />
+
+      <AddMemoryEntrySheet
+        visible={addEntryVisible}
+        onSelect={(entryMode) => {
+          setAddEntryVisible(false);
+          router.push(`/memory/add?mode=${entryMode}`);
+        }}
+        onDismiss={() => setAddEntryVisible(false)}
       />
     </SafeAreaView>
   );
