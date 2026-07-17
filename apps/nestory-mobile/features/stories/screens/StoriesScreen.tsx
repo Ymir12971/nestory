@@ -3,23 +3,14 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
-import type { CurrentMonthStatus, StoryListItem, SubscriptionStatus } from '@nestory/types';
+import { Modal } from 'react-native';
+import type { CurrentMonthStatus, StoryListItem } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { TopNotify, type TopNotifyStatus } from '@/shared/components/TopNotify';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMemoryEntrySheet } from '@/shared/components/AddMemoryEntrySheet';
-import { useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
+import { useAssetMonths, useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
 import { showToast } from '@/features/ui/toast';
-
-function topNotifyForSub(sub: SubscriptionStatus): TopNotifyStatus | null {
-  if (sub === 'trial_ended')   return 'stories_trial_ended';
-  if (sub === 'premium_ended') return 'stories_premium_ended';
-  return null;
-}
-
-function notifyKindFor(sub: SubscriptionStatus): 'trial' | 'premium' {
-  return sub === 'trial_ended' ? 'trial' : 'premium';
-}
 
 // ---------- Helpers ----------
 
@@ -130,14 +121,14 @@ function GeneratingCard({ monthKey }: { monthKey: string }) {
   );
 }
 
-function LockedCard({ onUpgrade }: { onUpgrade: () => void }) {
-  // Paywall target: Modal · Paywall · A — see docs/W2-Nestory_StateMatrix_v1.0.md §2.7.7
+/** Amber quota banner (DS Property=Locked) — persistent while free & out of stories. */
+function LockedCard({ childName, onUpgrade }: { childName: string; onUpgrade: () => void }) {
   return (
     <View style={styles.cardLocked}>
       <View style={styles.lockedContent}>
         <RemixIcon name="lock-line" size={24} color={theme.text.hint} />
         <Text style={styles.lockedBody}>
-          {"You've used your 2 free Stories. Upgrade to keep recording every month."}
+          You've used your 2 free Stories. Upgrade to keep {childName}'s Stories going.
         </Text>
       </View>
       <Pressable onPress={onUpgrade}>
@@ -152,9 +143,11 @@ function LockedCard({ onUpgrade }: { onUpgrade: () => void }) {
 function GeneratedCard({
   item,
   onPress,
+  onRegenerate,
 }: {
   item: StoryListItem;
   onPress: () => void;
+  onRegenerate?: () => void;
 }) {
   const { badge } = parseMonthKey(item.monthKey);
   return (
@@ -169,6 +162,7 @@ function GeneratedCard({
           <Text style={styles.monthBadgeLabel}>{badge}</Text>
         </View>
       </View>
+      {onRegenerate && <RegenerateStrip onPress={onRegenerate} />}
       <View style={styles.generatedBody}>
         <View style={styles.generatedTextGroup}>
           <Text style={styles.cardTitle}>{item.title ?? '—'}</Text>
@@ -185,22 +179,77 @@ function GeneratedCard({
   );
 }
 
-function NotGeneratedCard({ item }: { item: StoryListItem }) {
-  const { full, monthName } = parseMonthKey(item.monthKey);
+/** Blue "Memories changed" strip — Premium regenerate entry (DS AllowRegenerate). */
+function RegenerateStrip({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable style={styles.regenStrip} onPress={onPress}>
+      <Text style={styles.regenStripLabel}>Memories changed. Tap here to regenerate.</Text>
+    </Pressable>
+  );
+}
+
+/** NoMemories month card (DS Property=NoMemories). */
+function NoMemoriesCard({ item, onRegenerate }: { item: StoryListItem; onRegenerate?: () => void }) {
+  const { full } = parseMonthKey(item.monthKey);
   return (
     <View style={styles.cardNotGenerated}>
       <View style={styles.nsImgArea}>
         <RemixIcon name="link-unlink-m" size={48} color={theme.text.hint} />
+        <Text style={styles.nsImgCaption}>No memories were added for this month.</Text>
       </View>
+      {onRegenerate && <RegenerateStrip onPress={onRegenerate} />}
       <View style={styles.nsBody}>
         <View style={styles.nsTextGroup}>
           <Text style={styles.cardTitle}>{full}</Text>
-          <Text style={styles.nsCaption}>No Story was created for {monthName}.</Text>
         </View>
         <Text style={styles.nsDesc}>
-          Add a few moments next month and we'll bring your Story to life.
+          Add a few memories next month and we'll bring your Story to life.
         </Text>
       </View>
+    </View>
+  );
+}
+
+/** Folded "Story paused" card for consecutive subscription-gap months (DS NoPremium). */
+function PausedCard({ startKey, endKey, kind }: { startKey: string; endKey: string; kind: 'Trial' | 'Premium' }) {
+  const start = parseMonthKey(startKey);
+  const end   = parseMonthKey(endKey);
+  const range = startKey === endKey
+    ? start.full
+    : `${end.monthName} - ${start.full}`; // list is newest-first; display oldest → newest
+  return (
+    <View style={styles.cardNotGenerated}>
+      <View style={styles.nsImgArea}>
+        <RemixIcon name="lock-line" size={40} color={theme.text.hint} />
+        <Text style={styles.nsImgCaption}>Story paused ({kind} ended)</Text>
+      </View>
+      <View style={styles.nsBody}>
+        <Text style={styles.cardTitle}>{range}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** Premium-ended replacement for the current-month slot (Figma 731:3687). */
+function PremiumEndedCard({ childName, onRenew }: { childName: string; onRenew: () => void }) {
+  return (
+    <View style={styles.cardLocked}>
+      <View style={styles.lockedContent}>
+        <RemixIcon name="lock-line" size={24} color={theme.text.hint} />
+        <Text style={styles.lockedBody}>
+          Your Premium has ended. Renew to keep {childName}'s Stories going.
+        </Text>
+      </View>
+      <Pressable style={({ pressed }) => [styles.renewWrap, pressed && { opacity: 0.88 }]} onPress={onRenew}>
+        <LinearGradient
+          colors={[palette.accent[500], palette.accent[400]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.renewBtn}
+        >
+          <Text style={styles.renewLabel}>Renew Premium</Text>
+        </LinearGradient>
+      </Pressable>
     </View>
   );
 }
@@ -219,15 +268,22 @@ export function StoriesScreen() {
   const openPaywall = () => setPaywallVisible(true);
 
   const children = childrenQ.data ?? [];
-  const activeChildId =
-    children.find(c => c.isActive)?.id ?? children[0]?.id ?? '';
+  const activeChild = children.find(c => c.isActive) ?? children[0];
+  const activeChildId = activeChild?.id ?? '';
+  const childName = activeChild?.name ?? 'your little one';
   const storiesQ = useStories({ childId: activeChildId, year: selectedYear });
+  const monthsQ  = useAssetMonths(activeChildId);
   const generateNow = useGenerateStoryNow();
+  // monthKey pending regenerate confirmation (S-Regeneration confirm popup)
+  const [regenMonthKey, setRegenMonthKey] = useState<string | null>(null);
 
-  const handleGenerateNow = async () => {
+  const handleGenerateNow = async (monthKey?: string) => {
     if (!activeChildId || generateNow.isPending) return;
     try {
-      const res = await generateNow.mutateAsync({ childId: activeChildId });
+      const res = await generateNow.mutateAsync({
+        childId: activeChildId,
+        ...(monthKey ? { monthKey } : {}),
+      });
       showToast({
         type: 'info',
         message: res.status === 'already_in_progress'
@@ -252,12 +308,46 @@ export function StoriesScreen() {
   }, [children, thisYear]);
 
   const subStatus = subQ.data?.subscriptionStatus;
-  const notifyType = subStatus ? topNotifyForSub(subStatus) : null;
+  const isPremium = subStatus === 'premium_active' || subStatus === 'trial_active';
+  // New semantics (决策6): "Trial ended" = the 2 free stories are used up —
+  // judged by the quota state, NOT the legacy trial_ended platform enum.
+  const quotaExhausted = subStatus === 'trial_ended' ||
+    storiesQ.data?.currentMonth.listItemState === 'current_quota_exhausted';
+  const premiumEnded = subStatus === 'premium_ended';
+  const pausedKind: 'Trial' | 'Premium' = premiumEnded ? 'Premium' : 'Trial';
 
   const isLoading = childrenQ.isLoading || storiesQ.isLoading;
   const isError   = childrenQ.isError || storiesQ.isError;
   const current   = storiesQ.data?.currentMonth;
   const historical = storiesQ.data?.historical ?? [];
+
+  // Months that actually have memories — splits "not generated" months into
+  // Paused (had memories, no subscription/quota when the month closed) vs
+  // NoMemories. Consecutive Paused months fold into one card (annotation).
+  const monthsWithMemories = useMemo(
+    () => new Set((monthsQ.data ?? []).map(m => m.monthKey)),
+    [monthsQ.data],
+  );
+  type Row =
+    | { kind: 'generated'; item: StoryListItem }
+    | { kind: 'no_memories'; item: StoryListItem }
+    | { kind: 'paused'; startKey: string; endKey: string };
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = [];
+    for (const item of historical) {
+      if (item.listItemState === 'historical_generated' && item.id) {
+        out.push({ kind: 'generated', item });
+      } else if (monthsWithMemories.has(item.monthKey)) {
+        const last = out[out.length - 1];
+        // list is newest-first: extend the fold's older edge (endKey)
+        if (last?.kind === 'paused') last.endKey = item.monthKey;
+        else out.push({ kind: 'paused', startKey: item.monthKey, endKey: item.monthKey });
+      } else {
+        out.push({ kind: 'no_memories', item });
+      }
+    }
+    return out;
+  }, [historical, monthsWithMemories]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -285,13 +375,10 @@ export function StoriesScreen() {
         </View>
       </View>
 
-      {notifyType != null && subStatus && (
+      {/* Persistent quota banner — free users out of stories (Locked variant) */}
+      {quotaExhausted && !isLoading && (
         <View style={styles.notifyWrap}>
-          <TopNotify
-            type={notifyType}
-            kind={notifyKindFor(subStatus)}
-            onPress={openPaywall}
-          />
+          <LockedCard childName={childName} onUpgrade={openPaywall} />
         </View>
       )}
 
@@ -312,40 +399,102 @@ export function StoriesScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {current?.listItemState === 'current_collecting' && (
-            <CollectingCard
-              data={current}
-              onAddMemory={() => setAddEntryVisible(true)}
-              onGenerateNow={handleGenerateNow}
-              generating={generateNow.isPending}
-            />
-          )}
-          {current?.listItemState === 'current_in_progress' && (
-            <GeneratingCard monthKey={current.monthKey} />
-          )}
-          {current?.listItemState === 'current_quota_exhausted' && (
-            <LockedCard onUpgrade={openPaywall} />
-          )}
-          {current?.listItemState === 'current_generated' && current.storyId && (
-            <CurrentGeneratedCard
-              data={current}
-              onPress={() => router.push(`/story/${current.storyId}`)}
-            />
+          {/* Current-month slot. Premium-ended swaps in the Renew card; quota-
+              exhausted shows nothing here (the persistent banner covers it). */}
+          {premiumEnded ? (
+            <PremiumEndedCard childName={childName} onRenew={openPaywall} />
+          ) : (
+            <>
+              {current?.listItemState === 'current_collecting' && !quotaExhausted && (
+                <CollectingCard
+                  data={current}
+                  onAddMemory={() => setAddEntryVisible(true)}
+                  onGenerateNow={() => void handleGenerateNow()}
+                  generating={generateNow.isPending}
+                />
+              )}
+              {current?.listItemState === 'current_in_progress' && (
+                <GeneratingCard monthKey={current.monthKey} />
+              )}
+              {current?.listItemState === 'current_generated' && current.storyId && (
+                <CurrentGeneratedCard
+                  data={current}
+                  onPress={() => router.push(`/story/${current.storyId}`)}
+                />
+              )}
+            </>
           )}
 
-          {historical.map(item =>
-            item.listItemState === 'historical_generated' && item.id ? (
-              <GeneratedCard
-                key={item.monthKey}
-                item={item}
-                onPress={() => router.push(`/story/${item.id}`)}
+          {rows.map(row => {
+            if (row.kind === 'generated') {
+              const canRegen = isPremium && row.item.memoriesChanged === true;
+              return (
+                <GeneratedCard
+                  key={row.item.monthKey}
+                  item={row.item}
+                  onPress={() => router.push(`/story/${row.item.id}`)}
+                  onRegenerate={canRegen ? () => setRegenMonthKey(row.item.monthKey) : undefined}
+                />
+              );
+            }
+            if (row.kind === 'paused') {
+              return (
+                <PausedCard
+                  key={`paused-${row.startKey}`}
+                  startKey={row.startKey}
+                  endKey={row.endKey}
+                  kind={pausedKind}
+                />
+              );
+            }
+            const canRegen = isPremium && row.item.memoriesChanged === true;
+            return (
+              <NoMemoriesCard
+                key={row.item.monthKey}
+                item={row.item}
+                onRegenerate={canRegen ? () => setRegenMonthKey(row.item.monthKey) : undefined}
               />
-            ) : (
-              <NotGeneratedCard key={item.monthKey} item={item} />
-            ),
-          )}
+            );
+          })}
         </ScrollView>
       )}
+
+      {/* Regenerate confirm popup — the new Story OVERWRITES the old one */}
+      <Modal
+        visible={regenMonthKey !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRegenMonthKey(null)}
+      >
+        <Pressable style={styles.regenScrim} onPress={() => setRegenMonthKey(null)} />
+        <View style={styles.regenSheet}>
+          <View style={styles.regenHandle} />
+          <Text style={styles.regenTitle}>Regenerate this Story?</Text>
+          <Text style={styles.regenBody}>
+            We'll create a new Story from this month's updated memories. The new Story will replace the current one — this can't be undone.
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.regenConfirmWrap, pressed && { opacity: 0.88 }]}
+            onPress={() => {
+              const key = regenMonthKey;
+              setRegenMonthKey(null);
+              if (key) void handleGenerateNow(key);
+            }}
+          >
+            <LinearGradient
+              colors={[palette.primary[500], palette.primary[400]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.regenConfirmBtn}
+            >
+              <Text style={styles.regenConfirmLabel}>Confirm</Text>
+            </LinearGradient>
+          </Pressable>
+          <Pressable style={styles.regenCancelBtn} onPress={() => setRegenMonthKey(null)}>
+            <Text style={styles.regenCancelLabel}>Cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
 
       <PaywallModal
         visible={paywallVisible}
@@ -635,6 +784,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.muted,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.l,
+  },
+  nsImgCaption: {
+    ...theme.typography.caption,
+    color: theme.text.hint,
+    textAlign: 'center',
   },
   nsBody: {
     padding: theme.spacing.l,
@@ -651,6 +807,92 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     lineHeight: 20,
+    color: theme.text.secondary,
+  },
+
+  // Regenerate strip (DS AllowRegenerate — blue band)
+  regenStrip: {
+    backgroundColor: theme.surface.infoSubtle,
+    paddingVertical: theme.spacing.s,
+    paddingHorizontal: theme.spacing.l,
+  },
+  regenStripLabel: {
+    ...theme.typography.caption,
+    color: theme.text.info,
+  },
+
+  // Premium-ended renew button
+  renewWrap: {
+    borderRadius: theme.radius.full,
+    overflow: 'hidden',
+    alignSelf: 'flex-start',
+  },
+  renewBtn: {
+    height: 44,
+    paddingHorizontal: theme.spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  renewLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.premium,
+  },
+
+  // Regenerate confirm sheet
+  regenScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  regenSheet: {
+    backgroundColor: theme.surface.card,
+    borderTopLeftRadius: theme.radius.l,
+    borderTopRightRadius: theme.radius.l,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.m,
+    paddingBottom: theme.spacing.safeBtm + theme.spacing.l,
+    gap: theme.spacing.m,
+  },
+  regenHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.border.strong,
+    alignSelf: 'center',
+    marginBottom: theme.spacing.s,
+  },
+  regenTitle: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: 24,
+    lineHeight: 32,
+    color: theme.text.primary,
+  },
+  regenBody: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    lineHeight: 22,
+  },
+  regenConfirmWrap: {
+    width: '100%',
+    borderRadius: theme.radius.full,
+    overflow: 'hidden',
+    marginTop: theme.spacing.s,
+  },
+  regenConfirmBtn: {
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  regenConfirmLabel: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.onColor,
+  },
+  regenCancelBtn: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  regenCancelLabel: {
+    ...theme.typography.buttonLabelM,
     color: theme.text.secondary,
   },
 });

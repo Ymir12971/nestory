@@ -31,6 +31,13 @@ export interface StoryListItem {
   watermarkEnabled: boolean | null;     // null when no story
   generatedAt: string | null;
   memoryCount: number | null;           // null when no story; count of memories used to generate
+  /**
+   * Redesign (S-Regeneration allowed): memories changed after this month's
+   * story was generated (or after a no-memories month got backfilled).
+   * Premium-only regenerate strip renders when true. Backend populates this
+   * once memory-change tracking lands (WorkPlan §6) — optional until then.
+   */
+  memoriesChanged?: boolean;
 }
 
 // GET /stories — current_month object
