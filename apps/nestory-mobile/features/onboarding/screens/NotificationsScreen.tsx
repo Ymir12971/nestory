@@ -36,11 +36,20 @@ export function NotificationsScreen() {
       {/* Content */}
       <View style={styles.content}>
         <View style={styles.titleGroup}>
-          <Text style={styles.headline}>Don't miss a moment</Text>
+          <Text style={styles.headline}>Don't miss a Story</Text>
           <Text style={styles.subtitle}>Get notified when the monthly Story is ready</Text>
         </View>
-        <View style={styles.storySample}>
-          <Text style={styles.samplePlaceholder}>[ Story sample — image placeholder ]</Text>
+        {/* Mock push preview (copy from Figma O-Notification access) */}
+        <View style={styles.pushPreview}>
+          <View style={styles.pushIcon}>
+            <RemixIcon name="book-open-fill" size={20} color={theme.text.onColor} />
+          </View>
+          <View style={styles.pushText}>
+            <Text style={styles.pushApp}>Nestory</Text>
+            <Text style={styles.pushBody}>
+              Your little one's monthly Story is ready. Tap to read.
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -51,8 +60,12 @@ export function NotificationsScreen() {
         <Pressable
           style={({ pressed }) => [styles.buttonWrap, pressed && { opacity: 0.85 }]}
           onPress={async () => {
-            await Notifications.requestPermissionsAsync();
-            router.push('/onboarding/plan');
+            // Annotation: advance only if the user actually enabled notifications;
+            // otherwise stay on this page (Skip remains the explicit way past).
+            const res = await Notifications.requestPermissionsAsync();
+            if (res.granted || res.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
+              router.push('/onboarding/plan');
+            }
           }}
         >
           <LinearGradient
@@ -119,17 +132,30 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.text.secondary,
   },
-  storySample: {
-    height: 240,
+  pushPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.m,
     backgroundColor: theme.surface.card,
     borderRadius: theme.radius.l,
+    padding: theme.spacing.l,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  pushIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: theme.surface.brand,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  samplePlaceholder: {
-    ...theme.typography.body,
-    color: theme.text.hint,
-  },
+  pushText: { flex: 1, gap: 2 },
+  pushApp: { ...theme.typography.h4, color: theme.text.primary },
+  pushBody: { ...theme.typography.caption, color: theme.text.secondary },
   spacer: {
     flex: 1,
   },
