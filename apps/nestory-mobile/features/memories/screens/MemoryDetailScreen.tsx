@@ -5,9 +5,11 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Memory } from '@nestory/types';
 import { theme } from '@/shared/theme';
-import { useAsset } from '@/api';
+import { useAsset, useSubscription } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { FullscreenPhotoViewer } from '@/shared/components/FullscreenPhotoViewer';
+import { MemoryEditGateSheet } from '@/shared/components/MemoryEditGateSheet';
+import { PaywallModal } from '@/shared/components/PaywallModal';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -66,9 +68,23 @@ export function MemoryDetailScreen() {
 function Body({ memory }: { memory: Memory }) {
   const router = useRouter();
   const goBack = useGoBack();
+  const subQ = useSubscription();
   const dotCount = memory.files.length;
   const [activeIndex, setActiveIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [gateVisible, setGateVisible] = useState(false);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+
+  const isPremium =
+    subQ.data?.subscriptionStatus === 'premium_active' ||
+    subQ.data?.subscriptionStatus === 'trial_active';
+
+  // Current month (isEditable) → straight to edit. Past month: Premium sees a
+  // regenerate heads-up first; Free sees the upgrade gate.
+  const onEditPress = () => {
+    if (memory.isEditable) router.push(`/memory/${memory.id}/edit`);
+    else setGateVisible(true);
+  };
 
   const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / (PHOTO_CENTER_W + PHOTO_GAP));
@@ -82,26 +98,10 @@ function Body({ memory }: { memory: Memory }) {
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Memory</Text>
-        {memory.isEditable ? (
-          <Pressable hitSlop={8} onPress={() => router.push(`/memory/${memory.id}/edit`)}>
-            <Text style={styles.editButton}>Edit</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.navSpacer} />
-        )}
+        <Pressable hitSlop={8} onPress={onEditPress}>
+          <Text style={styles.editButton}>Edit</Text>
+        </Pressable>
       </View>
-
-      {/* H-04 Read-Only Banner — historical months only (R-08) */}
-      {!memory.isEditable && (
-        <View style={styles.bannerWrap}>
-          <View style={styles.banner}>
-            <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
-            <Text style={styles.bannerText}>
-              This memory was used to create a Story. We keep it as-is to preserve the authenticity of your stories.
-            </Text>
-          </View>
-        </View>
-      )}
 
       <ScrollView
         style={styles.scroll}
@@ -173,6 +173,27 @@ function Body({ memory }: { memory: Memory }) {
         initialIndex={viewerIndex ?? 0}
         onDismiss={() => setViewerIndex(null)}
       />
+
+      <MemoryEditGateSheet
+        visible={gateVisible}
+        variant={isPremium ? 'premium' : 'free'}
+        onPrimary={() => {
+          setGateVisible(false);
+          if (isPremium) router.push(`/memory/${memory.id}/edit`);
+          else setPaywallVisible(true);
+        }}
+        onViewBenefits={() => {
+          setGateVisible(false);
+          setPaywallVisible(true);
+        }}
+        onDismiss={() => setGateVisible(false)}
+      />
+
+      <PaywallModal
+        visible={paywallVisible}
+        onSubscribe={() => setPaywallVisible(false)}
+        onDismiss={() => setPaywallVisible(false)}
+      />
     </>
   );
 }
@@ -216,26 +237,6 @@ const styles = StyleSheet.create({
     color: theme.text.brand,
   },
   navSpacer: { width: 40 },
-
-  bannerWrap: {
-    paddingHorizontal: theme.spacing.xl,
-  },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 4,
-    backgroundColor: theme.surface.warningSubtle,
-    borderRadius: theme.radius.s,
-    paddingHorizontal: theme.spacing.l,
-    paddingVertical: theme.spacing.s,
-  },
-  bannerText: {
-    flex: 1,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    lineHeight: 16,
-    color: theme.text.warning,
-  },
 
   carouselScroll: {
     height: PHOTO_CENTER_H,

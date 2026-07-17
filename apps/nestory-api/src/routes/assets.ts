@@ -21,7 +21,8 @@ const fileInputSchema = z.object({
 const memoryCreateSchema = z.object({
   childId:     z.string().uuid(),
   capturedAt:  z.string().datetime(),
-  textNote:    z.string().max(MEMORY_CONSTRAINTS.maxTextChars).optional(),
+  // Redesign: text is required to save a Memory (photos optional).
+  textNote:    z.string().min(1).max(MEMORY_CONSTRAINTS.maxTextChars),
   tagValues:   z.array(z.string().min(1).max(50)).max(20).optional(),
   isHighlight: z.boolean().optional(),
   files:       z.array(fileInputSchema).max(MEMORY_CONSTRAINTS.maxPhotos).optional(),
@@ -330,7 +331,7 @@ export async function assetsRoutes(app: FastifyInstance) {
     };
   });
 
-  // PATCH /assets/:id — R-08：仅当月可编辑
+  // PATCH /assets/:id — 当月人人可编辑;过往月仅 Premium(2026-07 新规,旧 R-08 废止)
   app.patch('/:id', async (req) => {
     const { id } = parseParams(uuidParam, req);
     const body   = parseBody(memoryPatchSchema, req);
@@ -343,11 +344,20 @@ export async function assetsRoutes(app: FastifyInstance) {
 
     const tz = await getUserTimezone(req.userId);
     if (!isCurrentMonth(existing.capturedAt, tz)) {
-      throw new ApiError(
-        'MEMORY_EDIT_RESTRICTED',
-        'Cannot edit memories from past months (R-08)',
-        403,
-      );
+      const sub = await prisma.subscription.findUnique({
+        where:  { userId: req.userId },
+        select: { subscriptionStatus: true },
+      });
+      const isPremium =
+        sub?.subscriptionStatus === 'premium_active' ||
+        sub?.subscriptionStatus === 'trial_active';
+      if (!isPremium) {
+        throw new ApiError(
+          'MEMORY_EDIT_RESTRICTED',
+          'Editing past-month memories requires Premium',
+          403,
+        );
+      }
     }
 
     // mutex: addFiles 与 reorderFileIds 互斥
@@ -355,15 +365,12 @@ export async function assetsRoutes(app: FastifyInstance) {
       throw Errors.validation('addFiles and reorderFileIds are mutually exclusive');
     }
 
-    // EMPTY_MEMORY: 删到空（无 file + 空 text）
-    const finalText  = body.textNote !== undefined ? body.textNote : existing.textNote;
-    const finalCount = existing.files.length
-      - (body.removeFileIds?.length ?? 0)
-      + (body.addFiles?.length ?? 0);
-    if ((finalText?.trim().length ?? 0) === 0 && finalCount <= 0) {
+    // EMPTY_MEMORY: 新规则 text 必填 — 编辑后不允许留空文本
+    const finalText = body.textNote !== undefined ? body.textNote : existing.textNote;
+    if ((finalText?.trim().length ?? 0) === 0) {
       throw new ApiError(
         'EMPTY_MEMORY',
-        'Memory cannot be left empty (no photos and no text)',
+        'Memory must keep a text note (text is required to save)',
         400,
       );
     }
@@ -458,14 +465,23 @@ export async function assetsRoutes(app: FastifyInstance) {
     });
     if (!existing) throw Errors.notFound('Memory', id);
 
-    // R-08：历史月份禁止任何删除，无论 soft/hard
+    // 当月人人可删;过往月仅 Premium(与 PATCH 同规,旧 R-08 废止)
     const tz = await getUserTimezone(req.userId);
     if (!isCurrentMonth(existing.capturedAt, tz)) {
-      throw new ApiError(
-        'MEMORY_EDIT_RESTRICTED',
-        'Cannot delete memories from past months (R-08)',
-        403,
-      );
+      const sub = await prisma.subscription.findUnique({
+        where:  { userId: req.userId },
+        select: { subscriptionStatus: true },
+      });
+      const isPremium =
+        sub?.subscriptionStatus === 'premium_active' ||
+        sub?.subscriptionStatus === 'trial_active';
+      if (!isPremium) {
+        throw new ApiError(
+          'MEMORY_EDIT_RESTRICTED',
+          'Deleting past-month memories requires Premium',
+          403,
+        );
+      }
     }
 
     if (!force) {
