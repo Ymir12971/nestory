@@ -13,6 +13,7 @@ import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks
 import { uploadPhoto, useChildren, useCreateAsset } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { showToast } from '@/features/ui/toast';
+import { track } from '@/shared/lib/analytics';
 
 const MAX_PHOTOS = MEMORY_CONSTRAINTS.maxPhotos;
 
@@ -83,6 +84,14 @@ export function AddMemoryScreen() {
         ...(noteText.trim() ? { textNote: noteText.trim() } : {}),
         ...(tags.length > 0 ? { tagValues: tags } : {}),
         files: uploaded,
+      });
+
+      const now = new Date();
+      track('memory_saved', {
+        photoCount: photos.length,
+        charCount:  noteText.trim().length,
+        isBackfill: capturedAt.getFullYear() !== now.getFullYear() ||
+                    capturedAt.getMonth() !== now.getMonth(),
       });
 
       goBack();

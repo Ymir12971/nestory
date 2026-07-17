@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
@@ -11,6 +11,7 @@ import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMemoryEntrySheet } from '@/shared/components/AddMemoryEntrySheet';
 import { useAssetMonths, useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
 import { showToast } from '@/features/ui/toast';
+import { track } from '@/shared/lib/analytics';
 
 // ---------- Helpers ----------
 
@@ -387,17 +388,25 @@ export function StoriesScreen() {
           <ActivityIndicator color={theme.text.brand} />
         </View>
       ) : isError ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>Failed to load stories.</Text>
-          <Pressable onPress={() => storiesQ.refetch()}>
-            <Text style={styles.retryText}>Tap to retry</Text>
-          </Pressable>
-        </View>
+        // S-Stories couldn't load: pull down to refresh (annotation)
+        <ScrollView
+          contentContainerStyle={styles.center}
+          refreshControl={
+            <RefreshControl refreshing={storiesQ.isRefetching} onRefresh={() => void storiesQ.refetch()} />
+          }
+        >
+          <RemixIcon name="wifi-off-line" size={40} color={theme.text.hint} />
+          <Text style={styles.emptyText}>Your Stories couldn't load.</Text>
+          <Text style={styles.retryText}>Pull down to refresh</Text>
+        </ScrollView>
       ) : (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={storiesQ.isRefetching} onRefresh={() => void storiesQ.refetch()} />
+          }
         >
           {/* Current-month slot. Premium-ended swaps in the Renew card; quota-
               exhausted shows nothing here (the persistent banner covers it). */}
@@ -478,7 +487,10 @@ export function StoriesScreen() {
             onPress={() => {
               const key = regenMonthKey;
               setRegenMonthKey(null);
-              if (key) void handleGenerateNow(key);
+              if (key) {
+                track('story_regenerated', { monthKey: key });
+                void handleGenerateNow(key);
+              }
             }}
           >
             <LinearGradient

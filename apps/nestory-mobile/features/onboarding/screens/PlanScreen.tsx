@@ -9,6 +9,8 @@ import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { queryClient, queryKeys } from '@/api';
 import { purchasePlan, isPurchasesAvailable } from '@/features/billing/purchases';
+import { useChildren } from '@/api';
+import { track } from '@/shared/lib/analytics';
 
 // O-Choose plan (Figma 739:1406 yearly / 758:1219 monthly). No trial — the
 // product has no free-trial concept (Handoff §3.1); CTA is a straight purchase.
@@ -30,13 +32,17 @@ const FREE_ITEMS = ['One child profile', 'Two Stories', 'Watermarked Sharing'];
 export function PlanScreen() {
   const router = useRouter();
   const goBack = useGoBack();
+  const childrenQ = useChildren();
   const [plan, setPlan] = useState<Plan>('yearly');
   const [purchasing, setPurchasing] = useState(false);
+
+  const profileCount = childrenQ.data?.length ?? 0;
 
   const handleSubscribe = async () => {
     const cycle = plan === 'yearly' ? 'year' : 'month';
     // On web / dev (no RC key) skip the store and land on the welcome page.
     if (!isPurchasesAvailable()) {
+      track('onboarding_complete', { profileCount, plan: 'premium' });
       router.replace(`/welcome-premium?cycle=${cycle}&from=onboarding`);
       return;
     }
@@ -46,6 +52,8 @@ export function PlanScreen() {
       if (res.status === 'purchased') {
         // Webhook updates the backend async; refresh so the app reflects premium.
         await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        track('subscribe_success', { cycle: plan, source: 'onboarding' });
+        track('onboarding_complete', { profileCount, plan: 'premium' });
         router.replace(`/welcome-premium?cycle=${cycle}&from=onboarding`);
       }
       // 'cancelled' → stay on screen, let the user choose again.
@@ -171,7 +179,10 @@ export function PlanScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.freeButton, pressed && { opacity: 0.85 }]}
-          onPress={() => router.replace('/')}
+          onPress={() => {
+            track('onboarding_complete', { profileCount, plan: 'free' });
+            router.replace('/');
+          }}
         >
           <Text style={styles.freeLabel}>Start with Free</Text>
         </Pressable>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
@@ -134,12 +134,16 @@ export function MemoryListScreen() {
           <ActivityIndicator color={theme.text.brand} />
         </View>
       ) : assetsQ.isError ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>Failed to load memories.</Text>
-          <Pressable onPress={() => assetsQ.refetch()}>
-            <Text style={styles.retryText}>Tap to retry</Text>
-          </Pressable>
-        </View>
+        // H-Memories couldn't load: pull down to refresh (annotation)
+        <ScrollView
+          contentContainerStyle={styles.center}
+          refreshControl={
+            <RefreshControl refreshing={assetsQ.isRefetching} onRefresh={() => void assetsQ.refetch()} />
+          }
+        >
+          <Text style={styles.emptyText}>Your memories couldn't load.</Text>
+          <Text style={styles.retryText}>Pull down to refresh</Text>
+        </ScrollView>
       ) : groups.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyText}>No memories this month yet.</Text>
@@ -149,6 +153,9 @@ export function MemoryListScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={assetsQ.isRefetching} onRefresh={() => void assetsQ.refetch()} />
+          }
         >
           {groups.map((group, groupIndex) => (
             <View key={group.key} style={styles.dayGroup}>

@@ -9,6 +9,7 @@ import { theme, palette } from '@/shared/theme';
 import { useSubscription, queryClient, queryKeys } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { purchasePlan, openManageSubscriptions, isPurchasesAvailable } from '@/features/billing/purchases';
+import { track } from '@/shared/lib/analytics';
 import { showToast } from '@/features/ui/toast';
 
 // ---------- Types ----------
@@ -61,6 +62,7 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
       if (res.status === 'purchased') {
         // Refresh — once the webhook flips the row, this screen re-renders to Premium.
         await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        track('subscribe_success', { cycle, source: 'settings' });
         showToast({ type: 'success', message: 'Welcome to Premium!' });
       }
     } catch (e) {
@@ -222,8 +224,10 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
   const [otherText, setOtherText] = useState('');
 
   const confirmCancel = async () => {
-    // TODO(P5): analytics `subscription_cancelled` with { reason, otherText }.
-    console.log('[cancel-survey]', { reason, otherText: otherText.trim() || undefined });
+    track('subscription_cancelled', {
+      ...(reason ? { reason } : {}),
+      ...(otherText.trim() ? { otherText: otherText.trim() } : {}),
+    });
     setCancelStep(0);
     await openManageSubscriptions();
     showToast({

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,6 +16,7 @@ import { config } from '@/shared/config';
 import { useStory, getAuthToken, useCreateShare } from '@/api';
 import { showToast } from '@/features/ui/toast';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { track } from '@/shared/lib/analytics';
 import { StoryWebView } from '../components/StoryWebView';
 
 function formatMonth(monthKey: string): string {
@@ -52,6 +53,15 @@ export function StoryDetailScreen() {
 
   const monthKey  = storyQ.data?.monthKey;
   const navTitle  = monthKey ? formatMonth(monthKey) : 'Story';
+
+  // story_opened — once per screen visit, when the story has actually loaded.
+  const openedTracked = useRef(false);
+  useEffect(() => {
+    if (storyQ.data && !openedTracked.current) {
+      openedTracked.current = true;
+      track('story_opened', { storyId: storyQ.data.id, monthKey: storyQ.data.monthKey });
+    }
+  }, [storyQ.data]);
   // Used only as a fallback share title — the rendered cover/title come from
   // the WebView (StoryRenderer.tsx) so we no longer paint them natively.
   const docTitle  = storyQ.data?.document.meta.title ?? '';
@@ -66,12 +76,17 @@ export function StoryDetailScreen() {
       const share = await createShare.mutateAsync({ storyId: id });
       const url   = `${config.webBaseUrl}/share/${share.token}`;
       const title = share.og.title || docTitle || 'Nestory Story';
-      await Share.share({
+      const result = await Share.share({
         title,
         url,
         // Android only honours `message`; iOS uses url+title. Include both.
         message: `${title}\n${url}`,
       });
+      if (result.action === Share.sharedAction) {
+        track('story_shared', {
+          ...(result.activityType ? { channel: result.activityType } : {}),
+        });
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Please try again.';
       showToast({ type: 'error', message: `Couldn't share this story: ${msg}` });

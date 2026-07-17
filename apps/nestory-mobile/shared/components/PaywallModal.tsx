@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { theme, palette } from '@/shared/theme';
+import { track } from '@/shared/lib/analytics';
 
 // global-Paywall (Figma 775:1819) — the single paywall for the whole app.
 // The old contextual A/B/C/D variants are gone (2026-07 redesign, 模型 X 废弃);
@@ -22,10 +23,16 @@ interface PaywallModalProps {
   visible: boolean;
   onSubscribe: (cycle: PaywallCycle) => void;
   onDismiss: () => void;
+  /** Analytics: which entry point opened the paywall (Handoff §5 paywall_viewed). */
+  source?: string;
 }
 
-export function PaywallModal({ visible, onSubscribe, onDismiss }: PaywallModalProps) {
+export function PaywallModal({ visible, onSubscribe, onDismiss, source }: PaywallModalProps) {
   const [cycle, setCycle] = useState<PaywallCycle>('year');
+
+  useEffect(() => {
+    if (visible) track('paywall_viewed', { source: source ?? 'unknown' });
+  }, [visible, source]);
 
   return (
     <Modal
