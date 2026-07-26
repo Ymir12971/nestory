@@ -94,6 +94,28 @@ async function ensureChildOwned(childId: string, userId: string): Promise<void> 
 }
 
 /**
+ * Memory 增/改/删后打点:若该 (child, month) 已有生成完成的 Story,记下
+ * memoriesChangedAt — Premium 端 Regenerate 蓝条的触发信号。重生成会刷新
+ * generatedAt,序列化时按 memoriesChangedAt > generatedAt 判定,自动失效。
+ * Fire-and-forget:打点失败不应让 memory 写入本身报错。
+ */
+async function stampStoryMemoriesChanged(childId: string, capturedAt: Date, tz: string): Promise<void> {
+  const monthKey = toMonthKey(capturedAt, tz);
+  try {
+    await prisma.story.updateMany({
+      where: {
+        childId,
+        monthKey,
+        status: { in: ['generated', 'fallback_generated'] },
+      },
+      data: { memoriesChangedAt: new Date() },
+    });
+  } catch {
+    // 打点失败静默 — 下次该月再有变更仍会尝试
+  }
+}
+
+/**
  * Normalize tags: trim, drop empties, dedupe case-insensitively.
  * Preserves first-occurrence casing so "Playtime" + "playtime" → ["Playtime"].
  */
@@ -194,6 +216,8 @@ export async function assetsRoutes(app: FastifyInstance) {
     });
 
     const tz = await getUserTimezone(req.userId);
+    // 补录进已生成 Story 的月份 → 标记可 regenerate
+    await stampStoryMemoriesChanged(memory.childId, memory.capturedAt, tz);
     reply.code(201);
     return {
       data: serializeMemory({
@@ -446,6 +470,8 @@ export async function assetsRoutes(app: FastifyInstance) {
       });
     });
 
+    await stampStoryMemoriesChanged(updated.childId, updated.capturedAt, tz);
+
     return {
       data: serializeMemory({
         ...updated,
@@ -461,7 +487,7 @@ export async function assetsRoutes(app: FastifyInstance) {
 
     const existing = await prisma.rawAsset.findFirst({
       where:  { id, userId: req.userId },
-      select: { id: true, capturedAt: true },
+      select: { id: true, capturedAt: true, childId: true },
     });
     if (!existing) throw Errors.notFound('Memory', id);
 
@@ -489,10 +515,12 @@ export async function assetsRoutes(app: FastifyInstance) {
         where: { id },
         data:  { deletedAt: new Date() },
       });
+      await stampStoryMemoriesChanged(existing.childId, existing.capturedAt, tz);
       return { data: { deletedAt: new Date().toISOString() } };
     }
 
     await prisma.rawAsset.delete({ where: { id } });
+    await stampStoryMemoriesChanged(existing.childId, existing.capturedAt, tz);
     return { data: { hardDeleted: true } };
   });
 
@@ -514,6 +542,8 @@ export async function assetsRoutes(app: FastifyInstance) {
         highlight: { select: { id: true, title: true } },
       },
     });
+
+    await stampStoryMemoriesChanged(restored.childId, restored.capturedAt, tz);
 
     return {
       data: serializeMemory({

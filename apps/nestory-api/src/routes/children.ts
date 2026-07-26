@@ -10,6 +10,9 @@ const childCreateSchema = z.object({
   name:             z.string().min(1).max(50),
   birthDate:        z.string().date(), // 'YYYY-MM-DD'
   gender:           z.enum(['boy', 'girl', 'prefer_not_to_say']).optional(),
+  // 孩子对用户的称呼(O-Relationship):预设 Mom/Dad/… 或自定义,首个孩子必答;
+  // Add Another Child 不重复询问(Justin 2026-07-15),不传即空。
+  relationship:     z.string().min(1).max(30).optional(),
   avatarUrl:        z.string().url().max(500).optional(),
   heightValue:      z.number().positive().optional(),
   heightUnit:       z.enum(['cm', 'in']).optional(),
@@ -43,6 +46,7 @@ function serializeChild(c: any, activeChildId: string | null = null) {
     ageMonths:        ageMonthsFrom(c.birthDate),
     avatarUrl:        c.avatarUrl,
     gender:           c.gender,
+    relationship:     c.relationship ?? null,
     heightValue:      c.heightValue ? Number(c.heightValue) : null,
     heightUnit:       c.heightUnit,
     heightRecordedAt: c.heightRecordedAt?.toISOString() ?? null,
@@ -73,6 +77,7 @@ export async function childrenRoutes(app: FastifyInstance) {
         name:             body.name,
         birthDate:        new Date(body.birthDate),
         gender:           body.gender,
+        relationship:     body.relationship,
         avatarUrl:        body.avatarUrl,
         heightValue:      body.heightValue,
         heightUnit:       body.heightUnit,

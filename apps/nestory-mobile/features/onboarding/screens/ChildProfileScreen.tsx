@@ -311,12 +311,18 @@ export function ChildProfileScreen() {
 
     const weightNum = parseFloat(weight);
 
-    // NOTE: relationship (who the user is to the child) has no backend column
-    // yet — captured in UI, not persisted. See WorkPlan §6 backend follow-ups.
+    // Relationship: preset label, or the custom text for "Other...".
+    // "Prefer not to say" and the ?another=1 loop send nothing.
+    const relationshipValue =
+      relationship === 'Other...' ? customRelationship.trim()
+      : relationship === 'Prefer not to say' || relationship === null ? ''
+      : relationship;
+
     return {
       name:      name.trim(),
       birthDate: `${year}-${month}-${day}`,
       ...(gender ? { gender: GENDER_TO_API[gender] } : {}),
+      ...(relationshipValue ? { relationship: relationshipValue } : {}),
       ...(avatarUrl ? { avatarUrl } : {}),
       ...(heightState.resolve() ?? {}),
       ...(Number.isFinite(weightNum) && weightNum > 0

@@ -8,6 +8,7 @@ export interface Child {
   name: string;
   birthDate: string;            // YYYY-MM-DD
   gender: ChildGender | null;
+  relationship: string | null;  // who the user is to the child (Mom/Dad/…/custom)
   avatarUrl: string | null;
   ageMonths: number;            // computed by server at response time
   heightValue: number | null;
@@ -25,6 +26,7 @@ export interface ChildCreate {
   name: string;            // required, ≤ 50 chars
   birthDate: string;       // required, YYYY-MM-DD
   gender?: ChildGender;
+  relationship?: string;   // ≤ 30 chars; first child only (not re-asked for siblings)
   heightValue?: number;
   heightUnit?: HeightUnit; // required when heightValue is present
   weightValue?: number;

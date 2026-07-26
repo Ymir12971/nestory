@@ -180,6 +180,11 @@ export async function storiesRoutes(app: FastifyInstance) {
         watermarkEnabled: doc?.watermark.enabled ?? null,
         generatedAt:      s.generatedAt?.toISOString() ?? null,
         memoryCount:      memoryCountByMonth.get(monthKey) ?? 0,
+        // Regenerate 蓝条信号:生成之后该月 memory 又变过(重生成刷新 generatedAt 后自动消失)
+        memoriesChanged:
+          s.memoriesChangedAt != null &&
+          s.generatedAt != null &&
+          s.memoriesChangedAt > s.generatedAt,
       };
     });
 
@@ -231,6 +236,25 @@ export async function storiesRoutes(app: FastifyInstance) {
     if (!user)  throw Errors.notFound('User', req.userId);
 
     const monthKey = body.monthKey ?? currentMonthKey(user.timezone);
+
+    // Regenerate(过往月)是 Premium 专属 — 客户端已 gate,这里兜底。
+    if (monthKey !== currentMonthKey(user.timezone)) {
+      const sub = await prisma.subscription.findUnique({
+        where:  { userId: req.userId },
+        select: { subscriptionStatus: true },
+      });
+      const isPremium =
+        sub?.subscriptionStatus === 'premium_active' ||
+        sub?.subscriptionStatus === 'trial_active';
+      if (!isPremium) {
+        throw new ApiError(
+          'REGENERATE_RESTRICTED',
+          'Regenerating past-month stories requires Premium',
+          403,
+        );
+      }
+    }
+
     const expectedJobId = `story:${body.childId}:${monthKey}`;
 
     // If the deterministic job already exists, only retry/replace terminal ones;
