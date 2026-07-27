@@ -15,8 +15,7 @@
 // 部分索引、Realtime publication 等 Prisma DSL 不支持的，写在 migration SQL 后置脚本里。
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -25,9 +24,11 @@ datasource db {
   url        = env("DATABASE_URL")
   // Direct connection (port 5432) for `prisma migrate` — pgBouncer doesn't
   // support the prepared statements / DDL that migrations need.
-  directUrl  = env("DIRECT_URL")
-  // Supabase pre-installs these in `public`; declare them so migrate doesn't drift.
-  extensions = [pgcrypto, pg_stat_statements, uuid_ossp(map: "uuid-ossp"), supabase_vault]
+  directUrl = env("DIRECT_URL")
+  // 不声明 extensions:Supabase 把 pgcrypto / uuid-ossp / pg_stat_statements 装在
+  // `extensions` schema、supabase_vault 装在 `vault`,而迁移里的 CREATE EXTENSION
+  // 在影子库落到 `public` —— 声明它们只会让每次 migrate 都判为永久漂移并要求
+  // 全库 reset。扩展由 Supabase 托管,我们从不增删,交给它管即可。
 }
 
 // ============================================================================
@@ -186,7 +187,10 @@ model UserTagLibrary {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, name])
+  // 真实唯一约束是 functional index idx_user_tag_library_user_normalized_name
+  // (user_id, LOWER(TRIM(name)))，见 migrations/…_post_init_and_redesign。
+  // Prisma DSL 无法表达函数索引，故此处不声明 @@unique —— 否则每次 migrate
+  // 都会把 DB 判成漂移并要求重建字面唯一索引。
   @@index([userId], map: "idx_user_tag_library_user")
   @@map("user_tag_library")
 }
