@@ -3,6 +3,8 @@ import IORedis from 'ioredis';
 import { prisma, whereNotDeleted } from './prisma';
 import { toMonthKey } from './month';
 import { generateStory, type MemoryInput } from './storyAi';
+import { generateStoryV3, type V3Memory } from './storyGen';
+import { getStoryGenConfig } from './storyGen/config';
 
 const QUEUE_NAME      = 'story-generation';
 const DISPATCHER_ID   = 'story-dispatcher-daily';
@@ -206,19 +208,61 @@ async function processGenerateJob(
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   const generatedAt = new Date().toISOString();
+  const cfg = getStoryGenConfig();
 
   try {
-    const { document, meta } = await generateStory({
-      childName:      child.name,
-      childAgeMonths,
-      monthKey,
-      monthLabel,
-      locale:         'en-US',
-      memories,
-      candidateCoverImageUrl,
-      watermarkEnabled: !isPremium,
-      generatedAt,
-    });
+    let document: object;
+    let meta;
+
+    if (cfg.pipeline === 'two-phase-v3') {
+      // v3 两段式流水线;E01/P1 拒绝时标记 failed 并记录原因(不重试)
+      const v3Memories: V3Memory[] = memoriesInMonth.map(a => ({
+        id:         a.id,
+        capturedAt: a.capturedAt.toISOString(),
+        text:       a.textNote ?? '',
+        tags:       a.tags,
+        photos: a.files.map(f => ({
+          url:      f.fileUrl,
+          widthPx:  f.widthPx,
+          heightPx: f.heightPx,
+          // 预处理列(sharpness/qualityTier)就位后由 imageLayer 自动升级
+        })),
+      }));
+      const result = await generateStoryV3({
+        childName:        child.name,
+        childAgeMonths,
+        monthKey,
+        monthDisplay:     monthLabel.toUpperCase(),
+        locale:           'en-US',
+        memories:         v3Memories,
+        watermarkEnabled: !isPremium,
+        generatedAt,
+      });
+      if (!result.ok) {
+        await prisma.story.update({
+          where: { childId_monthKey: { childId, monthKey } },
+          data:  { status: 'failed', generationMeta: { declined: result.reason, detail: result.detail } as object },
+        });
+        log(`[story-worker] v3 declined ${childId}/${monthKey}: ${result.reason} (${result.detail ?? ''})`);
+        return;
+      }
+      document = result.document;
+      meta = result.meta;
+    } else {
+      const v2 = await generateStory({
+        childName:      child.name,
+        childAgeMonths,
+        monthKey,
+        monthLabel,
+        locale:         'en-US',
+        memories,
+        candidateCoverImageUrl,
+        watermarkEnabled: !isPremium,
+        generatedAt,
+      });
+      document = v2.document;
+      meta = v2.meta;
+    }
 
     // Stitch the DB-derived ids in now that we know them.
     const updated = await prisma.story.update({
