@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { setDevSession, useSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient, isSupabaseAuthAvailable } from '@/features/auth/supabaseClient';
-import { track } from '@/shared/lib/analytics';
+import { identify, track } from '@/shared/lib/analytics';
 
 // Demo userId for the dev escape hatch (Supabase envs not configured); matches
 // the seed user in apps/nestory-api/prisma/seed.ts.
@@ -47,6 +47,7 @@ export function SignInScreen() {
   const handleDevSignIn = () => {
     blurFocus();
     setDevSession({ userId: DEMO_USER_ID });
+    identify(DEMO_USER_ID);
     track('signup_success', { method: 'dev' });
     router.replace('/onboarding/privacy-claim');
   };
@@ -90,8 +91,9 @@ export function SignInScreen() {
       // PKCE: extract the ?code= from the deep link and exchange it for a session.
       const code = new URL(result.url).searchParams.get('code');
       if (!code) throw new Error('Missing OAuth code in callback URL');
-      const { error: exchErr } = await sb.auth.exchangeCodeForSession(code);
+      const { data: exch, error: exchErr } = await sb.auth.exchangeCodeForSession(code);
       if (exchErr) throw exchErr;
+      if (exch?.session?.user?.id) identify(exch.session.user.id);
       track('signup_success', { method: provider });
       router.replace('/onboarding/privacy-claim');
     } catch (e: any) {

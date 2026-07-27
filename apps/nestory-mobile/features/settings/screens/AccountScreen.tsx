@@ -12,6 +12,7 @@ import { setDevSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient } from '@/features/auth/supabaseClient';
 import { logOutPurchaseUser } from '@/features/billing/purchases';
 import { showToast } from '@/features/ui/toast';
+import { resetAnalytics } from '@/shared/lib/analytics';
 
 const PROVIDERS: { key: 'apple' | 'google'; label: string }[] = [
   { key: 'apple',  label: 'Apple'  },
@@ -42,6 +43,7 @@ export function AccountScreen() {
     if (sb) await sb.auth.signOut();
     await logOutPurchaseUser();
     setDevSession(null);
+    resetAnalytics();
     qc.clear();
     router.replace('/onboarding/auth');
   };
@@ -54,6 +56,7 @@ export function AccountScreen() {
       if (sb) await sb.auth.signOut();
       await logOutPurchaseUser();
       setDevSession(null);
+      resetAnalytics();
       qc.clear();
       showToast({ type: 'success', message: 'Account deleted.' });
       router.replace('/onboarding/auth');
