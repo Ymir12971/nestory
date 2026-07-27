@@ -225,7 +225,9 @@ async function processGenerateJob(
           url:      f.fileUrl,
           widthPx:  f.widthPx,
           heightPx: f.heightPx,
-          // 预处理列(sharpness/qualityTier)就位后由 imageLayer 自动升级
+          // 预处理产物;未打标的照片 imageLayer 自动降级到分辨率判定
+          ...(f.qualityTier ? { qualityTier: f.qualityTier as 'gold' | 'standard' | 'degraded' } : {}),
+          ...(f.sharpness != null ? { sharpness: Number(f.sharpness) } : {}),
         })),
       }));
       const result = await generateStoryV3({

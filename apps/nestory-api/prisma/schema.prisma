@@ -156,6 +156,10 @@ model AssetFile {
   heightPx     Int?     @map("height_px")
   byteSize     Int      @map("byte_size")
   displayOrder Int      @default(0) @map("display_order") @db.SmallInt
+  // §7.2 图片预处理产物(sharp 计算,上传后异步打标;storyGen v3 图片层消费)
+  sharpness    Decimal? @db.Decimal(10, 2) // Laplacian variance,统一短边 512 上计算
+  qualityTier  String?  @map("quality_tier") @db.VarChar(10) // 'gold' | 'standard' | 'degraded'
+  blurhash     String?  @db.VarChar(50)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   rawAsset          RawAsset    @relation(fields: [assetId], references: [id], onDelete: Cascade)

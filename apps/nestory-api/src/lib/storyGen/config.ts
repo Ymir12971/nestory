@@ -82,8 +82,16 @@ export interface StoryGenConfig {
     /** Gold-tier gate (§3.2). All objective, computed in preprocessing. */
     gold: {
       shortEdgeMinPx: number;
-      /** OpenCV Laplacian variance; higher = sharper. Doc default 100, "tune on samples". */
+      /** Laplacian variance; higher = sharper. Doc default 100, "tune on samples". */
       laplacianVarianceMin: number;
+    };
+    /** Degraded gate (§3.2 模糊或严重曝光异常) — photos below/outside are hidden from stories. */
+    degraded: {
+      /** Laplacian variance below this = blurry → degraded. */
+      laplacianVarianceMax: number;
+      /** Greyscale mean outside [min, max] = severe under/over exposure → degraded. */
+      exposureMeanMin: number;
+      exposureMeanMax: number;
     };
     /** Per narrative-unit photo cap (§3.6.1 rule 2). */
     photosPerUnitCap: number;
@@ -134,6 +142,11 @@ const defaults: StoryGenConfig = {
     gold: {
       shortEdgeMinPx:       800,
       laplacianVarianceMin: 100,
+    },
+    degraded: {
+      laplacianVarianceMax: 20,   // 明显糊的下限;上线按样本调
+      exposureMeanMin:      20,   // 0-255 灰度均值
+      exposureMeanMax:      235,
     },
     photosPerUnitCap:    3,
     photosPerChapterCap: 20,

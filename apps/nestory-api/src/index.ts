@@ -7,6 +7,7 @@ import authPlugin from './lib/auth';
 import { registerRateLimit } from './lib/rateLimit';
 import { ensureBuckets } from './lib/supabase';
 import { startStoryWorker } from './lib/storyQueue';
+import { startPhotoWorker } from './lib/photoPreprocess';
 import { isMockEnabled } from './lib/storyAi';
 import { registerRoutes } from './routes';
 
@@ -50,6 +51,16 @@ if (env.REDIS_URL && (env.ANTHROPIC_API_KEY || isMockEnabled())) {
   app.log.warn('REDIS_URL missing — story worker disabled');
 } else {
   app.log.warn('ANTHROPIC_API_KEY missing — set STORY_AI_MOCK=1 to enable mock generation');
+}
+
+// 图片预处理 worker(§7.2 阶段一)— 只依赖 Redis,与 LLM 无关
+if (env.REDIS_URL) {
+  try {
+    startPhotoWorker((msg) => app.log.info(msg));
+    app.log.info('[photo-worker] started (concurrency=2)');
+  } catch (err) {
+    app.log.error({ err }, 'Failed to start photo worker');
+  }
 }
 
 const port = Number(env.PORT);

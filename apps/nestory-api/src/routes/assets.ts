@@ -5,6 +5,7 @@ import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
 import { parseBody, parseParams, parseQuery, uuidParam, cursorPagination } from '../lib/validation';
 import { isCurrentMonth, toMonthKey } from '../lib/month';
+import { enqueuePhotoPreprocess } from '../lib/photoPreprocess';
 
 // ---------- Schemas ----------
 
@@ -218,6 +219,8 @@ export async function assetsRoutes(app: FastifyInstance) {
     const tz = await getUserTimezone(req.userId);
     // 补录进已生成 Story 的月份 → 标记可 regenerate
     await stampStoryMemoriesChanged(memory.childId, memory.capturedAt, tz);
+    // §7.2 异步质量打标(清晰度/曝光/blurhash)
+    enqueuePhotoPreprocess(memory.files.map(f => f.id));
     reply.code(201);
     return {
       data: serializeMemory({
@@ -471,6 +474,8 @@ export async function assetsRoutes(app: FastifyInstance) {
     });
 
     await stampStoryMemoriesChanged(updated.childId, updated.capturedAt, tz);
+    // 新增的照片同样走质量打标(已处理过的有 qualityTier,worker 幂等跳过)
+    enqueuePhotoPreprocess(updated.files.map(f => f.id));
 
     return {
       data: serializeMemory({
