@@ -153,11 +153,24 @@ async function processGenerateJob(
 
   const sub = await prisma.subscription.findUnique({
     where:  { userId: child.userId },
-    select: { subscriptionStatus: true },
+    select: { subscriptionStatus: true, storyQuota: true },
   });
   const isPremium =
     sub?.subscriptionStatus === 'premium_active' ||
     sub?.subscriptionStatus === 'trial_active';
+
+  // Handoff 3.3:Free 共 2 份配额(按账户)。配额尽 → 不生成(quota 从不重置)。
+  // 注:regenerate 只有 Premium 能触发(路由已 gate),不会走到这里的扣减分支。
+  if (!isPremium && (sub?.storyQuota ?? 0) <= 0) {
+    await prisma.story.upsert({
+      where:  { childId_monthKey: { childId, monthKey } },
+      update: { status: 'failed', generationMeta: { declined: 'FREE_QUOTA_EXHAUSTED' } as object },
+      create: { childId, userId: child.userId, monthKey, status: 'failed',
+                generationMeta: { declined: 'FREE_QUOTA_EXHAUSTED' } as object },
+    });
+    log(`[story-worker] skip ${childId}/${monthKey}: free quota exhausted`);
+    return;
+  }
 
   await prisma.story.upsert({
     where:  { childId_monthKey: { childId, monthKey } },
@@ -286,6 +299,23 @@ async function processGenerateJob(
       where: { id: updated.id },
       data:  { document: { ...document, childId, storyId: updated.id } as unknown as object },
     });
+
+    // Free 生成成功 → 扣 1 份配额;降到 0 的这份标记 isLastFreeStory
+    // (Paywall A 触发点:看完最后一份免费 Story 返回时弹,mobile 读此标记)。
+    if (!isPremium) {
+      const after = await prisma.subscription.update({
+        where: { userId: child.userId },
+        data:  { storyQuota: { decrement: 1 } },
+        select: { storyQuota: true },
+      });
+      if (after.storyQuota <= 0) {
+        await prisma.story.update({
+          where: { id: updated.id },
+          data:  { isLastFreeStory: true },
+        });
+      }
+      log(`[story-worker] free quota now ${after.storyQuota} for user=${child.userId}`);
+    }
 
     log(`[story-worker] generated story=${updated.id} duration_ms=${meta.generationDurationMs}`);
   } catch (err) {
