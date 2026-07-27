@@ -22,6 +22,7 @@
     "@fastify/sensible": "^6.0.1",
     "@nestory/types": "workspace:*",
     "@prisma/client": "^6.6.0",
+    "@sentry/node": "^10.68.0",
     "@supabase/supabase-js": "^2.46.1",
     "blurhash": "^2.0.5",
     "bullmq": "^5.34.0",

@@ -20,6 +20,8 @@ const envSchema = z.object({
   // Shared-secret bearer for /internal/* admin endpoints (queue control,
   // dispatcher backfills, etc.). When unset, the routes refuse all traffic.
   ADMIN_TOKEN: z.string().optional(),
+  // Crash/error reporting. Unset = Sentry stays off (dev default).
+  SENTRY_DSN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

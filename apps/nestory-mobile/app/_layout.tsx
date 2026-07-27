@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
@@ -25,6 +26,18 @@ import {
 } from '@expo-google-fonts/inter';
 
 SplashScreen.preventAutoHideAsync();
+
+// Crash reporting. No DSN configured → Sentry never initializes (local dev).
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    // Breadcrumbs + crashes are what we need for TestFlight; skip perf traces.
+    tracesSampleRate: 0,
+    // Don't ship dev-time noise to the dashboard.
+    enabled: !__DEV__,
+  });
+}
 
 // Minimum time the branded splash stays up once it appears, so the breathing
 // glow always plays at least one full cycle even when boot is near-instant.

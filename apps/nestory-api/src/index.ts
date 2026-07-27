@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
@@ -12,9 +13,25 @@ import { isMockEnabled } from './lib/storyAi';
 import { registerRoutes } from './routes';
 
 const env = loadEnv();
+
+// Sentry must init before anything else so early throws are captured.
+// No DSN → disabled entirely (local dev, CI).
+if (env.SENTRY_DSN) {
+  Sentry.init({
+    dsn:         env.SENTRY_DSN,
+    environment: env.NODE_ENV,
+    // Errors are the point here; sample a slice of traces for slow endpoints.
+    tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 0,
+  });
+}
+
 const app = Fastify({
   logger: { level: env.LOG_LEVEL },
 });
+if (env.SENTRY_DSN) {
+  Sentry.setupFastifyErrorHandler(app);
+  app.log.info('[sentry] error reporting enabled');
+}
 
 await app.register(cors, { origin: env.CORS_ORIGIN });
 await app.register(sensible);

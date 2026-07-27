@@ -1,4 +1,5 @@
 import { Queue, Worker, type Job } from 'bullmq';
+import * as Sentry from '@sentry/node';
 import IORedis from 'ioredis';
 import sharp from 'sharp';
 import { encode } from 'blurhash';
@@ -188,6 +189,7 @@ export function startPhotoWorker(log: (msg: string, data?: unknown) => void): Wo
   );
   _worker.on('failed', (job, err) => {
     log(`[photo-worker] failed ${job?.id}: ${err.message}`);
+    Sentry.captureException(err, { tags: { area: 'photo-worker' }, extra: { jobId: job?.id } });
   });
   return _worker;
 }

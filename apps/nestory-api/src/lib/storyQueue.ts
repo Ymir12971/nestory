@@ -1,4 +1,5 @@
 import { Queue, Worker, type Job } from 'bullmq';
+import * as Sentry from '@sentry/node';
 import IORedis from 'ioredis';
 import { prisma, whereNotDeleted } from './prisma';
 import { toMonthKey } from './month';
@@ -100,6 +101,8 @@ export function startStoryWorker(log: (msg: string, data?: unknown) => void): Wo
   });
   _worker.on('failed', (job, err) => {
     log(`[story-worker] failed ${job?.id}: ${err.message}`);
+    // Worker throws bypass Fastify's handler — report them explicitly.
+    Sentry.captureException(err, { tags: { area: 'story-worker' }, extra: { jobId: job?.id } });
   });
 
   // Upsert the daily dispatcher schedule. Safe to call on every boot.
