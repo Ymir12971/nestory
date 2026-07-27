@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { ApiFetchError, fetchStory } from '@/lib/api';
 import { StoryRenderer } from '@/app/_components/StoryRenderer';
+import { StoryRendererV3 } from '@/app/_components/StoryRendererV3';
+import { isStoryDocumentV3 } from '@nestory/types';
 
 interface StoryPageProps {
   params:       Promise<{ id: string }>;
@@ -41,5 +43,6 @@ export default async function StoryPage({ params, searchParams }: StoryPageProps
     throw err;
   }
 
-  return <StoryRenderer doc={detail.document} />;
+  const doc = detail.document;
+  return isStoryDocumentV3(doc) ? <StoryRendererV3 doc={doc} /> : <StoryRenderer doc={doc} />;
 }

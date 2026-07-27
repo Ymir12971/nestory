@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ApiFetchError, asStoryDocument, fetchPublicShare } from '@/lib/api';
 import { StoryRenderer } from '@/app/_components/StoryRenderer';
+import { StoryRendererV3 } from '@/app/_components/StoryRendererV3';
+import { isStoryDocumentV3 } from '@nestory/types';
 
 interface SharePageProps {
   params: Promise<{ token: string }>;
@@ -44,5 +46,6 @@ export default async function SharePage({ params }: SharePageProps) {
     throw err;
   }
 
-  return <StoryRenderer doc={asStoryDocument(share.document)} />;
+  const doc = asStoryDocument(share.document);
+  return isStoryDocumentV3(doc) ? <StoryRendererV3 doc={doc} /> : <StoryRenderer doc={doc} />;
 }
