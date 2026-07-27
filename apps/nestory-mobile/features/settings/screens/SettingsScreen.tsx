@@ -7,7 +7,7 @@ import * as Notifications from 'expo-notifications';
 import type { SubscriptionStatus } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
-import { useMe, useSubscription, useChildren } from '@/api';
+import { useMe, useSubscription, useChildren, useUpdateMe } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
 // ---------- Subscription entry derivation ----------
@@ -124,8 +124,9 @@ export function SettingsScreen() {
   const subQ       = useSubscription();
   const childrenQ  = useChildren();
 
-  // Story Notifications default follows the system permission granted (or not)
-  // during onboarding; Upload Reminders default ON (annotations).
+  // Both toggles persist to the user row (push delivery checks them server-side).
+  // Story Notifications additionally can't be on without OS permission.
+  const updateMe = useUpdateMe();
   const [storyNotif, setStoryNotif]     = useState(false);
   const [uploadRemind, setUploadRemind] = useState(true);
   // TODO: Story Location should follow the OS location permission once the
@@ -133,11 +134,23 @@ export function SettingsScreen() {
   const [location, setLocation]         = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
 
+  // Seed from the server, then AND the story toggle with OS permission.
   useEffect(() => {
+    if (!meQ.data) return;
+    setUploadRemind(meQ.data.uploadRemindersEnabled);
     void Notifications.getPermissionsAsync().then(res => {
-      setStoryNotif(res.granted);
+      setStoryNotif(meQ.data!.storyNotificationsEnabled && res.granted);
     });
-  }, []);
+  }, [meQ.data]);
+
+  const onToggleStoryNotif = (v: boolean) => {
+    setStoryNotif(v);
+    updateMe.mutate({ storyNotificationsEnabled: v });
+  };
+  const onToggleUploadRemind = (v: boolean) => {
+    setUploadRemind(v);
+    updateMe.mutate({ uploadRemindersEnabled: v });
+  };
 
   if (meQ.isLoading || subQ.isLoading || childrenQ.isLoading) {
     return (
@@ -257,14 +270,14 @@ export function SettingsScreen() {
               label="Story Notifications"
               subtitle="Get notified when your Story is ready"
               value={storyNotif}
-              onValueChange={setStoryNotif}
+              onValueChange={onToggleStoryNotif}
             />
             <Divider />
             <ToggleRow
               label="Upload Reminders"
               subtitle="Gentle reminders every 3 days"
               value={uploadRemind}
-              onValueChange={setUploadRemind}
+              onValueChange={onToggleUploadRemind}
             />
           </Card>
         </View>

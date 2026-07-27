@@ -5,6 +5,7 @@ import { toMonthKey } from './month';
 import { generateStory, type MemoryInput } from './storyAi';
 import { generateStoryV3, type V3Memory } from './storyGen';
 import { getStoryGenConfig } from './storyGen/config';
+import { sendPushToUser, sendStoryReadyPush } from './push';
 
 const QUEUE_NAME      = 'story-generation';
 const DISPATCHER_ID   = 'story-dispatcher-daily';
@@ -319,6 +320,16 @@ async function processGenerateJob(
       log(`[story-worker] free quota now ${after.storyQuota} for user=${child.userId}`);
     }
 
+    // 审核开启时等 approve 再推(内部端点负责);否则立即通知家长
+    if (!reviewRequired) {
+      const sent = await sendStoryReadyPush(
+        child.userId,
+        { childName: child.name, storyId: updated.id, monthKey },
+        (m) => log(m),
+      );
+      if (sent > 0) log(`[story-worker] story-ready push → ${sent} device(s)`);
+    }
+
     log(`[story-worker] generated story=${updated.id} duration_ms=${meta.generationDurationMs}`);
   } catch (err) {
     await prisma.story.update({
@@ -386,6 +397,42 @@ async function runDispatcher(log: (msg: string, data?: unknown) => void): Promis
   }
 
   log(`[story-worker] dispatcher done — enqueued=${enqueued} skipped=${skipped}`);
+
+  await runUploadReminders(log);
+}
+
+/**
+ * Upload Reminders(ST-Settings annotation):连续 3 天没上传任何 Memory,
+ * 且这 3 天内没有 Story 生成过 → 发一条温和提醒。跟着每日 dispatcher 跑。
+ * 开关关闭 / 无 token 的用户由 sendPushToUser 内部跳过。
+ */
+async function runUploadReminders(log: (msg: string, data?: unknown) => void): Promise<void> {
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+  const users = await prisma.user.findMany({
+    where: {
+      ...whereNotDeleted,
+      uploadRemindersEnabled: true,
+      pushTokens: { some: {} },          // 没设备的不查
+      children:   { some: { deletedAt: null } },
+      // 3 天内无上传
+      rawAssets:  { none: { createdAt: { gte: threeDaysAgo }, deletedAt: null } },
+      // 3 天内无 Story 生成(annotation:刚出 Story 的用户不催)
+      stories:    { none: { generatedAt: { gte: threeDaysAgo } } },
+    },
+    select: { id: true },
+  });
+
+  let sent = 0;
+  for (const u of users) {
+    const n = await sendPushToUser(u.id, 'upload_reminder', {
+      title: 'Turn every moment into a memory',
+      body:  'A photo or a quick note :)',
+      data:  { type: 'upload_reminder' },
+    }, (m) => log(m));
+    if (n > 0) sent += 1;
+  }
+  log(`[story-worker] upload reminders — ${sent}/${users.length} user(s) notified`);
 }
 
 function previousMonthKey(timezone: string): string {

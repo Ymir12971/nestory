@@ -2,9 +2,14 @@ import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { theme } from '@/shared/theme';
+import { useSession } from '@/features/auth/hooks/useSession';
+import { usePushRegistration } from '@/shared/hooks/usePushRegistration';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  // Register this device's push token once the user is inside the app.
+  const { session } = useSession();
+  usePushRegistration(!!session);
   return (
     <Tabs
       screenOptions={{

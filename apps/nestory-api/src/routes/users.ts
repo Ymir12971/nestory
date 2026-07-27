@@ -10,6 +10,13 @@ import { getSupabase } from '../lib/supabase';
 const userPatchSchema = z.object({
   name:     z.string().min(1).max(100).optional(),
   timezone: z.string().min(1).max(50).optional(),
+  storyNotificationsEnabled: z.boolean().optional(),
+  uploadRemindersEnabled:    z.boolean().optional(),
+});
+
+const pushTokenSchema = z.object({
+  token:    z.string().min(1).max(200),
+  platform: z.enum(['ios', 'android', 'web']),
 });
 
 export async function usersRoutes(app: FastifyInstance) {
@@ -30,6 +37,8 @@ export async function usersRoutes(app: FastifyInstance) {
       email:       row.email,
       name:        row.name,
       timezone:    row.timezone,
+      storyNotificationsEnabled: row.storyNotificationsEnabled,
+      uploadRemindersEnabled:    row.uploadRemindersEnabled,
       createdAt:   row.createdAt.toISOString(),
       linkedProviders: row.linkedProviders.map((p): LinkedProvider => ({
         provider:      p.provider as 'apple' | 'google',
@@ -57,6 +66,8 @@ export async function usersRoutes(app: FastifyInstance) {
       email:       row.email,
       name:        row.name,
       timezone:    row.timezone,
+      storyNotificationsEnabled: row.storyNotificationsEnabled,
+      uploadRemindersEnabled:    row.uploadRemindersEnabled,
       createdAt:   row.createdAt.toISOString(),
       linkedProviders: row.linkedProviders.map((p): LinkedProvider => ({
         provider:      p.provider as 'apple' | 'google',
@@ -65,6 +76,25 @@ export async function usersRoutes(app: FastifyInstance) {
       })),
     };
     return { data };
+  });
+
+  // POST /users/me/push-token — 注册/刷新本设备的 Expo 推送 token(upsert)。
+  // token 全局唯一:同一台设备换账号登录时,token 归属转移到新用户。
+  app.post('/me/push-token', async (req) => {
+    const body = parseBody(pushTokenSchema, req);
+    await prisma.pushToken.upsert({
+      where:  { token: body.token },
+      update: { userId: req.userId, platform: body.platform },
+      create: { userId: req.userId, token: body.token, platform: body.platform },
+    });
+    return { data: { registered: true } };
+  });
+
+  // DELETE /users/me/push-token — 登出时注销本设备 token
+  app.delete('/me/push-token', async (req) => {
+    const body = parseBody(z.object({ token: z.string().min(1).max(200) }), req);
+    await prisma.pushToken.deleteMany({ where: { token: body.token, userId: req.userId } });
+    return { data: { removed: true } };
   });
 
   // DELETE /users/me — 软删（注销账号，30 天恢复窗）

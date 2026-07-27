@@ -15,6 +15,14 @@ export async function updateMe(body: UserPatch): Promise<User> {
   return res.data;
 }
 
+export async function registerPushToken(token: string, platform: 'ios' | 'android' | 'web'): Promise<void> {
+  await apiFetch('/users/me/push-token', { method: 'POST', body: { token, platform } });
+}
+
+export async function unregisterPushToken(token: string): Promise<void> {
+  await apiFetch('/users/me/push-token', { method: 'DELETE', body: { token } });
+}
+
 export async function deleteMe(): Promise<{ deletedAt: string }> {
   const res = await apiFetch<{ data: { deletedAt: string } }>('/users/me', { method: 'DELETE' });
   return res.data;

@@ -40,6 +40,9 @@ model User {
   name          String    @db.VarChar(100)
   timezone      String    @default("UTC") @db.VarChar(50)
   activeChildId String?   @map("active_child_id") @db.Uuid
+  // 通知偏好(Handoff §4:推送 = 已登录 + 系统授权 + 对应开关)
+  storyNotificationsEnabled Boolean @default(true) @map("story_notifications_enabled")
+  uploadRemindersEnabled    Boolean @default(true) @map("upload_reminders_enabled")
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6) // 决策 5：软删
   lockedAt      DateTime? @map("locked_at") @db.Timestamptz(6) // abuse lock
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -55,6 +58,7 @@ model User {
   tagLibrary      UserTagLibrary[]
   linkedProviders LinkedProvider[]
   auditLogs       AuditLog[]
+  pushTokens      PushToken[]
   abuseLogs       AbuseLog[]
 
   @@index([deletedAt(sort: Desc)], map: "idx_users_deleted_at") // 部分索引在 migration SQL 加 WHERE
@@ -280,6 +284,23 @@ model StoryShare {
 // ============================================================================
 // subscriptions
 // ============================================================================
+
+// ============================================================================
+// push_tokens — Expo 推送令牌(一用户多设备)
+// ============================================================================
+
+model PushToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique @db.VarChar(200) // ExponentPushToken[...]
+  platform  String   @db.VarChar(10) // 'ios' | 'android' | 'web'
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_push_tokens_user")
+  @@map("push_tokens")
+}
 
 model Subscription {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

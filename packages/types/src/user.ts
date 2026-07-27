@@ -13,10 +13,15 @@ export interface User {
   timezone: string;             // IANA, e.g. "Asia/Shanghai"
   linkedProviders: LinkedProvider[];
   createdAt: string;            // ISO 8601 UTC
+  // Notification preferences (Handoff §4 — push needs these ON plus OS permission)
+  storyNotificationsEnabled: boolean;
+  uploadRemindersEnabled: boolean;
 }
 
 // PATCH /users/me
 export interface UserPatch {
   name?: string;
   timezone?: string;
+  storyNotificationsEnabled?: boolean;
+  uploadRemindersEnabled?: boolean;
 }

@@ -4,6 +4,7 @@ import { Errors } from '../lib/errors';
 import { parseBody, parseParams, uuidParam } from '../lib/validation';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { enqueueStoryGeneration, getStoryQueue } from '../lib/storyQueue';
+import { sendStoryReadyPush } from '../lib/push';
 import { toMonthKey } from '../lib/month';
 
 const generateBody = z.object({
@@ -83,6 +84,18 @@ export async function internalRoutes(app: FastifyInstance) {
       where: { id, status: 'pending_review' },
       data:  { status: 'generated' },
     });
+    // 审核通过才是家长视角的"Story 好了" → 此刻推送
+    if (n.count === 1) {
+      const story = await prisma.story.findUnique({
+        where:  { id },
+        select: { userId: true, monthKey: true, child: { select: { name: true } } },
+      });
+      if (story) {
+        await sendStoryReadyPush(story.userId, {
+          childName: story.child.name, storyId: id, monthKey: story.monthKey,
+        }, (m: string) => req.log.info(m));
+      }
+    }
     return { data: { approved: n.count === 1 } };
   });
 
