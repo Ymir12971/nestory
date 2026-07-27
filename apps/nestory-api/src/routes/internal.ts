@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Errors } from '../lib/errors';
-import { parseBody, parseParams } from '../lib/validation';
+import { parseBody, parseParams, uuidParam } from '../lib/validation';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { enqueueStoryGeneration, getStoryQueue } from '../lib/storyQueue';
 import { toMonthKey } from '../lib/month';
@@ -53,6 +53,48 @@ export async function internalRoutes(app: FastifyInstance) {
     const jobId = await enqueueStoryGeneration(body);
     reply.code(202);
     return { data: { jobId, ...body } };
+  });
+
+  // ── §8.2 人工审核队列 ────────────────────────────────────────────────
+  // GET /internal/stories/pending — 待审列表(标题/月份/预览字段)
+  app.get('/stories/pending', async () => {
+    const rows = await prisma.story.findMany({
+      where:   { status: 'pending_review' },
+      orderBy: { updatedAt: 'asc' },
+      select:  { id: true, childId: true, monthKey: true, updatedAt: true, document: true },
+    });
+    return {
+      data: rows.map(r => {
+        const doc = r.document as { meta?: { title?: string }; cover?: { subtitle?: string } } | null;
+        return {
+          id: r.id, childId: r.childId, monthKey: r.monthKey,
+          generatedAt: r.updatedAt.toISOString(),
+          title: doc?.meta?.title ?? null,
+          subtitle: doc?.cover?.subtitle ?? null,
+        };
+      }),
+    };
+  });
+
+  // POST /internal/stories/:id/approve — 通过 → 用户可见
+  app.post('/stories/:id/approve', async (req) => {
+    const { id } = parseParams(uuidParam, req);
+    const n = await prisma.story.updateMany({
+      where: { id, status: 'pending_review' },
+      data:  { status: 'generated' },
+    });
+    return { data: { approved: n.count === 1 } };
+  });
+
+  // POST /internal/stories/:id/reject — 拒绝 → failed + 原因
+  app.post('/stories/:id/reject', async (req) => {
+    const { id } = parseParams(uuidParam, req);
+    const body = parseBody(z.object({ reason: z.string().max(500).optional() }), req);
+    const n = await prisma.story.updateMany({
+      where: { id, status: 'pending_review' },
+      data:  { status: 'failed', generationMeta: { rejected: body.reason ?? 'rejected by reviewer' } as object },
+    });
+    return { data: { rejected: n.count === 1 } };
   });
 
   // GET /internal/stories/queue — pending/active/failed counts

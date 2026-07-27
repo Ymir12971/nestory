@@ -43,7 +43,7 @@ function deriveListState(
 ): StoryListItemState {
   if (isCurrentMonth) {
     if (isFreePlanQuotaExhausted) return 'current_quota_exhausted';
-    if (status === 'generating' || status === 'pending') return 'current_in_progress';
+    if (status === 'generating' || status === 'pending' || status === 'pending_review') return 'current_in_progress';
     return 'current_collecting';
   }
   return 'historical_generated';
@@ -130,6 +130,7 @@ export async function storiesRoutes(app: FastifyInstance) {
       curStory?.status === 'generated' || curStory?.status === 'fallback_generated';
     const isCurInProgress =
       curStory?.status === 'generating' ||
+      curStory?.status === 'pending_review' ||
       curStory?.status === 'pending' ||
       curStory?.status === 'queued';
 

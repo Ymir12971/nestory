@@ -221,6 +221,7 @@ async function processGenerateJob(
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   const generatedAt = new Date().toISOString();
+  const reviewRequired = ['1','true','yes'].includes((process.env.STORY_REVIEW_REQUIRED ?? '').toLowerCase());
   const cfg = getStoryGenConfig();
 
   try {
@@ -283,7 +284,8 @@ async function processGenerateJob(
     const updated = await prisma.story.update({
       where: { childId_monthKey: { childId, monthKey } },
       data: {
-        status:         'generated',
+        // §8.2 人工审核:开关开启时先进待审队列,approve 后才对用户可见
+        status:         reviewRequired ? 'pending_review' : 'generated',
         qualityLevel:   meta.qualityLevel,
         qualityScore:   meta.qualityScore,
         promptVersion:  meta.promptVersion,

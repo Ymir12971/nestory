@@ -4,6 +4,7 @@ export type StoryStatus =
   | 'pending'
   | 'queued'
   | 'generating'
+  | 'pending_review'   // §8.2 human review gate (STORY_REVIEW_REQUIRED); user sees "generating"
   | 'generated'
   | 'failed'
   | 'fallback_generated';
