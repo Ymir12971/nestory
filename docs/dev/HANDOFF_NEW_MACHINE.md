@@ -18,7 +18,7 @@
    - seed 数据写入(Demo User + Emma 子档案 + 订阅 free 状态)
 2. **API 实跑通过**:`GET /health` 200 + `GET /subscriptions/me`(带 `Bearer dev-aaaaaaaa-...`)真实返回 seed 数据 = 整个 dev-token → Prisma → Supabase 链路 OK
 3. **连接串结构调整**:`schema.prisma` 加 `directUrl`,`env.ts` 加 `DIRECT_URL`,`.env.example` 注释清晰说明 dev/prod 策略(dev 两根都填直连;prod Railway 时把 `DATABASE_URL` 换 pooler)
-4. **架构决策更新到 memory**:
+4. **架构决策更新到 moment**:
    - `project_deployment_decisions.md` — 改为"现阶段单 Supabase 项目,prod 项目 TestFlight 前一周再建"
    - 新增 `project_external_account_schedule.md` — Apple Dev / Google Play 注册推迟到 2026-05-10 那周
 
@@ -98,18 +98,18 @@ pnpm exec expo start --web --clear
 
 ## 1. 旧机器要做的事（离开前）
 
-### 1.1 拷出 memory 目录（**最重要**）
+### 1.1 拷出 moment 目录（**最重要**）
 
 ```
-源路径：C:\Users\JZ\.claude\projects\d--workspace-to-freedom-Blakard-Nestory\memory\
+源路径：C:\Users\JZ\.claude\projects\d--workspace-to-freedom-Blakard-Nestory\moment\
 内容：
-  - MEMORY.md                           # 索引
+  - MOMENT.md                           # 索引
   - feedback_pragmatic_architecture.md  # 架构哲学：先单产品，N=2 再抽
   - project_launch_deadline.md          # 1 个月上线 deadline (起点 2026-04-29)
   - user_role.md                        # 用户协作风格
 ```
 
-把整个 `memory/` 目录复制到 U 盘 / 云盘 / 直接 git（建议加一份到仓库 `_handoff/memory/` 临时目录）。
+把整个 `moment/` 目录复制到 U 盘 / 云盘 / 直接 git（建议加一份到仓库 `_handoff/moment/` 临时目录）。
 
 ### 1.2 确认代码已推
 
@@ -150,7 +150,7 @@ pnpm typecheck               # 验证：4 个 workspace 全绿，<2 秒
 ```
 d:\workspace_to_freedom\Blakard\Nestory
 ```
-否则 memory 目录的 hash 名（`d--workspace-to-freedom-Blakard-Nestory`）对不上，需要重命名。
+否则 moment 目录的 hash 名（`d--workspace-to-freedom-Blakard-Nestory`）对不上，需要重命名。
 
 ### 2.3 装 Claude Code + 登录
 
@@ -171,15 +171,15 @@ claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
 
 > **Pencil MCP 不要配** —— 路径绑定旧机器的 `C:\Users\JZ\.pencil\mcp\cursor\out\mcp-server-windows-x64.exe`，且这次会话里它已经断开。新机器需要 Pencil 时再重装。
 
-### 2.5 恢复 memory
+### 2.5 恢复 moment
 
-把旧机器拷出来的 `memory/` 目录放到：
+把旧机器拷出来的 `moment/` 目录放到：
 
 ```
-<新机器用户目录>\.claude\projects\d--workspace-to-freedom-Blakard-Nestory\memory\
+<新机器用户目录>\.claude\projects\d--workspace-to-freedom-Blakard-Nestory\moment\
 ```
 
-例如新机器用户名是 `Justin` → `C:\Users\Justin\.claude\projects\d--workspace-to-freedom-Blakard-Nestory\memory\`。
+例如新机器用户名是 `Justin` → `C:\Users\Justin\.claude\projects\d--workspace-to-freedom-Blakard-Nestory\moment\`。
 
 ---
 
@@ -205,7 +205,7 @@ claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
 | 文档 | `docs/dev/05_Nestory_API设计v1.3.md` | ✅ 已 patch 至 v1.4（camelCase / port 3001 / 移除 POST /stories / `/internal/*`）|
 | 文档 | `docs/dev/ARCH-DECISIONS-API-DB-20260501.md` | ✅ 5 项决策完整落地 |
 | Monorepo 骨架 | `package.json` / `pnpm-workspace.yaml` / `turbo.json` / `.npmrc` | ✅ pnpm install + typecheck 全绿 |
-| `packages/types` | 11 个 .ts，含新增 `topNotify.ts`；User/Memory/Subscription 字段补齐 | ✅ 全栈类型权威 |
+| `packages/types` | 11 个 .ts，含新增 `topNotify.ts`；User/Moment/Subscription 字段补齐 | ✅ 全栈类型权威 |
 | `apps/nestory-api` | Fastify 5 + Prisma 6 + 9 个 route 模块 + 8 个 endpoint 完整实现 | ✅ 等 DB 接通即可跑 |
 | `apps/nestory-web` | Next.js 15 + App Router 占位页 | ✅ typecheck 通过 |
 | Theme 层 | `shared/theme/{primitives,colors,typography,spacing,radius,index}.ts` | ✅ 完整对齐 0429 token JSON |
@@ -215,7 +215,7 @@ claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
 | 组件 | 文件 | 说明 |
 |---|---|---|
 | `TopNotify` | `shared/components/TopNotify.tsx` | 6 种状态；类型从 `@nestory/types` re-export |
-| `PaywallModal` | `shared/components/PaywallModal.tsx` | A/B/C/D 四 variant 全接通（A→Stories, B→Highlights/AddMemory, C→Stories/Settings ended, D→HomeScreen ProfileSwitcher）|
+| `PaywallModal` | `shared/components/PaywallModal.tsx` | A/B/C/D 四 variant 全接通（A→Stories, B→Highlights/AddMoment, C→Stories/Settings ended, D→HomeScreen ProfileSwitcher）|
 | `usePhotoPicker` | `shared/hooks/usePhotoPicker.ts` | expo-image-picker 封装，支持单选/多选 |
 
 #### Onboarding（全部完成）
@@ -232,20 +232,20 @@ claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
 | O-07 Privacy | `features/onboarding/screens/PrivacyScreen.tsx` | `64:361` |
 | 启动入口 | `app/index.tsx`（`useSession` 鉴权重定向）| — |
 
-#### Home & Memory（全部完成）
+#### Home & Moment（全部完成）
 
 | 屏 | 文件 | Figma node |
 |---|---|---|
-| H-01 Home | `features/home/screens/HomeScreen.tsx`（avatarRow 多档案变体 + ProfileSwitcher Sheet → Paywall D + memory=0 empty 态）| `94:349` + `269:800` |
-| H-02 Add Memory | `features/memories/screens/AddMemoryScreen.tsx`（Save CTA 渐变 + thumbnail radius 修正 + Paywall B 限额）| `96:384` |
-| H-03 Memory List | `features/memories/screens/MemoryListScreen.tsx` | `98:452` |
-| H-04 Memory Detail | `features/memories/screens/MemoryDetailScreen.tsx`（highlight card 横向布局 + 路由 bug 修复）| `102:531` |
-| H-04 Edit Mode | `features/memories/screens/MemoryEditScreen.tsx` | `102:618` |
-| Memory Tags | `features/memories/screens/MemoryTagsScreen.tsx` + `app/memory/tags.tsx` | 自建 |
-| Memory Date | `features/memories/screens/MemoryDateScreen.tsx` + `app/memory/date.tsx`（纯 RN 月历）| 自建 |
-| Memory Cover | `features/memories/screens/MemoryCoverScreen.tsx` + `app/memory/cover.tsx` | 自建 |
+| H-01 Home | `features/home/screens/HomeScreen.tsx`（avatarRow 多档案变体 + ProfileSwitcher Sheet → Paywall D + moment=0 empty 态）| `94:349` + `269:800` |
+| H-02 Add Moment | `features/moments/screens/AddMomentScreen.tsx`（Save CTA 渐变 + thumbnail radius 修正 + Paywall B 限额）| `96:384` |
+| H-03 Moment List | `features/moments/screens/MomentListScreen.tsx` | `98:452` |
+| H-04 Moment Detail | `features/moments/screens/MomentDetailScreen.tsx`（highlight card 横向布局 + 路由 bug 修复）| `102:531` |
+| H-04 Edit Mode | `features/moments/screens/MomentEditScreen.tsx` | `102:618` |
+| Moment Tags | `features/moments/screens/MomentTagsScreen.tsx` + `app/moment/tags.tsx` | 自建 |
+| Moment Date | `features/moments/screens/MomentDateScreen.tsx` + `app/moment/date.tsx`（纯 RN 月历）| 自建 |
+| Moment Cover | `features/moments/screens/MomentCoverScreen.tsx` + `app/moment/cover.tsx` | 自建 |
 
-> 路由按 expo-router v4 拆分：`app/memory/[id]/index.tsx` + `app/memory/[id]/edit.tsx`
+> 路由按 expo-router v4 拆分：`app/moment/[id]/index.tsx` + `app/moment/[id]/edit.tsx`
 
 #### Stories
 
@@ -360,10 +360,10 @@ claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
 | 屏 | 替换 hook |
 |---|---|
 | HomeScreen | `useChildren()` + `useSubscription()` + `useAssets({childId, month})` 取 count |
-| AddMemoryScreen | `useCreateAsset()` + `useSubscription()` |
-| MemoryEditScreen | `useAsset(id)` + `useUpdateAsset(id)` + `useDeleteAsset()` |
-| MemoryListScreen | `useAssets({childId, month})` cursor 分页，按日聚合 |
-| MemoryDetailScreen | `useAsset(id)` + linkedHighlight 字段 |
+| AddMomentScreen | `useCreateAsset()` + `useSubscription()` |
+| MomentEditScreen | `useAsset(id)` + `useUpdateAsset(id)` + `useDeleteAsset()` |
+| MomentListScreen | `useAssets({childId, month})` cursor 分页，按日聚合 |
+| MomentDetailScreen | `useAsset(id)` + linkedHighlight 字段 |
 | HighlightsScreen | `useHighlights({childId})` + `useSubscription()` |
 | HighlightDetailScreen | `useHighlight(id)` + `useUpdateHighlight()` + `useDeleteHighlight()` + `useCreateShare()` |
 | StoriesScreen | `useStories({childId})` 一次拿 currentMonth + historical |
@@ -529,7 +529,7 @@ https://www.figma.com/design/nwCrXylV5fm1iG7DVfEmGX/07-Nestory_Figma0429?node-id
 |---|---|---|
 | 1 | **API 边界 camelCase**（DB 列仍 snake_case，`@map` 桥接）| 全栈零序列化层；`packages/types` 是字段权威 |
 | 2 | **Subscription 5 态枚举**：`never_paid \| trial_active \| premium_active \| trial_ended \| premium_ended` | 全系统读 `subscription_status` 一字段，前端不再用 `'free'/'premium'` 简化别名 |
-| 3 | **types/ 字段补齐**：User.name + linkedProviders[]、Memory.linkedHighlight、Subscription.{billingCycle,benefits,storyQuotaRemaining}、新 topNotify.ts | 见 `packages/types/src/` |
+| 3 | **types/ 字段补齐**：User.name + linkedProviders[]、Moment.linkedHighlight、Subscription.{billingCycle,benefits,storyQuotaRemaining}、新 topNotify.ts | 见 `packages/types/src/` |
 | 4 | **Story 走 BullMQ + `/internal/*`**：cron / milestone / admin enqueue 三触发源；公网无 POST /stories | filter 支持 region / batchSize / dryRun / failed retry；admin token 鉴权 |
 | 5 | **双层删除**：软删 30 天恢复（users/children/raw_assets/highlights）+ 硬删 cron / GDPR | API DELETE 默认软删，`?hard=true` 硬删；`POST /:id/restore` 恢复；`GET /:resource/trash` 列 |
 
@@ -539,6 +539,6 @@ https://www.figma.com/design/nwCrXylV5fm1iG7DVfEmGX/07-Nestory_Figma0429?node-id
 |---|---|---|
 | R-04 | Free user Highlight ≤ 10，并发用 advisory_xact_lock | `apps/nestory-api/src/lib/quota.ts` |
 | R-05 | never_paid 用户不可切换非 active 档案 | `apps/nestory-api/src/routes/children.ts` PATCH /active |
-| R-07 | 单 Memory ≤ 10 张照片，单文件 ≤ 10 MB | zod schema + 应用层校验（multipart 接通时实装 magic bytes / EXIF strip） |
-| R-08 | 历史月份 Memory 不可编辑 / 删除 | `assets.ts` PATCH/DELETE 用 `isCurrentMonth(capturedAt, tz)` 校验 |
+| R-07 | 单 Moment ≤ 10 张照片，单文件 ≤ 10 MB | zod schema + 应用层校验（multipart 接通时实装 magic bytes / EXIF strip） |
+| R-08 | 历史月份 Moment 不可编辑 / 删除 | `assets.ts` PATCH/DELETE 用 `isCurrentMonth(capturedAt, tz)` 校验 |
 | R-10 | 降级常驻 Notify（不是 toast）| TopNotify 组件读 `subscription_status` 派生 |

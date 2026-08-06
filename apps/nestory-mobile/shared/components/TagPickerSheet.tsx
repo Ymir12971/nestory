@@ -14,7 +14,7 @@ interface TagPickerSheetProps {
   onDismiss: () => void;
 }
 
-/** Bottom sheet for picking Memory tags (system presets + user tag library + custom input). */
+/** Bottom sheet for picking Moment tags (system presets + user tag library + custom input). */
 export function TagPickerSheet({ visible, selected, onDone, onDismiss }: TagPickerSheetProps) {
   const presetTagsQ = usePresetTags();
   const userTagsQ   = useUserTags();
@@ -34,7 +34,7 @@ export function TagPickerSheet({ visible, selected, onDone, onDismiss }: TagPick
         next.delete(tag);
       } else {
         if (next.size >= MAX_TAGS) {
-          showToast({ type: 'warning', message: 'Maximum 10 tags per memory.' });
+          showToast({ type: 'warning', message: 'Maximum 10 tags per moment.' });
           return prev;
         }
         next.add(tag);
@@ -49,7 +49,7 @@ export function TagPickerSheet({ visible, selected, onDone, onDismiss }: TagPick
     setDraft(prev => {
       if (prev.has(trimmed)) return prev;
       if (prev.size >= MAX_TAGS) {
-        showToast({ type: 'warning', message: 'Maximum 10 tags per memory.' });
+        showToast({ type: 'warning', message: 'Maximum 10 tags per moment.' });
         return prev;
       }
       return new Set(prev).add(trimmed);

@@ -1,6 +1,6 @@
 export type PermissionRule =
   | 'R-01' // Story 生成配额
-  | 'R-02' // Memory 上传
+  | 'R-02' // Moment 上传
   | 'R-03' // Asset 删除
   | 'R-04' // Highlight 上限
   | 'R-05' // Profile 切换

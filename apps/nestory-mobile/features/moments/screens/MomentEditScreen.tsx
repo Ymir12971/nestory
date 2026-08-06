@@ -4,13 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { MEMORY_CONSTRAINTS, type Memory, type MemoryFile } from '@nestory/types';
+import { MOMENT_CONSTRAINTS, type Moment, type MomentFile } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { showToast } from '@/features/ui/toast';
 
-const MAX_PHOTOS = MEMORY_CONSTRAINTS.maxPhotos;
+const MAX_PHOTOS = MOMENT_CONSTRAINTS.maxPhotos;
 import {
   uploadPhoto,
   useAsset,
@@ -23,11 +23,11 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function MemoryEditScreen() {
+export function MomentEditScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const memoryQ = useAsset(id ?? null);
+  const momentQ = useAsset(id ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -35,37 +35,37 @@ export function MemoryEditScreen() {
         <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
         </Pressable>
-        <Text style={styles.navTitle}>Edit Memory</Text>
+        <Text style={styles.navTitle}>Edit Moment</Text>
         <View style={styles.navSpacer} />
       </View>
 
-      {memoryQ.isLoading ? (
+      {momentQ.isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.text.brand} />
         </View>
-      ) : memoryQ.isError || !memoryQ.data ? (
+      ) : momentQ.isError || !momentQ.data ? (
         <View style={styles.center}>
-          <Text style={styles.errorText}>Failed to load memory.</Text>
-          <Pressable onPress={() => memoryQ.refetch()}>
+          <Text style={styles.errorText}>Failed to load moment.</Text>
+          <Pressable onPress={() => momentQ.refetch()}>
             <Text style={styles.retryText}>Tap to retry</Text>
           </Pressable>
         </View>
       ) : (
-        <EditForm key={memoryQ.data.id} memory={memoryQ.data} />
+        <EditForm key={momentQ.data.id} moment={momentQ.data} />
       )}
     </SafeAreaView>
   );
 }
 
-function EditForm({ memory }: { memory: Memory }) {
+function EditForm({ moment }: { moment: Moment }) {
   const router = useRouter();
   const goBack = useGoBack();
-  const updateAsset     = useUpdateAsset(memory.id);
+  const updateAsset     = useUpdateAsset(moment.id);
   const deleteAsset     = useDeleteAsset();
   const pickFromLibrary = usePhotoPicker({ multiple: true });
   const takePhoto       = usePhotoCamera();
 
-  const [noteText, setNoteText]               = useState(memory.textNote ?? '');
+  const [noteText, setNoteText]               = useState(moment.textNote ?? '');
   const [removedFileIds, setRemovedFileIds]   = useState<Set<string>>(new Set());
   const [newPhotos, setNewPhotos]             = useState<PickedPhoto[]>([]);
   const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
@@ -75,8 +75,8 @@ function EditForm({ memory }: { memory: Memory }) {
   const photoStripRef = useRef<ScrollView>(null);
 
   const remainingFiles = useMemo(
-    () => memory.files.filter(f => !removedFileIds.has(f.id)),
-    [memory.files, removedFileIds],
+    () => moment.files.filter(f => !removedFileIds.has(f.id)),
+    [moment.files, removedFileIds],
   );
   const totalPhotos = remainingFiles.length + newPhotos.length;
 
@@ -91,7 +91,7 @@ function EditForm({ memory }: { memory: Memory }) {
       const room = MAX_PHOTOS - remainingFiles.length - prev.length;
       const accepted = picked.slice(0, room);
       if (accepted.length < picked.length) {
-        showToast({ type: 'warning', message: `Maximum ${MAX_PHOTOS} photos per memory.` });
+        showToast({ type: 'warning', message: `Maximum ${MAX_PHOTOS} photos per moment.` });
       }
       return [...prev, ...accepted];
     });
@@ -112,7 +112,7 @@ function EditForm({ memory }: { memory: Memory }) {
     addPickedPhotos(await pickFromLibrary({ selectionLimit: MAX_PHOTOS - totalPhotos }));
   };
 
-  const handleRemoveExisting = (file: MemoryFile) => {
+  const handleRemoveExisting = (file: MomentFile) => {
     setRemovedFileIds(prev => {
       const next = new Set(prev);
       next.add(file.id);
@@ -124,11 +124,11 @@ function EditForm({ memory }: { memory: Memory }) {
     setNewPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Redesign save rule: text required (photos optional) — same as Add Memory.
+  // Redesign save rule: text required (photos optional) — same as Add Moment.
   const onChangeNote = (text: string) => {
-    if (text.length > MEMORY_CONSTRAINTS.maxTextChars) {
-      showToast({ type: 'warning', message: `Notes are limited to ${MEMORY_CONSTRAINTS.maxTextChars} characters.` });
-      setNoteText(text.slice(0, MEMORY_CONSTRAINTS.maxTextChars));
+    if (text.length > MOMENT_CONSTRAINTS.maxTextChars) {
+      showToast({ type: 'warning', message: `Notes are limited to ${MOMENT_CONSTRAINTS.maxTextChars} characters.` });
+      setNoteText(text.slice(0, MOMENT_CONSTRAINTS.maxTextChars));
       return;
     }
     setNoteText(text);
@@ -136,7 +136,7 @@ function EditForm({ memory }: { memory: Memory }) {
 
   const handleSave = async () => {
     if (saving) return;
-    if (MEMORY_CONSTRAINTS.textRequiredToSave && noteText.trim().length === 0) {
+    if (MOMENT_CONSTRAINTS.textRequiredToSave && noteText.trim().length === 0) {
       setSaveError('Add a note before saving.');
       return;
     }
@@ -153,7 +153,7 @@ function EditForm({ memory }: { memory: Memory }) {
         ...(removedFileIds.size > 0  ? { removeFileIds: [...removedFileIds] } : {}),
       });
 
-      showToast({ type: 'success', message: 'Memory saved' });
+      showToast({ type: 'success', message: 'Moment saved' });
       goBack();
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to save changes.');
@@ -167,12 +167,12 @@ function EditForm({ memory }: { memory: Memory }) {
     setSaveError(null);
     setDeleting(true);
     try {
-      await deleteAsset.mutateAsync({ id: memory.id, hard: true });
+      await deleteAsset.mutateAsync({ id: moment.id, hard: true });
       // Detail page is now stale; pop both detail+edit so user lands on list.
       router.dismissAll();
-      router.replace('/memory/list');
+      router.replace('/moment/list');
     } catch (e: any) {
-      setSaveError(e?.message ?? 'Failed to delete memory.');
+      setSaveError(e?.message ?? 'Failed to delete moment.');
       setDeleting(false);
     }
   };
@@ -239,13 +239,13 @@ function EditForm({ memory }: { memory: Memory }) {
           {/* Tags */}
           <Pressable
             style={styles.detailRow}
-            onPress={() => router.push(`/memory/tags?memoryId=${memory.id}`)}
+            onPress={() => router.push(`/moment/tags?momentId=${moment.id}`)}
           >
             <Text style={styles.detailLabel}>Tags</Text>
             <View style={styles.detailRight}>
               <Text style={styles.detailValue}>
-                {memory.tags.length > 0
-                  ? `${memory.tags[0]}${memory.tags.length > 1 ? ` +${memory.tags.length - 1}` : ''}`
+                {moment.tags.length > 0
+                  ? `${moment.tags[0]}${moment.tags.length > 1 ? ` +${moment.tags.length - 1}` : ''}`
                   : 'None'}
               </Text>
               <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
@@ -257,7 +257,7 @@ function EditForm({ memory }: { memory: Memory }) {
           {/* Date — read-only here; capture date is fixed at create */}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date</Text>
-            <Text style={styles.detailValue}>{formatDate(memory.capturedAt)}</Text>
+            <Text style={styles.detailValue}>{formatDate(moment.capturedAt)}</Text>
           </View>
         </View>
       </ScrollView>
@@ -281,7 +281,7 @@ function EditForm({ memory }: { memory: Memory }) {
         </Pressable>
         <Pressable style={styles.deleteBtn} onPress={handleDelete} disabled={saving || deleting}>
           <Text style={styles.deleteBtnLabel}>
-            {deleting ? 'Deleting…' : 'Delete Memory'}
+            {deleting ? 'Deleting…' : 'Delete Moment'}
           </Text>
         </Pressable>
       </View>

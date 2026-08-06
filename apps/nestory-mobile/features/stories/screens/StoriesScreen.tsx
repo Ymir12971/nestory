@@ -8,7 +8,7 @@ import type { CurrentMonthStatus, StoryListItem } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PaywallModal } from '@/shared/components/PaywallModal';
-import { AddMemoryEntrySheet } from '@/shared/components/AddMemoryEntrySheet';
+import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
 import { useAssetMonths, useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
 import { showToast } from '@/features/ui/toast';
 import { track } from '@/shared/lib/analytics';
@@ -30,17 +30,17 @@ function parseMonthKey(monthKey: string) {
 
 function CollectingCard({
   data,
-  onAddMemory,
+  onAddMoment,
   onGenerateNow,
   generating,
 }: {
   data: CurrentMonthStatus;
-  onAddMemory: () => void;
+  onAddMoment: () => void;
   onGenerateNow: () => void;
   generating: boolean;
 }) {
   // TODO: use proper milestone-target calculation once design logic is confirmed
-  const progress = Math.min(data.memoryCount / 15, 1);
+  const progress = Math.min(data.momentCount / 15, 1);
   return (
     <View style={styles.cardCollecting}>
       <View style={styles.collectingInner}>
@@ -49,13 +49,13 @@ function CollectingCard({
           <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
         </View>
         <Text style={styles.collectingCaption}>
-          {data.memoryCount} {data.memoryCount === 1 ? 'memory' : 'memories'} so far — your story is starting to take shape.
+          {data.momentCount} {data.momentCount === 1 ? 'moment' : 'moments'} so far — your story is starting to take shape.
         </Text>
       </View>
       <View style={styles.collectingActions}>
-        <Pressable style={styles.addMemoryBtn} onPress={onAddMemory}>
+        <Pressable style={styles.addMomentBtn} onPress={onAddMoment}>
           <RemixIcon name="add-line" size={20} color={theme.text.brand} />
-          <Text style={styles.addMemoryBtnLabel}>Add Memory</Text>
+          <Text style={styles.addMomentBtnLabel}>Add Moment</Text>
         </Pressable>
         <Pressable
           style={[styles.generateNowBtn, generating && { opacity: 0.6 }]}
@@ -97,7 +97,7 @@ function CurrentGeneratedCard({
           <Text style={styles.cardTitle}>{data.title ?? '—'}</Text>
         </View>
         <View style={styles.cardFooter}>
-          <Text style={styles.nsCaption}>{data.memoryCount} memories</Text>
+          <Text style={styles.nsCaption}>{data.momentCount} moments</Text>
           <View style={{ flex: 1 }} />
           <RemixIcon name="arrow-right-s-line" size={24} color={theme.text.secondary} />
         </View>
@@ -169,8 +169,8 @@ function GeneratedCard({
           <Text style={styles.cardTitle}>{item.title ?? '—'}</Text>
         </View>
         <View style={styles.cardFooter}>
-          {item.memoryCount != null && (
-            <Text style={styles.nsCaption}>{item.memoryCount} memories</Text>
+          {item.momentCount != null && (
+            <Text style={styles.nsCaption}>{item.momentCount} moments</Text>
           )}
           <View style={{ flex: 1 }} />
           <RemixIcon name="arrow-right-s-line" size={24} color={theme.text.secondary} />
@@ -180,23 +180,23 @@ function GeneratedCard({
   );
 }
 
-/** Blue "Memories changed" strip — Premium regenerate entry (DS AllowRegenerate). */
+/** Blue "Moments changed" strip — Premium regenerate entry (DS AllowRegenerate). */
 function RegenerateStrip({ onPress }: { onPress: () => void }) {
   return (
     <Pressable style={styles.regenStrip} onPress={onPress}>
-      <Text style={styles.regenStripLabel}>Memories changed. Tap here to regenerate.</Text>
+      <Text style={styles.regenStripLabel}>Moments changed. Tap here to regenerate.</Text>
     </Pressable>
   );
 }
 
-/** NoMemories month card (DS Property=NoMemories). */
-function NoMemoriesCard({ item, onRegenerate }: { item: StoryListItem; onRegenerate?: () => void }) {
+/** NoMoments month card (DS Property=NoMoments). */
+function NoMomentsCard({ item, onRegenerate }: { item: StoryListItem; onRegenerate?: () => void }) {
   const { full } = parseMonthKey(item.monthKey);
   return (
     <View style={styles.cardNotGenerated}>
       <View style={styles.nsImgArea}>
         <RemixIcon name="link-unlink-m" size={48} color={theme.text.hint} />
-        <Text style={styles.nsImgCaption}>No memories were added for this month.</Text>
+        <Text style={styles.nsImgCaption}>No moments were added for this month.</Text>
       </View>
       {onRegenerate && <RegenerateStrip onPress={onRegenerate} />}
       <View style={styles.nsBody}>
@@ -204,7 +204,7 @@ function NoMemoriesCard({ item, onRegenerate }: { item: StoryListItem; onRegener
           <Text style={styles.cardTitle}>{full}</Text>
         </View>
         <Text style={styles.nsDesc}>
-          Add a few memories next month and we'll bring your Story to life.
+          Add a few moments next month and we'll bring your Story to life.
         </Text>
       </View>
     </View>
@@ -322,16 +322,16 @@ export function StoriesScreen() {
   const current   = storiesQ.data?.currentMonth;
   const historical = storiesQ.data?.historical ?? [];
 
-  // Months that actually have memories — splits "not generated" months into
-  // Paused (had memories, no subscription/quota when the month closed) vs
-  // NoMemories. Consecutive Paused months fold into one card (annotation).
-  const monthsWithMemories = useMemo(
+  // Months that actually have moments — splits "not generated" months into
+  // Paused (had moments, no subscription/quota when the month closed) vs
+  // NoMoments. Consecutive Paused months fold into one card (annotation).
+  const monthsWithMoments = useMemo(
     () => new Set((monthsQ.data ?? []).map(m => m.monthKey)),
     [monthsQ.data],
   );
   type Row =
     | { kind: 'generated'; item: StoryListItem }
-    | { kind: 'no_memories'; item: StoryListItem }
+    | { kind: 'no_moments'; item: StoryListItem }
     | { kind: 'paused'; startKey: string; endKey: string };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -340,18 +340,18 @@ export function StoriesScreen() {
         out.push({ kind: 'generated', item });
       } else if (item.canRegenerate) {
         // 生成失败但可补生成的月份:必须独立成卡(Paused 折叠卡没有重生成入口)
-        out.push({ kind: 'no_memories', item });
-      } else if (monthsWithMemories.has(item.monthKey)) {
+        out.push({ kind: 'no_moments', item });
+      } else if (monthsWithMoments.has(item.monthKey)) {
         const last = out[out.length - 1];
         // list is newest-first: extend the fold's older edge (endKey)
         if (last?.kind === 'paused') last.endKey = item.monthKey;
         else out.push({ kind: 'paused', startKey: item.monthKey, endKey: item.monthKey });
       } else {
-        out.push({ kind: 'no_memories', item });
+        out.push({ kind: 'no_moments', item });
       }
     }
     return out;
-  }, [historical, monthsWithMemories]);
+  }, [historical, monthsWithMoments]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -420,7 +420,7 @@ export function StoriesScreen() {
               {current?.listItemState === 'current_collecting' && !quotaExhausted && (
                 <CollectingCard
                   data={current}
-                  onAddMemory={() => setAddEntryVisible(true)}
+                  onAddMoment={() => setAddEntryVisible(true)}
                   onGenerateNow={() => void handleGenerateNow()}
                   generating={generateNow.isPending}
                 />
@@ -461,7 +461,7 @@ export function StoriesScreen() {
             }
             const canRegen = row.item.canRegenerate === true;
             return (
-              <NoMemoriesCard
+              <NoMomentsCard
                 key={row.item.monthKey}
                 item={row.item}
                 onRegenerate={canRegen ? () => setRegenMonthKey(row.item.monthKey) : undefined}
@@ -483,7 +483,7 @@ export function StoriesScreen() {
           <View style={styles.regenHandle} />
           <Text style={styles.regenTitle}>Regenerate this Story?</Text>
           <Text style={styles.regenBody}>
-            We'll create a new Story from this month's updated memories. The new Story will replace the current one — this can't be undone.
+            We'll create a new Story from this month's updated moments. The new Story will replace the current one — this can't be undone.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.regenConfirmWrap, pressed && { opacity: 0.88 }]}
@@ -517,11 +517,11 @@ export function StoriesScreen() {
         onDismiss={() => setPaywallVisible(false)}
       />
 
-      <AddMemoryEntrySheet
+      <AddMomentEntrySheet
         visible={addEntryVisible}
         onSelect={(entryMode) => {
           setAddEntryVisible(false);
-          router.push(`/memory/add?mode=${entryMode}`);
+          router.push(`/moment/add?mode=${entryMode}`);
         }}
         onDismiss={() => setAddEntryVisible(false)}
       />
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: theme.spacing.s,
   },
-  addMemoryBtn: {
+  addMomentBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -662,7 +662,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.default,
     gap: 4,
   },
-  addMemoryBtnLabel: {
+  addMomentBtnLabel: {
     ...theme.typography.buttonLabelM,
     color: theme.text.brand,
   },

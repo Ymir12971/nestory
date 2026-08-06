@@ -1,8 +1,8 @@
 /**
  * Deterministic image layer (StoryH5Design §3.6 / StoryGenPrompts §3). NO LLM.
  *
- * Takes the structure decision (chapters → narrative units → memoryIds) and each
- * memory's photo metadata, and decides — purely by rule — which photos survive,
+ * Takes the structure decision (chapters → narrative units → momentIds) and each
+ * moment's photo metadata, and decides — purely by rule — which photos survive,
  * how many, which Block layout each unit gets, and each photo's target crop ratio.
  *
  * Two things are deliberately pluggable / deferred, because the §7.2 preprocessing
@@ -40,7 +40,7 @@ export interface PhotoMeta {
 }
 
 /** Structure-decision input (subset of Prompt 1 output we need here). */
-export interface StructureUnit    { memoryIds: string[]; }
+export interface StructureUnit    { momentIds: string[]; }
 export interface StructureChapter  { themeKey: string; units: StructureUnit[]; }
 
 /**
@@ -57,7 +57,7 @@ export type LayoutDecision =
 
 export interface LaidOutPhoto { url: string; ratio: PhotoRatio; blurhash?: string | undefined }
 export interface LaidOutBlock {
-  memoryIds: string[];
+  momentIds: string[];
   layout:    LayoutDecision;
   photos:    LaidOutPhoto[];
 }
@@ -66,8 +66,8 @@ export interface LaidOutChapter {
   blocks:   LaidOutBlock[];
 }
 
-/** Resolves a memoryId to its photos (in display order). */
-export type PhotoLookup = (memoryId: string) => PhotoMeta[];
+/** Resolves a momentId to its photos (in display order). */
+export type PhotoLookup = (momentId: string) => PhotoMeta[];
 
 // ─── Public entry ────────────────────────────────────────────────────────────
 
@@ -86,14 +86,14 @@ function layoutChapter(chapter: StructureChapter, lookup: PhotoLookup, cfg: Stor
 
   // Step 1 — per unit: collect, drop degraded, cap to N by sharpness (§3.6.1 r1/r2).
   const units = chapter.units.map(u => {
-    const pool = u.memoryIds
+    const pool = u.momentIds
       .flatMap(lookup)
       .map(p => resolve(p, cfg))
       .filter(p => p.tier !== 'degraded');
     const capped = pool.length > photosPerUnitCap
       ? [...pool].sort((a, b) => b.sharpness - a.sharpness).slice(0, photosPerUnitCap)
       : pool;
-    return { memoryIds: u.memoryIds, photos: capped };
+    return { momentIds: u.momentIds, photos: capped };
   });
 
   // Step 2 — chapter cap (§3.6.1 r3), policy-driven when round-1 isn't enough.
@@ -118,32 +118,32 @@ function layoutChapter(chapter: StructureChapter, lookup: PhotoLookup, cfg: Stor
   }
 
   // Step 3 — pick layout + assign crop ratios per unit (§3.6.2 / §3.6.3).
-  const blocks: LaidOutBlock[] = units.map(u => pickLayout(u.memoryIds, u.photos, cfg));
+  const blocks: LaidOutBlock[] = units.map(u => pickLayout(u.momentIds, u.photos, cfg));
   return { themeKey: chapter.themeKey, blocks };
 }
 
 // ─── Layout selection (§3.6.2 / §3.6.3) ──────────────────────────────────────
 
-function pickLayout(memoryIds: string[], photos: ResolvedPhoto[], cfg: StoryGenConfig): LaidOutBlock {
+function pickLayout(momentIds: string[], photos: ResolvedPhoto[], cfg: StoryGenConfig): LaidOutBlock {
   const n = photos.length;
 
-  if (n === 0) return { memoryIds, layout: 'Block-Text', photos: [] };
+  if (n === 0) return { momentIds, layout: 'Block-Text', photos: [] };
 
   if (n === 1) {
     const p = photos[0]!;
     return p.orient === 'portrait'
-      ? { memoryIds, layout: 'Block-Single-V', photos: [{ url: p.url, ratio: '3:4', blurhash: p.blurhash }] }
-      : { memoryIds, layout: 'Block-Single-H', photos: [{ url: p.url, ratio: '4:3', blurhash: p.blurhash }] }; // square → 4:3
+      ? { momentIds, layout: 'Block-Single-V', photos: [{ url: p.url, ratio: '3:4', blurhash: p.blurhash }] }
+      : { momentIds, layout: 'Block-Single-H', photos: [{ url: p.url, ratio: '4:3', blurhash: p.blurhash }] }; // square → 4:3
   }
 
   if (n === 2) {
-    return { memoryIds, layout: 'Block-Duo', photos: photos.map(p => ({ url: p.url, ratio: duoRatio(p), blurhash: p.blurhash })) };
+    return { momentIds, layout: 'Block-Duo', photos: photos.map(p => ({ url: p.url, ratio: duoRatio(p), blurhash: p.blurhash })) };
   }
 
   // n === 3 → Block-Grid: Hero (non-3:4) + Duo slot.
   const allPortrait = photos.every(p => p.orient === 'portrait');
   if (allPortrait) {
-    return gridAllVertical(memoryIds, photos, cfg); // ⚠️ VICOL-PENDING Q#1
+    return gridAllVertical(momentIds, photos, cfg); // ⚠️ VICOL-PENDING Q#1
   }
   // Hero = highest-sharpness non-portrait photo; the other two fill the Duo slot.
   const heroIdx = photos
@@ -153,7 +153,7 @@ function pickLayout(memoryIds: string[], photos: ResolvedPhoto[], cfg: StoryGenC
   const hero  = photos[heroIdx]!;
   const rest  = photos.filter((_, i) => i !== heroIdx);
   return {
-    memoryIds,
+    momentIds,
     layout: 'Block-Grid',
     photos: [
       { url: hero.url, ratio: hero.orient === 'square' ? '1:1' : '4:3', blurhash: hero.blurhash },
@@ -162,18 +162,18 @@ function pickLayout(memoryIds: string[], photos: ResolvedPhoto[], cfg: StoryGenC
   };
 }
 
-function gridAllVertical(memoryIds: string[], photos: ResolvedPhoto[], cfg: StoryGenConfig): LaidOutBlock {
+function gridAllVertical(momentIds: string[], photos: ResolvedPhoto[], cfg: StoryGenConfig): LaidOutBlock {
   const best = [...photos].sort((a, b) => b.sharpness - a.sharpness);
   switch (cfg.image.gridAllVerticalPolicy) {
     case 'demote-to-single-v':
-      return { memoryIds, layout: 'Block-Single-V', photos: [{ url: best[0]!.url, ratio: '3:4', blurhash: best[0]!.blurhash }] };
+      return { momentIds, layout: 'Block-Single-V', photos: [{ url: best[0]!.url, ratio: '3:4', blurhash: best[0]!.blurhash }] };
     case 'demote-to-duo':
-      return { memoryIds, layout: 'Block-Duo', photos: best.slice(0, 2).map(p => ({ url: p.url, ratio: '3:4' as PhotoRatio, blurhash: p.blurhash })) };
+      return { momentIds, layout: 'Block-Duo', photos: best.slice(0, 2).map(p => ({ url: p.url, ratio: '3:4' as PhotoRatio, blurhash: p.blurhash })) };
     case 'crop-hero-to-4x3':
     default:
       // Crop the sharpest portrait to 4:3 for the Hero; keep the other two portrait.
       return {
-        memoryIds,
+        momentIds,
         layout: 'Block-Grid',
         photos: [
           { url: best[0]!.url, ratio: '4:3', blurhash: best[0]!.blurhash },

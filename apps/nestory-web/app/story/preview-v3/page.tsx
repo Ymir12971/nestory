@@ -36,11 +36,11 @@ const FIXTURE: StoryDocumentV3 = {
       type: 'body', chapterTitle: 'Splashes, Steps, and Open Skies',
       narrativeThread: 'Emma pushes her physical world wider',
       blocks: [
-        { memoryIds: ['m1'], blockLayout: 'Block-Single-V-v2', photos: [{ url: P(2, 600, 800), ratio: '3:4' }],
+        { momentIds: ['m1'], blockLayout: 'Block-Single-V-v2', photos: [{ url: P(2, 600, 800), ratio: '3:4' }],
           text: 'It started in the bathtub. Emma discovered that her hands, brought down hard on the surface, produced the most satisfying chaos — water everywhere, you included. The giggles that followed were less a reaction than a verdict: she approved, entirely.' },
-        { memoryIds: ['m2'], blockLayout: 'Block-Single-H', photos: [{ url: P(3), ratio: '4:3' }],
+        { momentIds: ['m2'], blockLayout: 'Block-Single-H', photos: [{ url: P(3), ratio: '4:3' }],
           text: "Then came the steps. Three of them, unassisted, before the floor rushed up to meet her. She didn't take them tentatively — she committed, the way she does everything this month." },
-        { memoryIds: ['m3', 'm4'], blockLayout: 'Block-Grid',
+        { momentIds: ['m3', 'm4'], blockLayout: 'Block-Grid',
           photos: [{ url: P(4), ratio: '4:3' }, { url: P(5, 600, 800), ratio: '3:4' }, { url: P(6, 600, 600), ratio: '1:1' }],
           text: 'By the weekend she was out in the world proper — first to the Scouts, then down to the pond where the geese waddled over and helped themselves without ceremony. Emma watched everything, missing nothing.' },
       ],
@@ -49,10 +49,10 @@ const FIXTURE: StoryDocumentV3 = {
       type: 'body', chapterTitle: 'Pancake Mornings, Bunny Afternoons',
       narrativeThread: 'quiet rituals hold their own weight',
       blocks: [
-        { memoryIds: ['m5'], blockLayout: 'Block-Duo',
+        { momentIds: ['m5'], blockLayout: 'Block-Duo',
           photos: [{ url: P(7), ratio: '4:3' }, { url: P(8), ratio: '4:3' }],
           text: 'Sunday morning, you made pancakes. Emma wore most of hers — batter on her chin, syrup somewhere near her ear — and seemed to consider this the correct outcome.' },
-        { memoryIds: ['m6'], blockLayout: 'Block-Text', photos: [],
+        { momentIds: ['m6'], blockLayout: 'Block-Text', photos: [],
           text: 'And then the quieter part of the day: nap time, bunny tucked under one arm, the whole world going still. She settled into sleep the way she does everything else — completely.' },
       ],
     },
@@ -60,6 +60,6 @@ const FIXTURE: StoryDocumentV3 = {
   closing: {
     type: 'closing',
     headline: "Nestory keeps your little one's everyday moments as they grow.",
-    stats: { memories: 6, photos: 13 },
+    stats: { moments: 6, photos: 13 },
   },
 };

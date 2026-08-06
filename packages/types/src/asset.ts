@@ -1,10 +1,10 @@
-// Memory (raw_asset) — aligns with POST /assets and GET /assets responses
+// Moment (raw_asset) — aligns with POST /assets and GET /assets responses
 
 export type AssetType = 'photo' | 'text' | 'mixed';
 export type MimeType  = 'image/jpeg' | 'image/png' | 'image/heif';
 
-// Single photo file within a Memory (asset_files row)
-export interface MemoryFile {
+// Single photo file within a Moment (asset_files row)
+export interface MomentFile {
   id: string;
   fileUrl: string;
   mimeType: MimeType;
@@ -15,11 +15,11 @@ export interface MemoryFile {
 }
 
 // GET /assets response item / POST /assets response
-export interface Memory {
+export interface Moment {
   id: string;
-  childId: string;          // which child this memory belongs to
+  childId: string;          // which child this moment belongs to
   assetType: AssetType;
-  files: MemoryFile[];      // empty array for text-only memories
+  files: MomentFile[];      // empty array for text-only moments
   textNote: string | null;
   tags: string[];           // value snapshot, e.g. ["Playtime", "第一次独站"]
   isHighlight: boolean;
@@ -30,7 +30,7 @@ export interface Memory {
 }
 
 // POST /assets — multipart/form-data (types are illustrative; actual upload uses FormData)
-export interface MemoryCreate {
+export interface MomentCreate {
   childId: string;          // required
   capturedAt: string;       // required, ISO 8601
   textNote?: string;        // ≤ 500 chars
@@ -40,7 +40,7 @@ export interface MemoryCreate {
 }
 
 // PATCH /assets/:id — multipart/form-data
-export interface MemoryPatch {
+export interface MomentPatch {
   textNote?: string;
   tagValues?: string[];     // full replacement of tags array
   isHighlight?: boolean;

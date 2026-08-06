@@ -67,7 +67,7 @@
 ### 本地 web 快速验证(不用等 APK)
 1. 根目录:`pnpm api` + `pnpm mobile`,按 `w` 开 web
 2. 用 `justin@blakard.com` Google 登录
-3. 应看到首页 carousel(4 张照片)、Memories(4 条)、Highlights(2 个)
+3. 应看到首页 carousel(4 张照片)、Moments(4 条)、Highlights(2 个)
 4. Story 详情在本地 web 需另起 `pnpm --filter ./apps/nestory-web dev`(3000 端口);APK 里走 Vercel 不受限
 
 ### APK 全流程
@@ -80,7 +80,7 @@
 1. 确认 Railway / Vercel 都在线(`/health` 200)
 2. 手机连好网络(picsum 占位图 + Vercel 都需要联网)
 3. 用已加入测试用户的 Google 账号登录
-4. 演示动线:首页 → Memories → 打开已生成 Story(2026-04)→ 现场「+ Add Memory」拍/传真实照片 → 回首页看更新
+4. 演示动线:首页 → Moments → 打开已生成 Story(2026-04)→ 现场「+ Add Moment」拍/传真实照片 → 回首页看更新
 5. 付费墙:点 Subscription 展示对比表 + 套餐(讲商业模式,**不真实扣款**,按钮在无 RC key 时优雅 no-op)
 
 ---

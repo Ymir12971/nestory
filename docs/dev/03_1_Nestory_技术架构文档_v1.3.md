@@ -152,7 +152,7 @@ for (const { childId, userId, monthKey, planType } of eligible) {
 
 **`pending` 行插入即触发 Supabase Realtime**，前端无需刷新即可感知生成开始。
 
-`users.timezone` 是业务关键字段。所有月份边界计算（素材归档范围、Memory 可编辑窗口、生成倒计时）均以用户本地时区为准。
+`users.timezone` 是业务关键字段。所有月份边界计算（素材归档范围、Moment 可编辑窗口、生成倒计时）均以用户本地时区为准。
 
 ### Renderer 架构：一套渲染器，两个 Shell
 
@@ -181,7 +181,7 @@ type StoryListItemState =
   | "current_in_progress"       // 当月有上传，等待月末生成
   | "current_quota_exhausted"   // Free 配额 = 0，锁定态，可点击 → Paywall C
   | "historical_generated"      // 历史已生成，可点击进入 S-02
-  | "historical_not_generated"  // 历史有 Memory 但未生成，不可点击
+  | "historical_not_generated"  // 历史有 Moment 但未生成，不可点击
 ```
 
 前后端共享同一套状态判断规则，不允许前端自行推断。
@@ -299,11 +299,11 @@ Worker UPDATE stories(status='completed', document=...)
 ### 来源感知路由
 
 ```typescript
-router.push('/add-memory', { source: 'home' | 'memory-list' | 'stories-list' })
+router.push('/add-moment', { source: 'home' | 'moment-list' | 'stories-list' })
 
 const returnTarget = {
-  'home':          '/memory-list',
-  'memory-list':   '/memory-list',
+  'home':          '/moment-list',
+  'moment-list':   '/moment-list',
   'stories-list':  '/stories-list',
 }
 ```
@@ -465,8 +465,8 @@ type StoryGenerationMeta = {
 |---|---|
 | `users` | 用户账户；`timezone`（调度关键）、`active_child_id`（活跃档案）、`deleted_at`（软删除）、`locked_at`（滥用锁定） |
 | `children` | 孩子档案；含身高体重（value + unit 分开存）；创建不限数量，切换受 R-05 约束 |
-| `raw_assets` | Memory 主表；`tags TEXT[]` value 模型存字符串快照；`captured_at` 为业务依据，`created_at` 仅审计 |
-| `asset_files` | 单条 Memory 的多张照片（最多 10 张，R-07）；含 storage_path、display_order、宽高、字节数 |
+| `raw_assets` | Moment 主表；`tags TEXT[]` value 模型存字符串快照；`captured_at` 为业务依据，`created_at` 仅审计 |
+| `asset_files` | 单条 Moment 的多张照片（最多 10 张，R-07）；含 storage_path、display_order、宽高、字节数 |
 | `user_tag_library` | 用户自定义 Tag 可复用列表（Picker 用）；与 raw_assets.tags 无外键，orphan chip 语义 |
 | `highlights` | Highlight 记录；per-user 上限 10（R-04，advisory lock 防并发）；含 cover_file_id、title |
 | `stories` | Story 主表；JSONB 存 document（含水印固化）+ generation_meta |
@@ -586,7 +586,7 @@ function resolveTheme(monthKey: string, childAgeMonths: number): ThemeAssignment
 | Highlights | 最多 10 个（R-04） | 不限量 |
 | 孩子档案 | 1 个活跃（R-05） | 不限量 |
 | 特色功能 | 无（R-06） | Birthday Celebration Push 等 |
-| Memory 编辑 | 当月可编辑（R-08） | 同左 |
+| Moment 编辑 | 当月可编辑（R-08） | 同左 |
 
 ### 权限拦截位置总览（SubscriptionRules 第四章）
 
@@ -598,8 +598,8 @@ function resolveTheme(monthKey: string, childAgeMonths: number): ThemeAssignment
 | R-04 Highlights | ✅ Toggle 点击时预检 | ✅ Save 时兜底 + Remove 接口 | 双重校验 |
 | R-05 档案切换 | ✅ Profile Switcher 三变体（Free / Premium / Ended）；Ended 非活跃档案视觉同 Free 但可点击 | ✅ 切换接口仅对 `never_paid` 返回 403；`Ended` 放行（创建不拦截） | 后端只拦截 Never Paid 切换，Ended 切换不拦 |
 | R-06 特色功能 | — | ✅ 事件触发时校验 | 静默处理，Free 无感知 |
-| R-07 Memory 上传 | ✅ 单条约束（10张/10MB/格式） | ✅ 文件校验 | 非权限规则，技术约束 |
-| R-08 Memory 编辑 | ✅ UI 隐藏 Edit 入口 | ✅ 写入时校验月份 | 以 captured_at 判断当月 |
+| R-07 Moment 上传 | ✅ 单条约束（10张/10MB/格式） | ✅ 文件校验 | 非权限规则，技术约束 |
+| R-08 Moment 编辑 | ✅ UI 隐藏 Edit 入口 | ✅ 写入时校验月份 | 以 captured_at 判断当月 |
 | R-09 Onboarding | ✅ inline 提示 | — | 后端全程不拦截 Onboarding 创建 |
 | R-10 降级常驻 Notify | ✅ 读 `subscription_status` 渲染 Notify（无需后端额外字段） | — | 纯前端渲染条件；Toast 方案已废弃 |
 | R-11 Free Trial | ✅ CTA 动态文案 | — | 依赖平台 SDK，后端不介入 |
@@ -796,7 +796,7 @@ type PaywallTrigger = "A" | "B" | "C" | "D"
 - [ ] 水印系统（渲染层控制，生成时固化）
 - [ ] Open Graph 完整配置
 - [ ] story_shares 表 + token 访问控制
-- [ ] Memory List 时间线（H-03，时区感知月份分组）
+- [ ] Moment List 时间线（H-03，时区感知月份分组）
 - [ ] Story 生成完成推送通知
 - [ ] R-05 档案切换后端校验（切换接口 403）
 - [ ] 降级常驻 Notify 组件（S-01 / HL-01 / ST-03a Type=Warning；Profile Switcher Ended Type=Info；{kind} 运行时替换）
@@ -884,7 +884,7 @@ Writing Rubric 必须回答：情感温度来自哪里、什么让一句话"像�
 | generatedFrom 字段 | DB 存 VARCHAR | DB enum | 支持未来扩展，无需 migration |
 | qualityLevel 阈值 | 软边界（综合文字丰富度） | 硬性素材数量 | 详细备注比大量无说明照片更 rich |
 | Story 生成调度 | hourly 时区感知 cron | 全局 UTC 月末 cron | 用户遍布全球时区 |
-| Tag 数据模型 | `raw_assets.tags TEXT[]` value 模型 + `user_tag_library` 表 | 独立关联表（reference 模型） | PRD v1.7 §4.1.1 要求字符串快照（orphan chip 语义）；MVP 无跨 Memory tag 查询，reference 模型带来复杂度无收益；见数据库设计 v1.4 |
+| Tag 数据模型 | `raw_assets.tags TEXT[]` value 模型 + `user_tag_library` 表 | 独立关联表（reference 模型） | PRD v1.7 §4.1.1 要求字符串快照（orphan chip 语义）；MVP 无跨 Moment tag 查询，reference 模型带来复杂度无收益；见数据库设计 v1.4 |
 | captured_at vs created_at | captured_at 用于业务逻辑 | created_at | 月份归档必须按用户上传时间 |
 | 水印状态固化 | 生成时写入 StoryDocument | 渲染时动态读取 | 降级后历史 story 水印永久不变（R-02） |
 | Paywall 设计 | 参数化组件 | 四个独立弹窗 | 便于维护和 A/B 测试 |

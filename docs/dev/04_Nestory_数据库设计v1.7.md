@@ -19,7 +19,7 @@
   - `audit_log` / `abuse_log` 的 `user_id` 改为 `ON DELETE SET NULL`（永不删，但用户被 hard purge 后变孤儿）
 - **`raw_assets.user_id` 补 ON DELETE CASCADE**（v1.7 遗漏 ON DELETE 子句）
 - **`stories.status` 增加 `'queued'` 状态**：对齐决策 4 的 BullMQ 状态机 `pending → queued → generating → generated | failed`
-- **Highlight 唯一性**：`highlights.asset_id` 加 UNIQUE（一条 Memory 最多一个 Highlight，原文档隐含但无显式约束）
+- **Highlight 唯一性**：`highlights.asset_id` 加 UNIQUE（一条 Moment 最多一个 Highlight，原文档隐含但无显式约束）
 - **API 命名约定**：决策 1 — DB 列名仍 snake_case，TS/JSON 全 camelCase（通过 Prisma `@map`）
 - **Subscription `subscription_status`**：决策 2 — 5 态枚举为唯一权威字段，前端不再用 `'free'` 简化别名
 
@@ -54,13 +54,13 @@
 - **Tag 存储模型从 reference 改为 value**（对齐 PRD v1.7 §4.1.1）：
   - 移除 `tags` 独立表和 `asset_tags` 关联表
   - `raw_assets` 新增 `tags TEXT[]` 字段，save 时做字符串快照，独立于任何 tag library
-  - 新增 `user_tag_library` 表，仅用于 Tag Picker 的可复用列表；与 Memory.tags 无外键关系
+  - 新增 `user_tag_library` 表，仅用于 Tag Picker 的可复用列表；与 Moment.tags 无外键关系
   - 8 个预设 Tag 移入 `packages/config/nestory/tags.ts`，不再存 DB；`GET /tags` 从 config 返回
   - 实现"orphan chip"语义：删除 custom tag 只删 user_tag_library 行，已存入 raw_assets.tags 的字符串不受影响
 
 ### v1.2 变更记录
 
-- 拆 `raw_assets.file_url` → `asset_files` 子表，支持 1 条 Memory N 张照片（解决与 API `POST /assets photos[]` 的模型不一致）
+- 拆 `raw_assets.file_url` → `asset_files` 子表，支持 1 条 Moment N 张照片（解决与 API `POST /assets photos[]` 的模型不一致）
 - `users.email` 加 `NOT NULL UNIQUE`
 - `users` 新增 `active_child_id` 字段，落库当前活跃档案（解决 `GET /children` 返回 `is_active` 但表无字段的问题）
 - `highlights` 与 `subscriptions.story_quota` 加并发控制说明
@@ -86,7 +86,7 @@
 `status`、`plan_type`、`asset_type` 等字段使用 VARCHAR，支持未来扩展无需 migration。
 
 **Tag value 模型**
-Tag 以字符串数组存于 `raw_assets.tags TEXT[]`，save 时做字符串快照；`user_tag_library` 仅服务 Picker 可复用列表，与 Memory.tags 无外键关系。
+Tag 以字符串数组存于 `raw_assets.tags TEXT[]`，save 时做字符串快照；`user_tag_library` 仅服务 Picker 可复用列表，与 Moment.tags 无外键关系。
 
 **业务状态显式落库**
 派生状态（如 `subscription_status` 五态）不在运行时计算，而是由 webhook handler 写入后落库，全系统统一读一个字段，避免多端派生逻辑不一致。
@@ -124,7 +124,7 @@ CREATE TABLE users (
   -- 业务关键字段，用于：
   --   · Story 生成调度（次月 1 日本地时区触发）
   --   · 素材月份归档范围计算
-  --   · Memory 可编辑窗口判断
+  --   · Moment 可编辑窗口判断
   --   · 生成倒计时本地化展示
   active_child_id          UUID         REFERENCES children(id) ON DELETE SET NULL,
   -- 当前活跃档案，GET /children 的 is_active 由此字段计算
@@ -194,7 +194,7 @@ CREATE TABLE raw_assets (
   captured_at    TIMESTAMPTZ NOT NULL,
   -- 客户端传入的用户本地时间，业务逻辑依据：
   --   · 月份归档（判断素材属于哪个月）
-  --   · Memory 可编辑窗口（是否为当月）
+  --   · Moment 可编辑窗口（是否为当月）
   --   · Story 时间线排序
   exif_taken_at  TIMESTAMPTZ,            -- EXIF 时间，次要参考（多张照片取首张 EXIF）
   ai_description TEXT,                   -- Vision API 生成的图片描述，异步写入（多张照片合并描述）
@@ -213,10 +213,10 @@ CREATE TABLE raw_assets (
 -- Highlight 标题改由 AI 从 text_note + tags 提取，存入 highlights.title。
 
 CREATE INDEX idx_assets_child_captured ON raw_assets(child_id, captured_at DESC);
--- 覆盖：月份聚合查询、Memory List 时间线分组
+-- 覆盖：月份聚合查询、Moment List 时间线分组
 ```
 
-> **v1.2 变更**：原 `file_url VARCHAR(500)` 字段移除，照片改由 `asset_files` 子表承载，支持 1 条 Memory 含多张照片（最多 10 张，对齐 R-07 与 `POST /assets photos[]`）。
+> **v1.2 变更**：原 `file_url VARCHAR(500)` 字段移除，照片改由 `asset_files` 子表承载，支持 1 条 Moment 含多张照片（最多 10 张，对齐 R-07 与 `POST /assets photos[]`）。
 
 ---
 
@@ -233,12 +233,12 @@ CREATE TABLE asset_files (
   height_px    INT,
   byte_size    INT          NOT NULL,   -- 用于配额统计（即使 R-07 暂不限）
   display_order SMALLINT    NOT NULL DEFAULT 0,
-  -- 一条 Memory 内的展示顺序（0..9），由客户端上传顺序决定
+  -- 一条 Moment 内的展示顺序（0..9），由客户端上传顺序决定
   created_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_asset_files_asset ON asset_files(asset_id, display_order);
--- 覆盖：按 Memory 取所有照片并保持顺序
+-- 覆盖：按 Moment 取所有照片并保持顺序
 
 -- 业务约束（应用层强制）：
 --   · 单个 raw_assets 最多 10 个 asset_files（R-07）
@@ -269,7 +269,7 @@ CREATE INDEX idx_user_tag_library_user ON user_tag_library(user_id);
 **用途说明：**
 - 仅服务于 Tag Picker 的"可复用自定义 Tag 列表"，与 `raw_assets.tags` **无外键关系**
 - 用户创建新 custom tag → 写入本表（如不存在）+ 追加到 `raw_assets.tags` 字符串数组
-- 用户删除 custom tag → 仅删除本表行，已存入任何 Memory 的 `raw_assets.tags` 字符串**不受影响**（orphan chip 语义）
+- 用户删除 custom tag → 仅删除本表行，已存入任何 Moment 的 `raw_assets.tags` 字符串**不受影响**（orphan chip 语义）
 - 8 个预设 Tag（Playtime / Mealtime / Bedtime / Bath Time / Outdoor / Family Time / Funny Moment / Learning）**不存本表**，维护在 `packages/config/nestory/tags.ts`，`GET /tags` 接口从 config 静态返回
 
 ---
@@ -299,7 +299,7 @@ CREATE INDEX idx_highlights_user ON highlights(user_id);
 -- R-04 高频查询：SELECT COUNT(*) FROM highlights WHERE user_id = $1
 -- Free 用户上限 10 个，Toggle 点击时前端预检，Save 时后端兜底
 
--- Remove Highlight：所有用户可操作，取消 is_highlight 标记，Memory 不删除
+-- Remove Highlight：所有用户可操作，取消 is_highlight 标记，Moment 不删除
 -- 对应接口：DELETE /highlights/:id → 删除 highlights 行，raw_assets.is_highlight = false
 
 -- 并发控制：Free 用户在 9/10 边界并发 Save，COUNT(*) 预检可能两个请求都通过。
@@ -551,16 +551,16 @@ CREATE INDEX idx_abuse_log_triggered_at ON abuse_log(triggered_at);
 | 表 | 索引 | 用途 |
 |---|---|---|
 | `users` | `(email)` UNIQUE | 登录查找、Auth 校验 |
-| `raw_assets` | `(child_id, captured_at DESC)` | Memory List 时间线分组、月份归档查询 |
-| `raw_assets` | GIN `(tags)` | 按 Tag 筛选 Memory（`WHERE 'Outdoor' = ANY(tags)`），可选，按实际查询需求启用 |
-| `asset_files` | `(asset_id, display_order)` | 取一条 Memory 的所有照片并保持顺序 |
+| `raw_assets` | `(child_id, captured_at DESC)` | Moment List 时间线分组、月份归档查询 |
+| `raw_assets` | GIN `(tags)` | 按 Tag 筛选 Moment（`WHERE 'Outdoor' = ANY(tags)`），可选，按实际查询需求启用 |
+| `asset_files` | `(asset_id, display_order)` | 取一条 Moment 的所有照片并保持顺序 |
 | `stories` | `(quality_level)` | 质量分布统计 |
 | `stories` | `(prompt_version)` | prompt 版本效果分析 |
 | `stories` | `(status)` | 待生成/失败任务查询 |
 | `stories` | `(user_id)` | 用户 Story 列表查询 |
 | `stories` | `(is_last_free_story) WHERE true` | Paywall A 标记查询（部分索引） |
 | `highlights` | `(user_id)` | Highlight count 查询（R-04 高频） |
-| `highlights` | `(asset_id)` | 按 Memory 查关联 Highlight（Remove 时使用） |
+| `highlights` | `(asset_id)` | 按 Moment 查关联 Highlight（Remove 时使用） |
 | `story_shares` | `(token)` UNIQUE | Public 分享页按 token 查 story |
 | `story_shares` | `(story_id)` | Story 分享链接查询 |
 | `children` | `(user_id)` | 用户档案列表查询 |
@@ -580,7 +580,7 @@ CREATE INDEX idx_abuse_log_triggered_at ON abuse_log(triggered_at);
 | `users.active_child_id` | 用 users 字段记录，不在 children 加 is_active | 单字段更新原子，避免多档案并发置位竞争 |
 | `users.timezone` | VARCHAR，非数据库时区类型 | 存 IANA 时区名（如 `Asia/Shanghai`），业务逻辑在应用层处理 |
 | R-10 降级通知 | 无需 DB 字段 | 改为常驻 Notify，前端直接读 `subscription_status` 渲染；`has_seen_downgrade_toast` 字段已移除 |
-| `raw_assets` 多照片 | 拆 `asset_files` 子表 | 1 条 Memory 含多张照片需可索引、可保序、可记宽高/字节数；JSONB 数组无法满足 |
+| `raw_assets` 多照片 | 拆 `asset_files` 子表 | 1 条 Moment 含多张照片需可索引、可保序、可记宽高/字节数；JSONB 数组无法满足 |
 | `asset_files.storage_path` | 与 file_url 并存 | URL 用于客户端展示，path 用于 Storage 物理操作（删除/迁移）|
 | `story_shares.token` | crypto.randomBytes(32) base64url | UUID 熵不足以抗枚举；token 是 public-by-token 模型的唯一防线 |
 | `subscriptions.story_quota` 扣减 | UPDATE ... WHERE story_quota > 0 RETURNING | 原子操作，避免 webhook 与 worker 并发 |
@@ -592,7 +592,7 @@ CREATE INDEX idx_abuse_log_triggered_at ON abuse_log(triggered_at);
 | `raw_assets.created_at` | 服务端 UTC | 仅审计用，不参与业务逻辑 |
 | `subscriptions.story_quota` | INT，归零不重置 | 降级后不重置是产品规则（R-01），DB 层直接体现 |
 | `subscriptions.paywall_trigger_log` | JSONB | 只需记录 Paywall A，结构简单，JSONB 足够 |
-| Tag 存储模型 | `raw_assets.tags TEXT[]` value 模型 + 独立 `user_tag_library` 表 | PRD v1.7 §4.1.1 明确要求字符串快照，保证 tag 库变动和降级行为不伤已有 Memory；orphan chip 语义自然实现；MVP 无跨 Memory tag 查询需求，reference 模型复杂度无收益 |
+| Tag 存储模型 | `raw_assets.tags TEXT[]` value 模型 + 独立 `user_tag_library` 表 | PRD v1.7 §4.1.1 明确要求字符串快照，保证 tag 库变动和降级行为不伤已有 Moment；orphan chip 语义自然实现；MVP 无跨 Moment tag 查询需求，reference 模型复杂度无收益 |
 | 预设 Tag | 移入 `packages/config/nestory/tags.ts`，不存 DB | 静态配置，不需要 migration；`GET /tags` 从 config 返回 |
 | `highlights.cover_file_id` | 引用 `asset_files`，ON DELETE SET NULL | 封面是具体某张照片，需明确指向；照片删除后 fallback 取第一张，不级联删 Highlight |
 | `highlights.title` | 可空 VARCHAR | AI 异步写入，生成前 null；用户可覆写；不在 `raw_assets` 存（Highlight 专属字段） |

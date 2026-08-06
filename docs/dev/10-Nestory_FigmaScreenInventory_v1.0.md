@@ -59,16 +59,16 @@
 
 ---
 
-## 2. Home & Memory (`features/home`, `features/memories`, `app/(tabs)/`, `app/memory/`)
+## 2. Home & Moment (`features/home`, `features/moments`, `app/(tabs)/`, `app/moment/`)
 
 | ID | 名称 | 尺寸 | 路由文件 | 备注 |
 |---|---|---|---|---|
 | `94:349`  | H-01 Home | 393×852 | `app/(tabs)/index.tsx` | avatarRow + highlightRow + StoryCard 主页 |
-| `96:384`  | H-02 Add Memory | 393×852 | `app/memory/add.tsx` | 上传/录入 memory |
-| `98:452`  | H-03 Memory List | 393×852 | `app/memory/list.tsx` | memory 列表 |
-| `102:531` | H-04 Memory Detail | 393×852 | `app/memory/[id].tsx` | 详情默认态 |
-| `102:573` | H-04 Memory Detail (Read Only) | 393×852 | 同上（状态变体） | 历史/锁定态 |
-| `102:618` | H-04 Memory Detail (Edit Mode) | 393×852 | 同上（编辑态） | 编辑/删除模式 |
+| `96:384`  | H-02 Add Moment | 393×852 | `app/moment/add.tsx` | 上传/录入 moment |
+| `98:452`  | H-03 Moment List | 393×852 | `app/moment/list.tsx` | moment 列表 |
+| `102:531` | H-04 Moment Detail | 393×852 | `app/moment/[id].tsx` | 详情默认态 |
+| `102:573` | H-04 Moment Detail (Read Only) | 393×852 | 同上（状态变体） | 历史/锁定态 |
+| `102:618` | H-04 Moment Detail (Edit Mode) | 393×852 | 同上（编辑态） | 编辑/删除模式 |
 
 ---
 
@@ -129,7 +129,7 @@
 - **BottomSheet** / **Loading-Page** / **Abnormal** ×2（Empty / WebIssue） / **Toast** ×3（Success/Warning/Error）
 - **HighlightCard** ×4（4:3/3:4 × OneLine/TwoLine）
 - **Notify** ×4（Success/Warning/Error/Info）
-- **MemoryCard** ×2（Content/Empty）
+- **MomentCard** ×2（Content/Empty）
 - **photoCarousel** ×2（Landscape/Portrait）
 - **StoryCard** ×7（Current × {Empty/Collecting/Locked/Generating} + History × {Generated/GeneratedLight/NotGenerated}）
 - **Modal/Paywall** ×8（A/B/C/D × year/month）
@@ -146,7 +146,7 @@
 |---|---|---|
 | Day 1-2 | O-01 Welcome + O-02 Sign In 精校 + 路由串通 | 1 天 |
 | Day 3-5 | O-03 a/b/c + O-04 Notifications + O-05 Plan | 2-3 天 |
-| Day 5-7 | H-01 Home + H-02 Add Memory + H-03/H-04 Memory | 2-3 天 |
+| Day 5-7 | H-01 Home + H-02 Add Moment + H-03/H-04 Moment | 2-3 天 |
 | Day 7-9 | S-01 Stories + S-02 Story Detail（WebView 壳）| 1.5 天 |
 | Day 9-11 | HL-01/02 Highlights | 1.5 天 |
 | Day 11-13 | ST-01~07 Settings 全套 | 2 天 |

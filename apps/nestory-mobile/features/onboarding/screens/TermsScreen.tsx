@@ -12,7 +12,7 @@ const TERMS_SECTIONS = [
   },
   {
     title: 'Use of the Service',
-    body: 'Nestory is a personal memory-keeping app. You are responsible for all content you create and share. You agree not to use the service for any unlawful purpose.',
+    body: 'Nestory is a personal moment-keeping app. You are responsible for all content you create and share. You agree not to use the service for any unlawful purpose.',
   },
   {
     title: 'Intellectual Property',

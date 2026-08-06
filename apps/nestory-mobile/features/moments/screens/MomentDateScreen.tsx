@@ -19,7 +19,7 @@ function getFirstWeekday(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
 
-export function MemoryDateScreen() {
+export function MomentDateScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const today = new Date();

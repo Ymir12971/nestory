@@ -7,9 +7,9 @@ import { palette, theme } from '@/shared/theme';
 const SCREEN_W = Dimensions.get('window').width;
 const GREEN = palette.primary[500]; // #23ab65
 
-// ─── Memory Card (Welcome-1 right column) ────────────────────────────────────
+// ─── Moment Card (Welcome-1 right column) ────────────────────────────────────
 
-function MemoryCard({ caption, tag }: { caption: string; tag?: string }) {
+function MomentCard({ caption, tag }: { caption: string; tag?: string }) {
   return (
     <View style={card.wrap}>
       <Image
@@ -67,7 +67,7 @@ const card = StyleSheet.create({
   },
 });
 
-// ─── Step 1: "Every little moment, kept as Memory" ───────────────────────────
+// ─── Step 1: "Every little moment, kept as Moment" ───────────────────────────
 
 function StepOne({ onNext }: { onNext: () => void }) {
   return (
@@ -83,18 +83,18 @@ function StepOne({ onNext }: { onNext: () => void }) {
           <View style={s.illustrationPlaceholder} />
           <View style={s.w1TextBlock}>
             <Text style={s.w1Pre}>Every little moment,{'\n'}kept as</Text>
-            <Text style={s.w1Hero}>Memory</Text>
+            <Text style={s.w1Hero}>Moment</Text>
           </View>
         </View>
 
-        {/* Right: 3 stacked memory cards */}
+        {/* Right: 3 stacked moment cards */}
         <View style={s.w1Right}>
-          <MemoryCard caption="Fell asleep mid-laugh during bedtime stories." />
-          <MemoryCard
+          <MomentCard caption="Fell asleep mid-laugh during bedtime stories." />
+          <MomentCard
             caption="Took his first wobbly steps across the room today."
             tag="First Step"
           />
-          <MemoryCard caption="Caught a tiny butterfly in the park — wouldn't let go." />
+          <MomentCard caption="Caught a tiny butterfly in the park — wouldn't let go." />
         </View>
       </View>
 
@@ -110,7 +110,7 @@ function StepOne({ onNext }: { onNext: () => void }) {
   );
 }
 
-// ─── Step 2: "Every memory, woven into a Story" ──────────────────────────────
+// ─── Step 2: "Every moment, woven into a Story" ──────────────────────────────
 
 const CARD_W = SCREEN_W - 48;
 const GRID_PHOTO_W = (CARD_W - 32 - 8) / 3; // card padding 16×2, two gaps of 4
@@ -135,7 +135,7 @@ function StoryPreviewCard() {
         This month Vincent found his feet, chasing butterflies and tumbling into giggles. Every
         wobble brought him closer to the world waiting for him.
       </Text>
-      <Text style={story.count}>54 memories</Text>
+      <Text style={story.count}>54 moments</Text>
     </View>
   );
 }
@@ -196,7 +196,7 @@ function StepTwo({ onEnter }: { onEnter: () => void }) {
       <View style={s.w2Body}>
         <StoryPreviewCard />
         <View style={s.w2TextBlock}>
-          <Text style={s.w2Pre}>Every memory,{'\n'}woven into a</Text>
+          <Text style={s.w2Pre}>Every moment,{'\n'}woven into a</Text>
           <Text style={s.w2Hero}>Story</Text>
         </View>
       </View>

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Memory, PaginatedResponse, MimeType } from '@nestory/types';
+import type { Moment, PaginatedResponse, MimeType } from '@nestory/types';
 import { apiFetch } from './client';
 import { queryKeys } from './queryClient';
 
@@ -15,7 +15,7 @@ export interface AssetFileInput {
   displayOrder?: number;
 }
 
-export interface MemoryCreateInput {
+export interface MomentCreateInput {
   childId:     string;
   capturedAt:  string;          // ISO 8601
   textNote?:   string;
@@ -23,7 +23,7 @@ export interface MemoryCreateInput {
   files?:      AssetFileInput[];
 }
 
-export interface MemoryPatchInput {
+export interface MomentPatchInput {
   textNote?:       string;
   tagValues?:      string[];
   addFiles?:       AssetFileInput[];
@@ -38,8 +38,8 @@ export async function listAssets(args: {
   month?:  string;
   cursor?: string;
   limit?:  number;
-}): Promise<PaginatedResponse<Memory>> {
-  return apiFetch<PaginatedResponse<Memory>>('/assets', {
+}): Promise<PaginatedResponse<Moment>> {
+  return apiFetch<PaginatedResponse<Moment>>('/assets', {
     query: {
       childId: args.childId,
       month:   args.month,
@@ -53,34 +53,34 @@ export async function listAssetsTrash(args: {
   childId?: string;
   cursor?:  string;
   limit?:   number;
-}): Promise<PaginatedResponse<Memory>> {
-  return apiFetch<PaginatedResponse<Memory>>('/assets/trash', { query: args });
+}): Promise<PaginatedResponse<Moment>> {
+  return apiFetch<PaginatedResponse<Moment>>('/assets/trash', { query: args });
 }
 
-export interface MemoryMonthSummary {
+export interface MomentMonthSummary {
   monthKey: string; // "YYYY-MM", user-timezone bucketed, DESC from server
   count:    number;
 }
 
-export async function listAssetMonths(childId: string): Promise<MemoryMonthSummary[]> {
-  const res = await apiFetch<{ data: MemoryMonthSummary[] }>('/assets/months', {
+export async function listAssetMonths(childId: string): Promise<MomentMonthSummary[]> {
+  const res = await apiFetch<{ data: MomentMonthSummary[] }>('/assets/months', {
     query: { childId },
   });
   return res.data;
 }
 
-export async function getAsset(id: string): Promise<Memory> {
-  const res = await apiFetch<{ data: Memory }>(`/assets/${id}`);
+export async function getAsset(id: string): Promise<Moment> {
+  const res = await apiFetch<{ data: Moment }>(`/assets/${id}`);
   return res.data;
 }
 
-export async function createAsset(body: MemoryCreateInput): Promise<Memory> {
-  const res = await apiFetch<{ data: Memory }>('/assets', { method: 'POST', body });
+export async function createAsset(body: MomentCreateInput): Promise<Moment> {
+  const res = await apiFetch<{ data: Moment }>('/assets', { method: 'POST', body });
   return res.data;
 }
 
-export async function updateAsset(id: string, body: MemoryPatchInput): Promise<Memory> {
-  const res = await apiFetch<{ data: Memory }>(`/assets/${id}`, { method: 'PATCH', body });
+export async function updateAsset(id: string, body: MomentPatchInput): Promise<Moment> {
+  const res = await apiFetch<{ data: Moment }>(`/assets/${id}`, { method: 'PATCH', body });
   return res.data;
 }
 
@@ -91,8 +91,8 @@ export async function deleteAsset(id: string, hard = true): Promise<void> {
   });
 }
 
-export async function restoreAsset(id: string): Promise<Memory> {
-  const res = await apiFetch<{ data: Memory }>(`/assets/${id}/restore`, { method: 'POST' });
+export async function restoreAsset(id: string): Promise<Moment> {
+  const res = await apiFetch<{ data: Moment }>(`/assets/${id}/restore`, { method: 'POST' });
   return res.data;
 }
 
@@ -143,7 +143,7 @@ export function useCreateAsset() {
 export function useUpdateAsset(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: MemoryPatchInput) => updateAsset(id, body),
+    mutationFn: (body: MomentPatchInput) => updateAsset(id, body),
     onSuccess: (data) => {
       qc.setQueryData(queryKeys.asset(id), data);
       qc.invalidateQueries({ queryKey: ['assets'] }); // 任意 list 都失效

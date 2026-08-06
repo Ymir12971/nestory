@@ -131,7 +131,7 @@ function ClosingPage({ doc, onBack }: { doc: StoryDocumentV3; onBack: () => void
       <p className={styles.closingBrand}>Nestory</p>
       <h2 className={styles.closingHeadline}>{doc.closing.headline}</h2>
       <p className={styles.closingStats}>
-        {doc.closing.stats.memories} memories · {doc.closing.stats.photos} photos
+        {doc.closing.stats.moments} moments · {doc.closing.stats.photos} photos
       </p>
       <button className={styles.shareBtn} onClick={share}>Share this Story</button>
       <button className={styles.backBtn} onClick={onBack}>Back to Home</button>

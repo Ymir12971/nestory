@@ -1,19 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod/v4';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { type StoryGenConfig, maxThemesForMemoryCount } from './config';
+import { type StoryGenConfig, maxThemesForMomentCount } from './config';
 
 // Prompt 1 · 结构决策 (StoryGenPrompts §2, Step A-D). STRUCTURE ONLY — no
 // user-facing text. Low temperature: the structure should be reproducible.
 //
 // Deviation from the doc: highlight/is_highlight signals are dropped — the
-// Highlight feature was removed in the 2026-07 redesign, so memories carry
+// Highlight feature was removed in the 2026-07 redesign, so moments carry
 // only text/tags/photo counts as signals.
 
-export interface P1Memory {
+export interface P1Moment {
   id:         string;
   capturedAt: string;        // ISO 8601
-  text:       string;        // memories are text-required since the redesign
+  text:       string;        // moments are text-required since the redesign
   tags:       string[];
   photoCount: number;
 }
@@ -23,7 +23,7 @@ export interface P1Input {
   childAgeMonths: number;
   monthDisplay:  string;     // "NOVEMBER 2025"
   monthKey:      string;
-  memories:      P1Memory[];
+  moments:      P1Moment[];
 }
 
 const structureSchema = z.object({
@@ -35,55 +35,55 @@ const structureSchema = z.object({
     theme_label: z.string(),
     units: z.array(z.object({
       unit_id:      z.string(),
-      memory_ids:   z.array(z.string()).min(1),
+      moment_ids:   z.array(z.string()).min(1),
       merge_reason: z.string().nullable(),
     })).min(1),
   })),
-  dropped_memory_ids: z.array(z.string()),
-  skipped_memory_ids: z.array(z.string()),
+  dropped_moment_ids: z.array(z.string()),
+  skipped_moment_ids: z.array(z.string()),
 });
 
 export type StructureDecision = z.infer<typeof structureSchema>;
 
-const SYSTEM_PROMPT = `You are the narrative architect for Nestory, a baby-memory app that turns a
+const SYSTEM_PROMPT = `You are the narrative architect for Nestory, a baby-moment app that turns a
 parent's monthly notes and photos into a short, beautifully told "Story" about
 their child.
 
 Your job in THIS step is STRUCTURE ONLY. You do NOT write the final story text.
-You read all of this month's memories and decide:
+You read all of this month's moments and decide:
   A. Theme Discovery — what recurring themes run through this month.
   B. Theme Selection — pick the themes that genuinely define the month, within
      the cap you are given. The number of selected themes = the number of Body
      chapters.
-  C. Memory Allocation & Clustering —
-     C1. Assign each memory to exactly ONE theme (chapter).
-     C2. Within each chapter, find memories about the SAME or HIGHLY SIMILAR
+  C. Moment Allocation & Clustering —
+     C1. Assign each moment to exactly ONE theme (chapter).
+     C2. Within each chapter, find moments about the SAME or HIGHLY SIMILAR
          events and either:
          - MERGE them into one "narrative unit" if each adds new information or
            shows progression (e.g. "took 3 steps" + "walked 4 steps" = progress).
          - DEDUPE if they are near-duplicates with no new information: keep only
-           the single best memory (more specific text / more photos), drop the
+           the single best moment (more specific text / more photos), drop the
            rest entirely.
      One narrative unit = one Block in the final layout. A unit may contain one
-     or more memories.
+     or more moments.
   D. Narrative Ordering — order the chapters for emotional rhythm
      (e.g. light→meaningful, inner→outer, build a gentle arc).
 
 Hard rules:
 - Theme count must respect the cap provided to you.
-- Every selected memory belongs to exactly one chapter and one unit.
-- Dropped (deduped) memories must be listed explicitly so downstream steps skip them.
-- Skip any memory that is clearly NOT about the child (list it in
-  skipped_memory_ids); if fewer than 5 usable memories remain, return
+- Every selected moment belongs to exactly one chapter and one unit.
+- Dropped (deduped) moments must be listed explicitly so downstream steps skip them.
+- Skip any moment that is clearly NOT about the child (list it in
+  skipped_moment_ids); if fewer than 5 usable moments remain, return
   generate=false with a reason.
 - Tags are SUPPORTING signals only; do not let an unfamiliar custom tag drive
   your grouping. Ignore tags you don't understand.
 - You do NOT choose photos — downstream code does. Use photo COUNT only as a
-  hint of how rich a memory is.`;
+  hint of how rich a moment is.`;
 
 function buildUserPrompt(input: P1Input, cfg: StoryGenConfig): string {
-  const cap = maxThemesForMemoryCount(input.memories.length, cfg);
-  const memories = input.memories.map(m => ({
+  const cap = maxThemesForMomentCount(input.moments.length, cfg);
+  const moments = input.moments.map(m => ({
     id:          m.id,
     captured_at: m.capturedAt,
     text:        m.text,
@@ -93,11 +93,11 @@ function buildUserPrompt(input: P1Input, cfg: StoryGenConfig): string {
   return [
     `Child profile: ${input.childName}, ${input.childAgeMonths} months old`,
     `Month: ${input.monthDisplay} (${input.monthKey})`,
-    `Total memories this month: ${input.memories.length}`,
+    `Total moments this month: ${input.moments.length}`,
     `Theme-count cap for this volume: max ${cap} themes (fewer is fine if the month genuinely has fewer).`,
     '',
-    'Here are all memories for this month (JSON array):',
-    JSON.stringify(memories),
+    'Here are all moments for this month (JSON array):',
+    JSON.stringify(moments),
     '',
     'Return the structure decision as JSON following the schema.',
   ].join('\n');

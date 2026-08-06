@@ -56,7 +56,7 @@ type SubscriptionStatus =
 
 **影响：**
 - mobile 所有 `MOCK_SUB_STATUS` / `SubStatus` 类型重命名（5 处）
-- TopNotify / SubscriptionScreen / SettingsScreen / HighlightsScreen / AddMemoryScreen / StoriesScreen 的状态判断改名
+- TopNotify / SubscriptionScreen / SettingsScreen / HighlightsScreen / AddMomentScreen / StoriesScreen 的状态判断改名
 
 ---
 
@@ -69,7 +69,7 @@ type SubscriptionStatus =
 | `user.ts` | `name: string`（用户显示名） |
 | `user.ts` | `linkedProviders: LinkedProvider[]`（OAuth 绑定列表） |
 | `user.ts` | 新接口 `LinkedProvider { provider: 'apple' \| 'google'; providerEmail: string \| null; connectedAt: ISO }` |
-| `asset.ts` | `Memory.linkedHighlight: { id: string; title: string \| null } \| null`（M-04 详情页要展示）|
+| `asset.ts` | `Moment.linkedHighlight: { id: string; title: string \| null } \| null`（M-04 详情页要展示）|
 | `subscription.ts` | `billingCycle: 'yearly' \| 'monthly' \| null` |
 | `subscription.ts` | `benefits: string[]`（ST-02B 显示当前 plan benefit 列表）|
 | `subscription.ts` | `storyQuotaRemaining: number \| null`（Free `'2 Stories remaining'`，Premium `null`）|
@@ -81,7 +81,7 @@ type SubscriptionStatus =
 
 **触发源：**
 1. **月末 cron**：`0 23 28-31 * *`，到月最后一天 23 点入队当月 stories
-2. **Milestone 触发**：用户加入第 N 个 memory 时 server-side hook 入队（具体阈值待 PM 定）
+2. **Milestone 触发**：用户加入第 N 个 moment 时 server-side hook 入队（具体阈值待 PM 定）
 3. **管理员手动**：调 `/internal/stories/enqueue`
 4. **失败重试**：BullMQ 内置 exponential backoff（5 次：1s/5s/30s/2m/10m）
 
@@ -127,12 +127,12 @@ type SubscriptionStatus =
 **Worker 责任：**
 - 加 `pg_advisory_xact_lock(child_id, month_key)` 防并发
 - 检查 `STORY_ALREADY_EXISTS`（DB 已 `generated` 就跳过）
-- 拉 memories → LLM 生成 → 写 `story_document` → 标 `generated`
+- 拉 moments → LLM 生成 → 写 `story_document` → 标 `generated`
 - Supabase Realtime publication 自动推送 mobile
 
 **错误码归属：**
 - `STORY_ALREADY_EXISTS`：worker 内部，乐观锁拒绝重复入队
-- `STORY_READ_ONLY`：从 stories 模块**移到 assets 模块**，由 `PATCH /assets/:id` / `DELETE /assets/:id` 在 R-08 命中时返回（历史月份 memory 不可编辑）
+- `STORY_READ_ONLY`：从 stories 模块**移到 assets 模块**，由 `PATCH /assets/:id` / `DELETE /assets/:id` 在 R-08 命中时返回（历史月份 moment 不可编辑）
 
 **没有 `POST /stories`（公网 API）。** 文档 v1.3 错误码表对应处需注释。
 
@@ -185,7 +185,7 @@ GET    /assets/trash         → 列"最近删除"
 DELETE FROM users WHERE deleted_at < now() - INTERVAL '30 days';
 -- CASCADE 链自动清下游
 DELETE FROM raw_assets WHERE deleted_at < now() - INTERVAL '30 days';
--- 单条 memory 软删过期
+-- 单条 moment 软删过期
 ```
 
 ### `raw_assets.user_id` 冗余列

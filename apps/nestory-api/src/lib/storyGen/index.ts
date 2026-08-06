@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { GenerationMeta, StoryDocumentV3 } from '@nestory/types';
 import { type StoryGenConfig, getStoryGenConfig } from './config';
-import { runPrompt1, type P1Memory, type StructureDecision } from './prompt1';
+import { runPrompt1, type P1Moment, type StructureDecision } from './prompt1';
 import { runPrompt2 } from './prompt2';
 import { layoutChapters, type PhotoMeta } from './imageLayer';
 import { buildStoryPhotos } from './imagePipeline';
@@ -13,7 +13,7 @@ import { assemble, AssembleValidationError } from './assemble';
 
 export interface V3Photo extends PhotoMeta {}
 
-export interface V3Memory {
+export interface V3Moment {
   id:         string;
   capturedAt: string;
   text:       string;
@@ -27,14 +27,14 @@ export interface GenerateStoryV3Input {
   monthKey:         string;   // "YYYY-MM"
   monthDisplay:     string;   // "NOVEMBER 2025"
   locale:           string;
-  memories:         V3Memory[];
+  moments:         V3Moment[];
   watermarkEnabled: boolean;
   generatedAt:      string;   // ISO 8601
 }
 
 export type GenerateStoryV3Result =
   | { ok: true; document: StoryDocumentV3; meta: GenerationMeta }
-  | { ok: false; reason: 'E01_INSUFFICIENT_MEMORIES' | 'P1_DECLINED'; detail: string | null };
+  | { ok: false; reason: 'E01_INSUFFICIENT_MOMENTS' | 'P1_DECLINED'; detail: string | null };
 
 const PROMPT_VERSION = 'storyGen:v3-two-phase';
 
@@ -53,18 +53,18 @@ export async function generateStoryV3(
   const start = Date.now();
 
   // E01 前置拦截:素材不足不调 LLM
-  if (input.memories.length < cfg.minMemoriesToGenerate) {
+  if (input.moments.length < cfg.minMomentsToGenerate) {
     return {
       ok: false,
-      reason: 'E01_INSUFFICIENT_MEMORIES',
-      detail: `${input.memories.length} memories < ${cfg.minMemoriesToGenerate}`,
+      reason: 'E01_INSUFFICIENT_MOMENTS',
+      detail: `${input.moments.length} moments < ${cfg.minMomentsToGenerate}`,
     };
   }
 
   const client = getClient();
 
   // ── Prompt 1 · 结构决策 ──────────────────────────────────────────────
-  const p1Memories: P1Memory[] = input.memories.map(m => ({
+  const p1Moments: P1Moment[] = input.moments.map(m => ({
     id:         m.id,
     capturedAt: m.capturedAt,
     text:       m.text,
@@ -76,7 +76,7 @@ export async function generateStoryV3(
     childAgeMonths: input.childAgeMonths,
     monthDisplay:   input.monthDisplay,
     monthKey:       input.monthKey,
-    memories:       p1Memories,
+    moments:       p1Moments,
   }, cfg);
 
   if (!structure.generate) {
@@ -84,14 +84,14 @@ export async function generateStoryV3(
   }
 
   // ── 代码层 · 图片处理(确定性,不调 LLM)─────────────────────────────
-  const excluded = new Set([...structure.dropped_memory_ids, ...structure.skipped_memory_ids]);
-  const photosByMemory = new Map(input.memories.map(m => [m.id, m.photos]));
-  const lookup = (memoryId: string) =>
-    excluded.has(memoryId) ? [] : (photosByMemory.get(memoryId) ?? []);
+  const excluded = new Set([...structure.dropped_moment_ids, ...structure.skipped_moment_ids]);
+  const photosByMoment = new Map(input.moments.map(m => [m.id, m.photos]));
+  const lookup = (momentId: string) =>
+    excluded.has(momentId) ? [] : (photosByMoment.get(momentId) ?? []);
   const laidOut = layoutChapters(
     structure.chapters.map(c => ({
       themeKey: c.theme_key,
-      units:    c.units.map(u => ({ memoryIds: u.memory_ids })),
+      units:    c.units.map(u => ({ momentIds: u.moment_ids })),
     })),
     lookup,
     cfg,
@@ -113,15 +113,15 @@ export async function generateStoryV3(
   }
 
   // ── Prompt 2 · 文案(校验失败重试一次,§3.5)────────────────────────
-  const memoryTexts: Record<string, string> = {};
-  for (const m of input.memories) {
-    if (!excluded.has(m.id)) memoryTexts[m.id] = m.text;
+  const momentTexts: Record<string, string> = {};
+  for (const m of input.moments) {
+    if (!excluded.has(m.id)) momentTexts[m.id] = m.text;
   }
-  const surviving = input.memories.filter(m => !excluded.has(m.id));
+  const surviving = input.moments.filter(m => !excluded.has(m.id));
   const allPhotos = surviving.flatMap(m => m.photos);
   const totals = {
-    memories: input.memories.length,
-    photos:   input.memories.reduce((n, m) => n + m.photos.length, 0),
+    moments: input.moments.length,
+    photos:   input.moments.reduce((n, m) => n + m.photos.length, 0),
   };
 
   let retries = 0;
@@ -132,7 +132,7 @@ export async function generateStoryV3(
       monthDisplay: input.monthDisplay,
       structure,
       laidOut,
-      memoryTexts,
+      momentTexts,
     }, cfg);
     try {
       core = assemble({
@@ -171,7 +171,7 @@ export async function generateStoryV3(
       ogDescription: core.cover.subtitle,
       ogImageUrl:    core.cover.coverPhotoUrl ?? '',
     },
-    qualityLevel: input.memories.length >= 15 ? 'rich' : input.memories.length >= 8 ? 'medium' : 'low',
+    qualityLevel: input.moments.length >= 15 ? 'rich' : input.moments.length >= 8 ? 'medium' : 'low',
     ...core,
   };
 
@@ -179,7 +179,7 @@ export async function generateStoryV3(
     promptVersion:        PROMPT_VERSION,
     modelName:            cfg.llm.writer.model,
     qualityLevel:         document.qualityLevel,
-    qualityScore:         Math.min(1, input.memories.length / 20),
+    qualityScore:         Math.min(1, input.moments.length / 20),
     generatedAt:          input.generatedAt,
     generationDurationMs: Date.now() - start,
     failureTracking:      { retries, usedFallback: false },

@@ -3,12 +3,12 @@ import { ActivityIndicator, Dimensions, Image, type NativeScrollEvent, type Nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import type { Memory } from '@nestory/types';
+import type { Moment } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { useAsset, useSubscription } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { FullscreenPhotoViewer } from '@/shared/components/FullscreenPhotoViewer';
-import { MemoryEditGateSheet } from '@/shared/components/MemoryEditGateSheet';
+import { MomentEditGateSheet } from '@/shared/components/MomentEditGateSheet';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -27,37 +27,37 @@ function formatCapturedAt(iso: string): string {
   return `${datePart} · ${timePart}`;
 }
 
-export function MemoryDetailScreen() {
+export function MomentDetailScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const memoryQ = useAsset(id ?? null);
+  const momentQ = useAsset(id ?? null);
 
   return (
     <View style={styles.root}>
       <View style={{ height: insets.top, backgroundColor: theme.surface.default }} />
 
-      {memoryQ.isLoading ? (
+      {momentQ.isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.text.brand} />
         </View>
-      ) : memoryQ.isError || !memoryQ.data ? (
+      ) : momentQ.isError || !momentQ.data ? (
         <View style={styles.center}>
           <View style={styles.navBar}>
             <Pressable hitSlop={8} onPress={goBack}>
               <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
             </Pressable>
-            <Text style={styles.navTitle}>Memory</Text>
+            <Text style={styles.navTitle}>Moment</Text>
             <View style={styles.navSpacer} />
           </View>
-          <Text style={styles.errorText}>Failed to load memory.</Text>
-          <Pressable onPress={() => memoryQ.refetch()}>
+          <Text style={styles.errorText}>Failed to load moment.</Text>
+          <Pressable onPress={() => momentQ.refetch()}>
             <Text style={styles.retryText}>Tap to retry</Text>
           </Pressable>
         </View>
       ) : (
-        <Body memory={memoryQ.data} />
+        <Body moment={momentQ.data} />
       )}
 
       <View style={{ height: insets.bottom }} />
@@ -65,11 +65,11 @@ export function MemoryDetailScreen() {
   );
 }
 
-function Body({ memory }: { memory: Memory }) {
+function Body({ moment }: { moment: Moment }) {
   const router = useRouter();
   const goBack = useGoBack();
   const subQ = useSubscription();
-  const dotCount = memory.files.length;
+  const dotCount = moment.files.length;
   const [activeIndex, setActiveIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [gateVisible, setGateVisible] = useState(false);
@@ -82,7 +82,7 @@ function Body({ memory }: { memory: Memory }) {
   // Current month (isEditable) → straight to edit. Past month: Premium sees a
   // regenerate heads-up first; Free sees the upgrade gate.
   const onEditPress = () => {
-    if (memory.isEditable) router.push(`/memory/${memory.id}/edit`);
+    if (moment.isEditable) router.push(`/moment/${moment.id}/edit`);
     else setGateVisible(true);
   };
 
@@ -97,7 +97,7 @@ function Body({ memory }: { memory: Memory }) {
         <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
         </Pressable>
-        <Text style={styles.navTitle}>Memory</Text>
+        <Text style={styles.navTitle}>Moment</Text>
         <Pressable hitSlop={8} onPress={onEditPress}>
           <Text style={styles.editButton}>Edit</Text>
         </Pressable>
@@ -108,7 +108,7 @@ function Body({ memory }: { memory: Memory }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {memory.files.length > 0 && (
+        {moment.files.length > 0 && (
           <>
             <ScrollView
               horizontal
@@ -122,13 +122,13 @@ function Body({ memory }: { memory: Memory }) {
                 { paddingHorizontal: CAROUSEL_PADDING },
               ]}
             >
-              {memory.files.map((f, i) => (
+              {moment.files.map((f, i) => (
                 <Pressable key={f.id} onPress={() => setViewerIndex(i)}>
                   <Image
                     source={{ uri: f.fileUrl }}
                     style={[
                       styles.photoCenter,
-                      i < memory.files.length - 1 ? { marginRight: PHOTO_GAP } : null,
+                      i < moment.files.length - 1 ? { marginRight: PHOTO_GAP } : null,
                     ]}
                   />
                 </Pressable>
@@ -146,13 +146,13 @@ function Body({ memory }: { memory: Memory }) {
         )}
 
         <View style={styles.body}>
-          {memory.textNote ? (
-            <Text style={styles.noteText}>{memory.textNote}</Text>
+          {moment.textNote ? (
+            <Text style={styles.noteText}>{moment.textNote}</Text>
           ) : null}
 
-          {memory.tags.length > 0 && (
+          {moment.tags.length > 0 && (
             <View style={styles.tagsRow}>
-              {memory.tags.map(tag => (
+              {moment.tags.map(tag => (
                 <View key={tag} style={styles.tagPill}>
                   <Text style={styles.tagLabel}>{tag}</Text>
                 </View>
@@ -162,24 +162,24 @@ function Body({ memory }: { memory: Memory }) {
 
           <View style={styles.metaRow}>
             <RemixIcon name="time-line" size={16} color={theme.text.secondary} />
-            <Text style={styles.metaText}>{formatCapturedAt(memory.capturedAt)}</Text>
+            <Text style={styles.metaText}>{formatCapturedAt(moment.capturedAt)}</Text>
           </View>
         </View>
       </ScrollView>
 
       <FullscreenPhotoViewer
         visible={viewerIndex !== null}
-        photoUrls={memory.files.map(f => f.fileUrl)}
+        photoUrls={moment.files.map(f => f.fileUrl)}
         initialIndex={viewerIndex ?? 0}
         onDismiss={() => setViewerIndex(null)}
       />
 
-      <MemoryEditGateSheet
+      <MomentEditGateSheet
         visible={gateVisible}
         variant={isPremium ? 'premium' : 'free'}
         onPrimary={() => {
           setGateVisible(false);
-          if (isPremium) router.push(`/memory/${memory.id}/edit`);
+          if (isPremium) router.push(`/moment/${moment.id}/edit`);
           else setPaywallVisible(true);
         }}
         onViewBenefits={() => {

@@ -15,6 +15,8 @@ export function getSupabase(): SupabaseClient {
   return _client;
 }
 
+// 注:bucket 名保留 'memories' —— 产品术语 2026-07 改叫 Moment,但桶名写在
+// 所有已存照片的 URL 里,改名要迁移全部对象存储,对用户零收益。
 export type StorageBucket = 'memories' | 'avatars' | 'stories';
 
 const BUCKET_CONFIG: Record<StorageBucket, { public: boolean }> = {

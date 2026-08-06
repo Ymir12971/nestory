@@ -10,7 +10,7 @@ import PostHog from 'posthog-react-native';
 export type AnalyticsEvent =
   | 'signup_success'          // { method: 'apple' | 'google' | 'dev' }
   | 'onboarding_complete'     // { profileCount?: number; plan: 'free' | 'premium' }
-  | 'memory_saved'            // { photoCount: number; charCount: number; isBackfill: boolean }
+  | 'moment_saved'            // { photoCount: number; charCount: number; isBackfill: boolean }
   | 'story_opened'            // { storyId: string; monthKey?: string }
   | 'story_shared'            // { channel?: string }
   | 'paywall_viewed'          // { source: string }

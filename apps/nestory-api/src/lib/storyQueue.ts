@@ -3,8 +3,8 @@ import * as Sentry from '@sentry/node';
 import IORedis from 'ioredis';
 import { prisma, whereNotDeleted } from './prisma';
 import { toMonthKey } from './month';
-import { generateStory, type MemoryInput } from './storyAi';
-import { generateStoryV3, type V3Memory } from './storyGen';
+import { generateStory, type MomentInput } from './storyAi';
+import { generateStoryV3, type V3Moment } from './storyGen';
 import { getStoryGenConfig } from './storyGen/config';
 import { sendPushToUser, sendStoryReadyPush } from './push';
 
@@ -187,7 +187,7 @@ async function processGenerateJob(
     },
   });
 
-  // Pull memories that fall within `monthKey` in the user's local timezone.
+  // Pull moments that fall within `monthKey` in the user's local timezone.
   // We over-fetch with a generous UTC window then filter client-side, since the
   // schema doesn't yet have a generated month_key column.
   const [yStr, mStr] = monthKey.split('-');
@@ -205,19 +205,19 @@ async function processGenerateJob(
     include: { files: { orderBy: { displayOrder: 'asc' } } },
     orderBy: { capturedAt: 'asc' },
   });
-  const memoriesInMonth = rawAssets.filter(
+  const momentsInMonth = rawAssets.filter(
     a => toMonthKey(a.capturedAt, user.timezone) === monthKey,
   );
 
-  const memories: MemoryInput[] = memoriesInMonth.map(a => ({
+  const moments: MomentInput[] = momentsInMonth.map(a => ({
     capturedAt: a.capturedAt.toISOString(),
     textNote:   a.textNote,
     tags:       a.tags,
     fileUrls:   a.files.map(f => f.fileUrl),
   }));
 
-  // Cover image: pick the file from the memory with the most photos.
-  const covered = [...memoriesInMonth].sort((a, b) => b.files.length - a.files.length)[0];
+  // Cover image: pick the file from the moment with the most photos.
+  const covered = [...momentsInMonth].sort((a, b) => b.files.length - a.files.length)[0];
   const candidateCoverImageUrl = covered?.files[0]?.fileUrl ?? null;
 
   const childAgeMonths = monthsBetween(child.birthDate, new Date(Date.UTC(y, m - 1, 15)));
@@ -234,7 +234,7 @@ async function processGenerateJob(
 
     if (cfg.pipeline === 'two-phase-v3') {
       // v3 两段式流水线;E01/P1 拒绝时标记 failed 并记录原因(不重试)
-      const v3Memories: V3Memory[] = memoriesInMonth.map(a => ({
+      const v3Moments: V3Moment[] = momentsInMonth.map(a => ({
         id:         a.id,
         capturedAt: a.capturedAt.toISOString(),
         text:       a.textNote ?? '',
@@ -254,7 +254,7 @@ async function processGenerateJob(
         monthKey,
         monthDisplay:     monthLabel.toUpperCase(),
         locale:           'en-US',
-        memories:         v3Memories,
+        moments:         v3Moments,
         watermarkEnabled: !isPremium,
         generatedAt,
       });
@@ -275,7 +275,7 @@ async function processGenerateJob(
         monthKey,
         monthLabel,
         locale:         'en-US',
-        memories,
+        moments,
         candidateCoverImageUrl,
         watermarkEnabled: !isPremium,
         generatedAt,
@@ -386,9 +386,9 @@ async function runDispatcher(log: (msg: string, data?: unknown) => void): Promis
     });
     if (existing && existing.status !== 'failed') { skipped++; continue; }
 
-    // Don't bother enqueueing a story for a month with zero memories — no
+    // Don't bother enqueueing a story for a month with zero moments — no
     // point spending tokens on "the month was quiet" for someone who hasn't
-    // captured anything yet. The worker handles 0-memory cases gracefully if
+    // captured anything yet. The worker handles 0-moment cases gracefully if
     // a manual trigger fires it anyway.
     const memCount = await prisma.rawAsset.count({
       where: { ...whereNotDeleted, childId: child.id },
@@ -405,7 +405,7 @@ async function runDispatcher(log: (msg: string, data?: unknown) => void): Promis
 }
 
 /**
- * Upload Reminders(ST-Settings annotation):连续 3 天没上传任何 Memory,
+ * Upload Reminders(ST-Settings annotation):连续 3 天没上传任何 Moment,
  * 且这 3 天内没有 Story 生成过 → 发一条温和提醒。跟着每日 dispatcher 跑。
  * 开关关闭 / 无 token 的用户由 sendPushToUser 内部跳过。
  */
@@ -429,7 +429,7 @@ async function runUploadReminders(log: (msg: string, data?: unknown) => void): P
   let sent = 0;
   for (const u of users) {
     const n = await sendPushToUser(u.id, 'upload_reminder', {
-      title: 'Turn every moment into a memory',
+      title: 'Turn every moment into a moment',
       body:  'A photo or a quick note :)',
       data:  { type: 'upload_reminder' },
     }, (m) => log(m));

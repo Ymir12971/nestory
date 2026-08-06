@@ -1,6 +1,6 @@
 // Demo data seed for a REAL (OAuth) user — for showing the app to a partner.
 //
-// Populates one child + a few current-month photo memories + 2 highlights +
+// Populates one child + a few current-month photo moments + 2 highlights +
 // one fully-rendered past-month Story, so the app isn't empty on first open
 // and "view AI Story" works immediately.
 //
@@ -83,8 +83,8 @@ async function main() {
   });
   await prisma.user.update({ where: { id: USER_ID }, data: { activeChildId: CHILD_ID } });
 
-  // --- Current-month memories (2026-05) ---
-  const memories: {
+  // --- Current-month moments (2026-05) ---
+  const moments: {
     id: string; capturedAt: string; textNote: string; isHighlight: boolean;
     files: { id: string; seed: string; w: number; h: number; order: number }[];
   }[] = [
@@ -105,7 +105,7 @@ async function main() {
       files: [{ id: F.nap, seed: 'emma-nap', w: 800, h: 1000, order: 0 }] },
   ];
 
-  for (const m of memories) {
+  for (const m of moments) {
     await prisma.rawAsset.upsert({
       where:  { id: m.id },
       update: {},
@@ -203,7 +203,7 @@ async function main() {
 
   console.log('Demo seed completed:');
   console.log(`  Child:      Emma (${CHILD_ID})`);
-  console.log(`  Memories:   ${memories.length} (current month 2026-05)`);
+  console.log(`  Moments:   ${moments.length} (current month 2026-05)`);
   console.log('  Highlights: 2');
   console.log('  Story:      2026-04 "The Month Emma Found Her Feet" (generated)');
 }

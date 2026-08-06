@@ -66,15 +66,15 @@ export type ChapterTrimPolicy = 'demote-worst-units-to-text' | 'keep-one-per-uni
 export interface StoryGenConfig {
   pipeline: PipelineMode;
 
-  /** E01 — below this many usable memories, don't generate at all. */
-  minMemoriesToGenerate: number;
+  /** E01 — below this many usable moments, don't generate at all. */
+  minMomentsToGenerate: number;
 
   /**
-   * Theme-count cap by memory volume (StoryH5Design §4.2 / PromptGen §2.2).
-   * Sorted ascending by `upToMemories` (inclusive upper bound); the first
+   * Theme-count cap by moment volume (StoryH5Design §4.2 / PromptGen §2.2).
+   * Sorted ascending by `upToMoments` (inclusive upper bound); the first
    * bracket a count falls into gives the max theme (= Body chapter) count.
    */
-  themeCountCaps: ReadonlyArray<{ upToMemories: number; maxThemes: number }>;
+  themeCountCaps: ReadonlyArray<{ upToMoments: number; maxThemes: number }>;
   /** Body chapters never exceed this regardless of themes chosen (§4.2). */
   bodyChapterHardCap: number;
 
@@ -128,13 +128,13 @@ const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const defaults: StoryGenConfig = {
   pipeline: 'single-shot-v2',
 
-  minMemoriesToGenerate: 5,
+  minMomentsToGenerate: 5,
 
   themeCountCaps: [
-    { upToMemories: 10,       maxThemes: 2 },
-    { upToMemories: 25,       maxThemes: 3 },
-    { upToMemories: 50,       maxThemes: 4 },
-    { upToMemories: Infinity, maxThemes: 5 },
+    { upToMoments: 10,       maxThemes: 2 },
+    { upToMoments: 25,       maxThemes: 3 },
+    { upToMoments: 50,       maxThemes: 4 },
+    { upToMoments: Infinity, maxThemes: 5 },
   ],
   bodyChapterHardCap: 5,
 
@@ -195,10 +195,10 @@ export function getStoryGenConfig(): StoryGenConfig {
   };
 }
 
-/** Resolve the theme cap for a given usable-memory count. */
-export function maxThemesForMemoryCount(count: number, cfg: StoryGenConfig = getStoryGenConfig()): number {
+/** Resolve the theme cap for a given usable-moment count. */
+export function maxThemesForMomentCount(count: number, cfg: StoryGenConfig = getStoryGenConfig()): number {
   for (const bracket of cfg.themeCountCaps) {
-    if (count <= bracket.upToMemories) return bracket.maxThemes;
+    if (count <= bracket.upToMoments) return bracket.maxThemes;
   }
   return cfg.themeCountCaps[cfg.themeCountCaps.length - 1]?.maxThemes ?? 5;
 }

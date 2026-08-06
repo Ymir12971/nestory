@@ -1,7 +1,7 @@
 // End-to-end verification that the live Anthropic story-generation path works.
 //
 // By default targets MONTH_KEY=2026-05 (the month that actually has seeded
-// memories), leaving the existing 2026-04 *mock* story untouched so you can
+// moments), leaving the existing 2026-04 *mock* story untouched so you can
 // compare mock vs real side by side in the app's Stories list.
 //
 //   1. If a 2026-05 story already exists, delete it (clean re-gen).

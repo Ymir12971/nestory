@@ -22,7 +22,7 @@ export function toMonthKey(date: Date | string, timezone: string): string {
 }
 
 /**
- * R-08：判断 capturedAt 是否在用户的"当月"内 → memory 是否可编辑
+ * R-08：判断 capturedAt 是否在用户的"当月"内 → moment 是否可编辑
  */
 export function isCurrentMonth(capturedAt: Date | string, timezone: string): boolean {
   return toMonthKey(capturedAt, timezone) === toMonthKey(new Date(), timezone);

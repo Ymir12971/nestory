@@ -118,7 +118,7 @@ model Child {
 }
 
 // ============================================================================
-// raw_assets — Memory（一条 Memory 含 N 张照片）
+// raw_assets — Moment（一条 Moment 含 N 张照片）
 // ============================================================================
 
 model RawAsset {
@@ -203,7 +203,7 @@ model Highlight {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId           String    @map("user_id") @db.Uuid
   childId          String    @map("child_id") @db.Uuid
-  assetId          String    @unique @map("asset_id") @db.Uuid // 一条 Memory 最多对应一个 Highlight
+  assetId          String    @unique @map("asset_id") @db.Uuid // 一条 Moment 最多对应一个 Highlight
   coverFileId      String?   @map("cover_file_id") @db.Uuid
   title            String?   @db.VarChar(100) // AI 异步写入，可用户覆写
   cardType         String?   @map("card_type") @db.VarChar(50)
@@ -239,9 +239,9 @@ model Story {
   promptVersion      String?   @map("prompt_version") @db.VarChar(60)
   modelName          String?   @map("model_name") @db.VarChar(60)
   generatedAt        DateTime? @map("generated_at") @db.Timestamptz(6)
-  // 该月 memory 在生成之后又发生了变化（增/改/删）→ Premium 可 regenerate。
-  // 重生成后 generatedAt 更新,memoriesChangedAt > generatedAt 比较自动失效。
-  memoriesChangedAt  DateTime? @map("memories_changed_at") @db.Timestamptz(6)
+  // 该月 moment 在生成之后又发生了变化（增/改/删）→ Premium 可 regenerate。
+  // 重生成后 generatedAt 更新,momentsChangedAt > generatedAt 比较自动失效。
+  momentsChangedAt  DateTime? @map("memories_changed_at") @db.Timestamptz(6)
   isLastFreeStory    Boolean   @default(false) @map("is_last_free_story")
   generatedUnderPlan String?   @map("generated_under_plan") @db.VarChar(10) // 'free' | 'premium'
 

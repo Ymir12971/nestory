@@ -107,23 +107,23 @@ export async function storiesRoutes(app: FastifyInstance) {
       orderBy: { monthKey: 'desc' },
     });
 
-    // memoryCount per month — bucket once instead of N queries. UTC drift
+    // momentCount per month — bucket once instead of N queries. UTC drift
     // matches the existing month_key compromise; precise tz bucketing waits
     // for the generated month_key column.
-    const allMemoryDates = await prisma.rawAsset.findMany({
+    const allMomentDates = await prisma.rawAsset.findMany({
       where:  { ...whereNotDeleted, childId: q.childId },
       select: { capturedAt: true },
     });
-    const memoryCountByMonth = new Map<string, number>();
-    for (const r of allMemoryDates) {
+    const momentCountByMonth = new Map<string, number>();
+    for (const r of allMomentDates) {
       const d = r.capturedAt;
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-      memoryCountByMonth.set(key, (memoryCountByMonth.get(key) ?? 0) + 1);
+      momentCountByMonth.set(key, (momentCountByMonth.get(key) ?? 0) + 1);
     }
 
     // 当月数据
     const curStory = stories.find(s => s.monthKey === curMonthKey);
-    const memCount = memoryCountByMonth.get(curMonthKey) ?? 0;
+    const memCount = momentCountByMonth.get(curMonthKey) ?? 0;
 
     const curStoryDoc = curStory?.document as StoryDocument | null | undefined;
     const isCurGenerated =
@@ -143,7 +143,7 @@ export async function storiesRoutes(app: FastifyInstance) {
           : isCurInProgress
             ? 'current_in_progress'
             : 'current_collecting',
-      memoryCount:         memCount,
+      momentCount:         memCount,
       daysUntilGeneration: daysUntilNextMonth(),
       milestoneLevel:      memCount >= 15 ? '15+' : memCount >= 10 ? '10' : memCount >= 3 ? '3' : memCount >= 1 ? '1' : null,
       storyId:       isCurGenerated ? curStory!.id : null,
@@ -158,14 +158,14 @@ export async function storiesRoutes(app: FastifyInstance) {
 
     const historical: StoryListItem[] = historicalKeys.map(monthKey => {
       const s = stories.find(st => st.monthKey === monthKey);
-      const monthMemories = memoryCountByMonth.get(monthKey) ?? 0;
-      // 决策 3:有占位卡(= 该月有 memory)且当前是 Premium → 可生成/重生成。
+      const monthMoments = momentCountByMonth.get(monthKey) ?? 0;
+      // 决策 3:有占位卡(= 该月有 moment)且当前是 Premium → 可生成/重生成。
       // 未成功生成的月份(E01 素材不足、配额尽、失败)也算,只要现在有素材。
       const isDone = s?.status === 'generated' || s?.status === 'fallback_generated';
       const inFlight = s?.status === 'generating' || s?.status === 'queued' ||
                        s?.status === 'pending' || s?.status === 'pending_review';
       // Handoff 3.4(b)(c):从未尝试过的月份(无行)和断订/配额空窗永不补发。
-      // 只有"尝试过但因素材不足/生成出错而失败"的月份,补了 memory 后可再生成。
+      // 只有"尝试过但因素材不足/生成出错而失败"的月份,补了 moment 后可再生成。
       const declined = (s?.generationMeta as { declined?: string } | null)?.declined;
       const failedRecoverably =
         s?.status === 'failed' && declined !== 'FREE_QUOTA_EXHAUSTED';
@@ -183,8 +183,8 @@ export async function storiesRoutes(app: FastifyInstance) {
           isLastFreeStory:  false,
           watermarkEnabled: null,
           generatedAt:      null,
-          memoryCount:      monthMemories,
-          canRegenerate:    isPremiumNow && monthMemories > 0 && !inFlight && failedRecoverably,
+          momentCount:      monthMoments,
+          canRegenerate:    isPremiumNow && monthMoments > 0 && !inFlight && failedRecoverably,
         };
       }
       const doc = s.document as StoryDocument | null;
@@ -198,18 +198,18 @@ export async function storiesRoutes(app: FastifyInstance) {
         isLastFreeStory:  s.isLastFreeStory,
         watermarkEnabled: doc?.watermark.enabled ?? null,
         generatedAt:      s.generatedAt?.toISOString() ?? null,
-        memoryCount:      monthMemories,
-        // Regenerate 蓝条信号:生成之后该月 memory 又变过(重生成刷新 generatedAt 后自动消失)
-        memoriesChanged:
-          s.memoriesChangedAt != null &&
+        momentCount:      monthMoments,
+        // Regenerate 蓝条信号:生成之后该月 moment 又变过(重生成刷新 generatedAt 后自动消失)
+        momentsChanged:
+          s.momentsChangedAt != null &&
           s.generatedAt != null &&
-          s.memoriesChangedAt > s.generatedAt,
-        // 已生成的月份要重生成,除了 Premium 还需 memory 真的变过
+          s.momentsChangedAt > s.generatedAt,
+        // 已生成的月份要重生成,除了 Premium 还需 moment 真的变过
         canRegenerate:
           isPremiumNow &&
-          s.memoriesChangedAt != null &&
+          s.momentsChangedAt != null &&
           s.generatedAt != null &&
-          s.memoriesChangedAt > s.generatedAt,
+          s.momentsChangedAt > s.generatedAt,
       };
     });
 

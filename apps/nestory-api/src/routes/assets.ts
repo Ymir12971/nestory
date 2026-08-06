@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { MEMORY_CONSTRAINTS, type Memory, type MemoryFile, type MimeType } from '@nestory/types';
+import { MOMENT_CONSTRAINTS, type Moment, type MomentFile, type MimeType } from '@nestory/types';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
 import { parseBody, parseParams, parseQuery, uuidParam, cursorPagination } from '../lib/validation';
@@ -15,23 +15,23 @@ const fileInputSchema = z.object({
   mimeType:     z.enum(['image/jpeg', 'image/png', 'image/heif']),
   widthPx:      z.number().int().positive().nullish(),
   heightPx:     z.number().int().positive().nullish(),
-  byteSize:     z.number().int().positive().max(MEMORY_CONSTRAINTS.maxPhotoBytes), // ≤ 10 MB
-  displayOrder: z.number().int().min(0).max(MEMORY_CONSTRAINTS.maxPhotos - 1).optional(),
+  byteSize:     z.number().int().positive().max(MOMENT_CONSTRAINTS.maxPhotoBytes), // ≤ 10 MB
+  displayOrder: z.number().int().min(0).max(MOMENT_CONSTRAINTS.maxPhotos - 1).optional(),
 });
 
-const memoryCreateSchema = z.object({
+const momentCreateSchema = z.object({
   childId:     z.string().uuid(),
   capturedAt:  z.string().datetime(),
-  // Redesign: text is required to save a Memory (photos optional).
-  textNote:    z.string().min(1).max(MEMORY_CONSTRAINTS.maxTextChars),
+  // Redesign: text is required to save a Moment (photos optional).
+  textNote:    z.string().min(1).max(MOMENT_CONSTRAINTS.maxTextChars),
   tagValues:   z.array(z.string().min(1).max(50)).max(20).optional(),
   isHighlight: z.boolean().optional(),
-  files:       z.array(fileInputSchema).max(MEMORY_CONSTRAINTS.maxPhotos).optional(),
+  files:       z.array(fileInputSchema).max(MOMENT_CONSTRAINTS.maxPhotos).optional(),
 });
 
 // Highlight toggle 走 POST /highlights（配额校验），不在 PATCH 里处理
-const memoryPatchSchema = z.object({
-  textNote:        z.string().max(MEMORY_CONSTRAINTS.maxTextChars).optional(),
+const momentPatchSchema = z.object({
+  textNote:        z.string().max(MOMENT_CONSTRAINTS.maxTextChars).optional(),
   tagValues:       z.array(z.string().min(1).max(50)).max(20).optional(),
   addFiles:        z.array(fileInputSchema).optional(),
   removeFileIds:   z.array(z.string().uuid()).optional(),
@@ -49,12 +49,12 @@ const trashQuery = cursorPagination.extend({
 
 // ---------- Serializer ----------
 
-function serializeMemory(row: any): Memory {
+function serializeMoment(row: any): Moment {
   return {
     id:            row.id,
     childId:       row.childId,
     assetType:     row.assetType,
-    files:         row.files.map((f: any): MemoryFile => ({
+    files:         row.files.map((f: any): MomentFile => ({
       id:           f.id,
       fileUrl:      f.fileUrl,
       mimeType:     f.mimeType as MimeType,
@@ -95,12 +95,12 @@ async function ensureChildOwned(childId: string, userId: string): Promise<void> 
 }
 
 /**
- * Memory 增/改/删后打点:若该 (child, month) 已有生成完成的 Story,记下
- * memoriesChangedAt — Premium 端 Regenerate 蓝条的触发信号。重生成会刷新
- * generatedAt,序列化时按 memoriesChangedAt > generatedAt 判定,自动失效。
- * Fire-and-forget:打点失败不应让 memory 写入本身报错。
+ * Moment 增/改/删后打点:若该 (child, month) 已有生成完成的 Story,记下
+ * momentsChangedAt — Premium 端 Regenerate 蓝条的触发信号。重生成会刷新
+ * generatedAt,序列化时按 momentsChangedAt > generatedAt 判定,自动失效。
+ * Fire-and-forget:打点失败不应让 moment 写入本身报错。
  */
-async function stampStoryMemoriesChanged(childId: string, capturedAt: Date, tz: string): Promise<void> {
+async function stampStoryMomentsChanged(childId: string, capturedAt: Date, tz: string): Promise<void> {
   const monthKey = toMonthKey(capturedAt, tz);
   try {
     await prisma.story.updateMany({
@@ -109,7 +109,7 @@ async function stampStoryMemoriesChanged(childId: string, capturedAt: Date, tz: 
         monthKey,
         status: { in: ['generated', 'fallback_generated'] },
       },
-      data: { memoriesChangedAt: new Date() },
+      data: { momentsChangedAt: new Date() },
     });
   } catch {
     // 打点失败静默 — 下次该月再有变更仍会尝试
@@ -153,9 +153,9 @@ async function upsertCustomTags(userId: string, tagValues: string[]): Promise<vo
 // ---------- Routes ----------
 
 export async function assetsRoutes(app: FastifyInstance) {
-  // POST /assets — 创建 Memory（metadata 路径，文件已上传到 Supabase Storage）
+  // POST /assets — 创建 Moment（metadata 路径，文件已上传到 Supabase Storage）
   app.post('/', async (req, reply) => {
-    const body = parseBody(memoryCreateSchema, req);
+    const body = parseBody(momentCreateSchema, req);
 
     // 业务校验：captured_at 不能是未来 5 分钟以上
     const capturedAt = new Date(body.capturedAt);
@@ -173,8 +173,8 @@ export async function assetsRoutes(app: FastifyInstance) {
     const hasText  = (body.textNote?.trim().length ?? 0) > 0;
     if (!hasFiles && !hasText) {
       throw new ApiError(
-        'EMPTY_MEMORY',
-        'Memory must have at least one photo or non-empty text',
+        'EMPTY_MOMENT',
+        'Moment must have at least one photo or non-empty text',
         400,
       );
     }
@@ -182,7 +182,7 @@ export async function assetsRoutes(app: FastifyInstance) {
       hasFiles && hasText ? 'mixed' : hasFiles ? 'photo' : 'text';
     const normalizedTags = normalizeTags(body.tagValues);
 
-    const memory = await prisma.$transaction(async (tx) => {
+    const moment = await prisma.$transaction(async (tx) => {
       const created = await tx.rawAsset.create({
         data: {
           childId:     body.childId,
@@ -218,15 +218,15 @@ export async function assetsRoutes(app: FastifyInstance) {
 
     const tz = await getUserTimezone(req.userId);
     // 补录进已生成 Story 的月份 → 标记可 regenerate
-    await stampStoryMemoriesChanged(memory.childId, memory.capturedAt, tz);
+    await stampStoryMomentsChanged(moment.childId, moment.capturedAt, tz);
     // §7.2 异步质量打标(清晰度/曝光/blurhash)
-    enqueuePhotoPreprocess(memory.files.map(f => f.id));
+    enqueuePhotoPreprocess(moment.files.map(f => f.id));
     reply.code(201);
     return {
-      data: serializeMemory({
-        ...memory,
+      data: serializeMoment({
+        ...moment,
         highlight: null,
-        __isEditable: isCurrentMonth(memory.capturedAt, tz),
+        __isEditable: isCurrentMonth(moment.capturedAt, tz),
       }),
     };
   });
@@ -264,7 +264,7 @@ export async function assetsRoutes(app: FastifyInstance) {
     const tz        = await getUserTimezone(req.userId);
 
     return {
-      data: trimmed.map(item => serializeMemory({
+      data: trimmed.map(item => serializeMoment({
         ...item,
         __isEditable: isCurrentMonth(item.capturedAt, tz),
       })),
@@ -299,7 +299,7 @@ export async function assetsRoutes(app: FastifyInstance) {
     const trimmed = hasMore ? items.slice(0, q.limit) : items;
 
     return {
-      data: trimmed.map(item => serializeMemory({
+      data: trimmed.map(item => serializeMoment({
         ...item,
         __isEditable: false,
       })),
@@ -310,8 +310,8 @@ export async function assetsRoutes(app: FastifyInstance) {
     };
   });
 
-  // GET /assets/months — 月份摘要（哪些月有 memory + 数量），驱动 H-01 月份筛选条
-  // （只显示有 memory 的过往月;当前月由前端恒显）。必须注册在 /:id 之前。
+  // GET /assets/months — 月份摘要（哪些月有 moment + 数量），驱动 H-01 月份筛选条
+  // （只显示有 moment 的过往月;当前月由前端恒显）。必须注册在 /:id 之前。
   app.get('/months', async (req) => {
     const q = parseQuery(z.object({ childId: z.string().uuid() }), req);
     await ensureChildOwned(q.childId, req.userId);
@@ -340,20 +340,20 @@ export async function assetsRoutes(app: FastifyInstance) {
   // GET /assets/:id
   app.get('/:id', async (req) => {
     const { id } = parseParams(uuidParam, req);
-    const memory = await prisma.rawAsset.findFirst({
+    const moment = await prisma.rawAsset.findFirst({
       where: { ...whereNotDeleted, id, userId: req.userId },
       include: {
         files:     { orderBy: { displayOrder: 'asc' } },
         highlight: { select: { id: true, title: true } },
       },
     });
-    if (!memory) throw Errors.notFound('Memory', id);
+    if (!moment) throw Errors.notFound('Moment', id);
 
     const tz = await getUserTimezone(req.userId);
     return {
-      data: serializeMemory({
-        ...memory,
-        __isEditable: isCurrentMonth(memory.capturedAt, tz),
+      data: serializeMoment({
+        ...moment,
+        __isEditable: isCurrentMonth(moment.capturedAt, tz),
       }),
     };
   });
@@ -361,13 +361,13 @@ export async function assetsRoutes(app: FastifyInstance) {
   // PATCH /assets/:id — 当月人人可编辑;过往月仅 Premium(2026-07 新规,旧 R-08 废止)
   app.patch('/:id', async (req) => {
     const { id } = parseParams(uuidParam, req);
-    const body   = parseBody(memoryPatchSchema, req);
+    const body   = parseBody(momentPatchSchema, req);
 
     const existing = await prisma.rawAsset.findFirst({
       where: { ...whereNotDeleted, id, userId: req.userId },
       include: { files: { select: { id: true } } },
     });
-    if (!existing) throw Errors.notFound('Memory', id);
+    if (!existing) throw Errors.notFound('Moment', id);
 
     const tz = await getUserTimezone(req.userId);
     if (!isCurrentMonth(existing.capturedAt, tz)) {
@@ -380,8 +380,8 @@ export async function assetsRoutes(app: FastifyInstance) {
         sub?.subscriptionStatus === 'trial_active';
       if (!isPremium) {
         throw new ApiError(
-          'MEMORY_EDIT_RESTRICTED',
-          'Editing past-month memories requires Premium',
+          'MOMENT_EDIT_RESTRICTED',
+          'Editing past-month moments requires Premium',
           403,
         );
       }
@@ -392,12 +392,12 @@ export async function assetsRoutes(app: FastifyInstance) {
       throw Errors.validation('addFiles and reorderFileIds are mutually exclusive');
     }
 
-    // EMPTY_MEMORY: 新规则 text 必填 — 编辑后不允许留空文本
+    // EMPTY_MOMENT: 新规则 text 必填 — 编辑后不允许留空文本
     const finalText = body.textNote !== undefined ? body.textNote : existing.textNote;
     if ((finalText?.trim().length ?? 0) === 0) {
       throw new ApiError(
-        'EMPTY_MEMORY',
-        'Memory must keep a text note (text is required to save)',
+        'EMPTY_MOMENT',
+        'Moment must keep a text note (text is required to save)',
         400,
       );
     }
@@ -473,12 +473,12 @@ export async function assetsRoutes(app: FastifyInstance) {
       });
     });
 
-    await stampStoryMemoriesChanged(updated.childId, updated.capturedAt, tz);
+    await stampStoryMomentsChanged(updated.childId, updated.capturedAt, tz);
     // 新增的照片同样走质量打标(已处理过的有 qualityTier,worker 幂等跳过)
     enqueuePhotoPreprocess(updated.files.map(f => f.id));
 
     return {
-      data: serializeMemory({
+      data: serializeMoment({
         ...updated,
         __isEditable: true,
       }),
@@ -494,7 +494,7 @@ export async function assetsRoutes(app: FastifyInstance) {
       where:  { id, userId: req.userId },
       select: { id: true, capturedAt: true, childId: true },
     });
-    if (!existing) throw Errors.notFound('Memory', id);
+    if (!existing) throw Errors.notFound('Moment', id);
 
     // 当月人人可删;过往月仅 Premium(与 PATCH 同规,旧 R-08 废止)
     const tz = await getUserTimezone(req.userId);
@@ -508,8 +508,8 @@ export async function assetsRoutes(app: FastifyInstance) {
         sub?.subscriptionStatus === 'trial_active';
       if (!isPremium) {
         throw new ApiError(
-          'MEMORY_EDIT_RESTRICTED',
-          'Deleting past-month memories requires Premium',
+          'MOMENT_EDIT_RESTRICTED',
+          'Deleting past-month moments requires Premium',
           403,
         );
       }
@@ -520,12 +520,12 @@ export async function assetsRoutes(app: FastifyInstance) {
         where: { id },
         data:  { deletedAt: new Date() },
       });
-      await stampStoryMemoriesChanged(existing.childId, existing.capturedAt, tz);
+      await stampStoryMomentsChanged(existing.childId, existing.capturedAt, tz);
       return { data: { deletedAt: new Date().toISOString() } };
     }
 
     await prisma.rawAsset.delete({ where: { id } });
-    await stampStoryMemoriesChanged(existing.childId, existing.capturedAt, tz);
+    await stampStoryMomentsChanged(existing.childId, existing.capturedAt, tz);
     return { data: { hardDeleted: true } };
   });
 
@@ -535,8 +535,8 @@ export async function assetsRoutes(app: FastifyInstance) {
     const existing = await prisma.rawAsset.findFirst({
       where: { id, userId: req.userId },
     });
-    if (!existing) throw Errors.notFound('Memory', id);
-    if (!existing.deletedAt) throw Errors.validation('Memory is not soft-deleted');
+    if (!existing) throw Errors.notFound('Moment', id);
+    if (!existing.deletedAt) throw Errors.validation('Moment is not soft-deleted');
 
     const tz = await getUserTimezone(req.userId);
     const restored = await prisma.rawAsset.update({
@@ -548,10 +548,10 @@ export async function assetsRoutes(app: FastifyInstance) {
       },
     });
 
-    await stampStoryMemoriesChanged(restored.childId, restored.capturedAt, tz);
+    await stampStoryMomentsChanged(restored.childId, restored.capturedAt, tz);
 
     return {
-      data: serializeMemory({
+      data: serializeMoment({
         ...restored,
         __isEditable: isCurrentMonth(restored.capturedAt, tz),
       }),

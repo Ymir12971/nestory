@@ -92,7 +92,7 @@ apps/nestory-mobile/
 │   │   ├── index.tsx                    # H-01 Home → features/home
 │   │   ├── stories.tsx                  # S-01 Stories 列表
 │   │   └── highlights.tsx               # HL-01 Highlights 列表
-│   ├── memory/
+│   ├── moment/
 │   │   ├── add.tsx
 │   │   ├── list.tsx
 │   │   └── [id].tsx
@@ -133,11 +133,11 @@ apps/nestory-mobile/
 │   │   ├── api/, hooks/, components/, screens/, types.ts
 │   │   └── （HighlightCard 4:3 / 3:4 × OneLine/TwoLine 四变体；HL-01/HL-02）
 │   │
-│   ├── memories/                        # Memory 上传/编辑（注意：不要跟 stories 混）
-│   │   ├── api/memoriesApi.ts           # POST /assets（含 Idempotency-Key）+ PATCH /assets/:id
-│   │   ├── hooks/{useMemories, useUploadMemory, useDeleteMemory}.ts
-│   │   ├── components/{MemoryCard, PhotoGrid, UploadButton, TagSelector, HighlightToggle}.tsx
-│   │   ├── screens/{MemoriesScreen, MemoryUploadScreen, MemoryDetailScreen}.tsx
+│   ├── moments/                        # Moment 上传/编辑（注意：不要跟 stories 混）
+│   │   ├── api/momentsApi.ts           # POST /assets（含 Idempotency-Key）+ PATCH /assets/:id
+│   │   ├── hooks/{useMoments, useUploadMoment, useDeleteMoment}.ts
+│   │   ├── components/{MomentCard, PhotoGrid, UploadButton, TagSelector, HighlightToggle}.tsx
+│   │   ├── screens/{MomentsScreen, MomentUploadScreen, MomentDetailScreen}.tsx
 │   │   └── types.ts
 │   │
 │   ├── subscription/
@@ -442,7 +442,7 @@ apps/nestory-mobile   → @nestory/types
 用户操作（apps/nestory-mobile）
   ↓ REST API
 apps/nestory-api/routes  →  services
-  ↓ Memory 上传
+  ↓ Moment 上传
 apps/nestory-api/src/modules/media (mime check / exif strip / Supabase upload)
   ↓
 prisma 事务（raw_assets + N 行 asset_files）

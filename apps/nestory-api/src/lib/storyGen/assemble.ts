@@ -37,10 +37,10 @@ export interface AssembleInput {
   structure:    StructureDecision;
   laidOut:      LaidOutChapter[];
   writing:      WritingOutput;
-  /** All of the month's photos (surviving memories) — Cover-A/B 判定用. */
+  /** All of the month's photos (surviving moments) — Cover-A/B 判定用. */
   allPhotos:    PhotoMeta[];
   /** Month totals for the Closing stats (包含未入选素材, 决策 C1). */
-  totals:       { memories: number; photos: number };
+  totals:       { moments: number; photos: number };
 }
 
 export interface AssembledCore {
@@ -68,7 +68,7 @@ export function assemble(input: AssembleInput, cfg: StoryGenConfig): AssembledCo
       const laidBlock = l.blocks[structCh.units.indexOf(unit)];
       const text = textByUnit.get(unit.unit_id) ?? '';
       return {
-        memoryIds:   unit.memory_ids,
+        momentIds:   unit.moment_ids,
         text,
         photos:      laidBlock?.photos ?? [],
         blockLayout: resolveLayout(laidBlock?.layout ?? 'Block-Text', text),
@@ -130,7 +130,7 @@ function validate(core: AssembledCore, input: AssembleInput, cfg: StoryGenConfig
     }
     if (ch.blocks.length === 0) issues.push(`chapter "${ch.chapterTitle}" has no blocks`);
     for (const b of ch.blocks) {
-      if (b.memoryIds.length === 0) issues.push('dangling block without memory ids');
+      if (b.momentIds.length === 0) issues.push('dangling block without moment ids');
       const wc = wordCount(b.text);
       // 长度用宽松带(±40%)校验 — 模型对词数只能近似遵循,过严会重试风暴
       if (b.text && (wc < Math.floor(pMin * 0.6) || wc > Math.ceil(pMax * 1.4))) {

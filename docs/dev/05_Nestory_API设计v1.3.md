@@ -12,7 +12,7 @@
 - **API 字段命名约定改为 camelCase（决策 1）**：所有 JSON request/response 字段统一 `camelCase`（如 `coverFileId / monthKey / isLastFreeStory / capturedAt / childId`）。本文档中残留的 snake_case 示例将随各 endpoint 实现陆续替换；TS 类型层 `packages/types/src/` 是当前最权威的字段定义。
 - **Base URL 端口由 3000 改为 3001**：与 `apps/nestory-api/src/config/env.ts` 默认值对齐
 - **移除 `POST /stories`（公网接口）**：决策 4 — Story 生成走 BullMQ worker，触发由 cron / milestone hook / `/internal/stories/enqueue` 完成。`STORY_ALREADY_EXISTS` (409) 改为 worker 内部错误码。
-- **`STORY_READ_ONLY` 错误码归属调整**：从 stories 模块移到 **assets** 模块，由 `PATCH /assets/:id` / `DELETE /assets/:id` 命中 R-08 时返回（编辑历史月份 memory）。
+- **`STORY_READ_ONLY` 错误码归属调整**：从 stories 模块移到 **assets** 模块，由 `PATCH /assets/:id` / `DELETE /assets/:id` 命中 R-08 时返回（编辑历史月份 moment）。
 - **新增 `/internal/*` 控制平面**：admin token 鉴权（与 user JWT 区分），不暴露给 client。详见 §"内部控制平面"章节。
 - **新增 GDPR 双层删除接口**：所有 `DELETE` endpoint 默认软删（移入 trash）；`?hard=true` 硬删；新增 `POST /:resource/:id/restore` 与 `GET /:resource/trash`（决策 5）。
 - **`GET /users/me` 响应补字段**：`name`、`linkedProviders[]`（OAuth 绑定列表）。详见 `packages/types/src/user.ts`。
@@ -100,11 +100,11 @@ Token 由 Supabase Auth 签发，后端通过 Supabase JWT 验证获取 `user_id
 | HTTP | code | 触发场景 |
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | 请求参数不合法 |
-| 400 | `EMPTY_MEMORY` | Memory 同时无文字无照片（POST 或 PATCH 删到空） |
+| 400 | `EMPTY_MOMENT` | Moment 同时无文字无照片（POST 或 PATCH 删到空） |
 | 401 | `UNAUTHORIZED` | Token 缺失或失效 |
 | 403 | `HIGHLIGHT_LIMIT_REACHED` | Free 用户 Highlight 数量 ≥ 10（R-04） |
 | 403 | `PROFILE_SWITCH_RESTRICTED` | Never Paid 用户尝试切换档案（R-05；Ended 用户不拦截） |
-| 403 | `MEMORY_EDIT_RESTRICTED` | 尝试编辑历史月份 Memory（R-08） |
+| 403 | `MOMENT_EDIT_RESTRICTED` | 尝试编辑历史月份 Moment（R-08） |
 | 403 | `STORY_READ_ONLY` | v1.4 改：`PATCH/DELETE /assets/:id` 命中已生成历史月份（R-08）时返回 |
 | 404 | `NOT_FOUND` | 资源不存在 |
 | 409 | `STORY_ALREADY_EXISTS` | v1.4 改：仅 BullMQ worker 内部使用（重复入队保护），公网 API 不返回 |
@@ -155,7 +155,7 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
 
 ### POST /assets
 
-上传单条 Memory（照片 + 文字 + Tag + Highlight 标记）。
+上传单条 Moment（照片 + 文字 + Tag + Highlight 标记）。
 
 **Request Headers**
 
@@ -226,13 +226,13 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
 }
 ```
 
-> `files` 数组按 `display_order` 升序，对应 `asset_files` 子表行。纯文字 Memory 时 `files: []`。
+> `files` 数组按 `display_order` 升序，对应 `asset_files` 子表行。纯文字 Moment 时 `files: []`。
 
 ---
 
 ### GET /assets
 
-获取指定孩子的 Memory 列表（H-03 Memory List 数据源）。
+获取指定孩子的 Moment 列表（H-03 Moment List 数据源）。
 
 **Query Parameters**
 
@@ -278,9 +278,9 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
 
 ### PATCH /assets/:id
 
-编辑当月 Memory。
+编辑当月 Moment。
 
-**限制：** 历史月份 Memory 不可编辑。后端以 `captured_at` 判断是否属于当月（用户本地时区）。
+**限制：** 历史月份 Moment 不可编辑。后端以 `captured_at` 判断是否属于当月（用户本地时区）。
 
 **Request**（multipart/form-data，所有字段可选，只传需要更新的字段）
 
@@ -293,11 +293,11 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
 | `remove_file_ids` | string[] (UUID) | 要删除的 asset_files.id 列表，从 Storage 物理删除由 cleanup job 处理 |
 | `reorder_file_ids` | string[] (UUID) | 全量重排 asset_files，按数组顺序重写 display_order；与 add_photos 互斥 |
 
-> 删除最后一张照片且 text_note 为空 → `400 EMPTY_MEMORY`。Memory 不允许同时无文字无图。
+> 删除最后一张照片且 text_note 为空 → `400 EMPTY_MOMENT`。Moment 不允许同时无文字无图。
 
 **权限校验**
 
-- `captured_at` 不在当月 → `403 MEMORY_EDIT_RESTRICTED`
+- `captured_at` 不在当月 → `403 MOMENT_EDIT_RESTRICTED`
 - `is_highlight` 从 false → true 时，检查 Highlight count（R-04）
 
 **Response 200** 返回更新后完整对象，结构同 POST /assets。
@@ -306,9 +306,9 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
 
 ### DELETE /assets/:id
 
-删除当月 Memory。
+删除当月 Moment。
 
-**限制：** 历史月份 Memory 不可删除（R-08）。
+**限制：** 历史月份 Moment 不可删除（R-08）。
 
 **Response 204** No Content
 
@@ -345,8 +345,8 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
       // Paywall A 触发依据，前端从 S-02 返回时检查
       "watermark_enabled": true,
       "generated_at": "2026-04-01T00:05:32Z",
-      "memory_count": 14
-      // 生成该 Story 时使用的 Memory 数量；S-01 Generated card footer 展示用
+      "moment_count": 14
+      // 生成该 Story 时使用的 Moment 数量；S-01 Generated card footer 展示用
     },
     {
       "id": null,
@@ -358,14 +358,14 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
       "is_last_free_story": false,
       "watermark_enabled": null,
       "generated_at": null,
-      "memory_count": null
+      "moment_count": null
     }
   ],
   "current_month": {
     "month_key": "2026-04",
     "list_item_state": "current_in_progress",
     // current_collecting | current_in_progress | current_quota_exhausted
-    "memory_count": 12,
+    "moment_count": 12,
     "days_until_generation": 19,
     "milestone_level": "10"
     // 动态引导文案 milestone 档位：null | "1" | "3" | "10" | "15+"
@@ -461,7 +461,7 @@ GET /stories?limit=20&before=2026-02-01T00:00:00Z
 
 ### POST /highlights
 
-将指定 Memory 标记为 Highlight。
+将指定 Moment 标记为 Highlight。
 
 **Request Body**
 
@@ -574,7 +574,7 @@ Free/降级：
 
 取消 Highlight 标记（Remove Highlight，所有用户可用）。
 
-Memory 本身不删除，只取消 Highlight 标记。
+Moment 本身不删除，只取消 Highlight 标记。
 
 **操作：**
 1. 删除 `highlights` 行
@@ -979,7 +979,7 @@ X-RevenueCat-Webhook-Secret: <secret>
 
 从用户 Tag Library 移除一个自定义 Tag（URL encode name）。
 
-**行为：** 仅删除 `user_tag_library` 行，已存入任何 Memory 的 `raw_assets.tags` 字符串**不受影响**（orphan chip 语义）。
+**行为：** 仅删除 `user_tag_library` 行，已存入任何 Moment 的 `raw_assets.tags` 字符串**不受影响**（orphan chip 语义）。
 
 **Response 204** No Content
 
@@ -993,7 +993,7 @@ X-RevenueCat-Webhook-Secret: <secret>
 | `POST /assets`（is_highlight=true） | R-04 Highlight 上限 | 后端 Save 时兜底 |
 | `PATCH /assets/:id`（tag_values） | — | 全量替换 raw_assets.tags；包含新 custom tag 时写入 user_tag_library |
 | `PATCH /assets/:id`（is_highlight true→true） | R-04 | 后端 |
-| `PATCH /assets/:id`（历史月份） | R-08 Memory 编辑 | 后端，以 captured_at 判断 |
+| `PATCH /assets/:id`（历史月份） | R-08 Moment 编辑 | 后端，以 captured_at 判断 |
 | `DELETE /assets/:id`（历史月份） | R-08 | 后端 |
 | `POST /highlights` | R-04 | 后端 |
 | `DELETE /highlights/:id` | 所有用户可用 | 无限制 |
@@ -1020,7 +1020,7 @@ App 启动
   → GET /stories?child_id=...        // 获取 Story 列表（S-01 数据）
 ```
 
-### 上传 Memory
+### 上传 Moment
 
 ```
 用户填写 H-02

@@ -53,7 +53,7 @@ export default function TermsPage() {
 
       <h2 style={h2Style}>4. AI-generated content</h2>
       <p>
-        AI Stories are produced by a third-party model based on the memories
+        AI Stories are produced by a third-party model based on the moments
         and metadata you supply. The output may contain inaccuracies; it is
         intended as a keepsake, not a factual record. You are free to delete
         any generated story you don't want to keep.

@@ -6,7 +6,7 @@ export type Session = { userId: string; accessToken: string | null };
 
 // ─── Dev escape hatch ──────────────────────────────────────────────────────
 // When EXPO_PUBLIC_SUPABASE_* envs are absent (or for the demo flow before
-// OAuth is configured), SignInScreen calls setDevSession() to set an in-memory
+// OAuth is configured), SignInScreen calls setDevSession() to set an in-moment
 // session whose access token is `dev-<userId>`. The API server recognises that
 // prefix in non-production and trusts the embedded userId.
 

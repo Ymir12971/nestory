@@ -73,7 +73,7 @@ base/
 |---|---|---|
 | 底座（可复用） | `packages/` | 用户系统、订阅状态机、RevenueCat、媒体上传、AI 管道、推送调度、通用组件、Token 系统 |
 | 业务配置层 | `packages/config/` | 权益配额、Paywall 变体内容、Tag 预设、AI Prompt 模板、推送文案 |
-| 产品业务层 | `apps/nestory-*/` | 所有页面、Memory / Story / Highlight 数据模型、产品专属逻辑 |
+| 产品业务层 | `apps/nestory-*/` | 所有页面、Moment / Story / Highlight 数据模型、产品专属逻辑 |
 
 ---
 

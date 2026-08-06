@@ -23,7 +23,7 @@ interface DateTimePickerSheetProps {
   onDismiss: () => void;
 }
 
-/** Bottom sheet for picking the Memory's capture date & time (H-02). */
+/** Bottom sheet for picking the Moment's capture date & time (H-02). */
 export function DateTimePickerSheet({ visible, value, onConfirm, onDismiss }: DateTimePickerSheetProps) {
   const now = new Date();
   const YEARS = yearsUpTo(now.getFullYear());
@@ -51,7 +51,7 @@ export function DateTimePickerSheet({ visible, value, onConfirm, onDismiss }: Da
     if (meridiemIdx === 1 && hour24 !== 12) hour24 += 12;
     if (meridiemIdx === 0 && hour24 === 12) hour24 = 0;
     const picked = new Date(Number(YEARS[yearIdx]), monthIdx, dayIdx + 1, hour24, minuteIdx);
-    // A memory can't be captured in the future — clamp to now.
+    // A moment can't be captured in the future — clamp to now.
     onConfirm(picked > now ? now : picked);
     onDismiss();
   };

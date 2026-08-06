@@ -20,7 +20,7 @@ export function PlanCancelledScreen() {
         </View>
         <Text style={styles.title}>Premium has been cancelled</Text>
         <Text style={styles.caption}>
-          Your Premium benefits stay active until the end of the current billing period. All your Stories, Memories and Profiles are safe — nothing gets deleted.
+          Your Premium benefits stay active until the end of the current billing period. All your Stories, Moments and Profiles are safe — nothing gets deleted.
         </Text>
       </View>
 

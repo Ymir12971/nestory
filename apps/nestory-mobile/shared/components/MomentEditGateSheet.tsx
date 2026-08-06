@@ -2,17 +2,17 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme, palette } from '@/shared/theme';
 
-// Past-month Memory edit gates (2026-07 redesign; old everyone-read-only R-08
-// is gone). Current-month memories never see these — the caller routes straight
+// Past-month Moment edit gates (2026-07 redesign; old everyone-read-only R-08
+// is gone). Current-month moments never see these — the caller routes straight
 // to the edit page.
 //
 //   variant="free"    — H-NoPremium request to edit Popup (744:3627): upgrade
 //                       or view benefits; both land on the global Paywall
 //                       (决策 4: unified MVP routing).
-//   variant="premium" — H-Memory Edit Alert (745:1252): heads-up that the
+//   variant="premium" — H-Moment Edit Alert (745:1252): heads-up that the
 //                       Story can be regenerated later, then continue to edit.
 
-interface MemoryEditGateSheetProps {
+interface MomentEditGateSheetProps {
   visible:  boolean;
   variant:  'free' | 'premium';
   /** free: open the paywall. premium: proceed into the edit page. */
@@ -22,13 +22,13 @@ interface MemoryEditGateSheetProps {
   onDismiss: () => void;
 }
 
-export function MemoryEditGateSheet({
+export function MomentEditGateSheet({
   visible,
   variant,
   onPrimary,
   onViewBenefits,
   onDismiss,
-}: MemoryEditGateSheetProps) {
+}: MomentEditGateSheetProps) {
   const isFree = variant === 'free';
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
@@ -40,8 +40,8 @@ export function MemoryEditGateSheet({
         </Text>
         <Text style={styles.body}>
           {isFree
-            ? 'This Memory was used to create a Story. You can upgrade to Premium to edit and recreate that Story.'
-            : 'This Memory was used to create a Story. As our Premium user, you have the chance to regenerate that Story later.'}
+            ? 'This Moment was used to create a Story. You can upgrade to Premium to edit and recreate that Story.'
+            : 'This Moment was used to create a Story. As our Premium user, you have the chance to regenerate that Story later.'}
         </Text>
 
         <Pressable

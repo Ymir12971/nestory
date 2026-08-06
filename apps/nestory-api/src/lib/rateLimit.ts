@@ -17,7 +17,7 @@ import { prisma } from './prisma';
  * never delay the 429 response.
  *
  * Storage: Redis when REDIS_URL is set (so a multi-instance API shares the
- * counter), in-memory otherwise (single dev process). The plugin handles
+ * counter), in-moment otherwise (single dev process). The plugin handles
  * both transparently when given a `redis` option.
  *
  * Defaults are conservative; tune via routeConfig per endpoint:
@@ -29,7 +29,7 @@ const DEFAULT_WINDOW_MS   = 60 * 1000;
 const ABUSE_TYPE          = 'rate_limit_429';
 
 export async function registerRateLimit(app: FastifyInstance): Promise<void> {
-  // In-memory store. Single-instance dev (today) is unaffected; on Railway
+  // In-moment store. Single-instance dev (today) is unaffected; on Railway
   // we'll spin up a Redis service and switch the plugin to a Redis store —
   // the API is single-instance until that scales out. Keeping the in-mem
   // path here avoids brittle ioredis startup races when Docker Desktop is

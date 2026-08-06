@@ -13,7 +13,7 @@ export type StoryStatus =
 // current month states come from current_month.list_item_state
 // historical states come from data[].list_item_state
 export type StoryListItemState =
-  | 'current_collecting'       // current month, memories accumulating
+  | 'current_collecting'       // current month, moments accumulating
   | 'current_in_progress'      // current month, generation triggered/running
   | 'current_quota_exhausted'  // current month, Free quota used up (R-01)
   | 'current_generated'        // current month, story finished (manual trigger / early generation)
@@ -31,18 +31,18 @@ export interface StoryListItem {
   isLastFreeStory: boolean;             // Paywall A trigger — check on return from S-02
   watermarkEnabled: boolean | null;     // null when no story
   generatedAt: string | null;
-  memoryCount: number | null;           // null when no story; count of memories used to generate
+  momentCount: number | null;           // null when no story; count of moments used to generate
   /**
-   * Redesign (S-Regeneration allowed): memories changed after this month's
-   * story was generated (or after a no-memories month got backfilled).
+   * Redesign (S-Regeneration allowed): moments changed after this month's
+   * story was generated (or after a no-moments month got backfilled).
    * Premium-only regenerate strip renders when true. Backend populates this
-   * once memory-change tracking lands (WorkPlan §6) — optional until then.
+   * once moment-change tracking lands (WorkPlan §6) — optional until then.
    */
-  memoriesChanged?: boolean;
+  momentsChanged?: boolean;
   /**
    * Server's verdict on whether the regenerate affordance should show
-   * (决策 3 "有占位卡就可以生成"): Premium, the month has memories, nothing is
-   * already in flight, and — for an already-generated month — the memories
+   * (决策 3 "有占位卡就可以生成"): Premium, the month has moments, nothing is
+   * already in flight, and — for an already-generated month — the moments
    * actually changed. Clients render the strip on this alone.
    */
   canRegenerate?: boolean;
@@ -55,7 +55,7 @@ export interface CurrentMonthStatus {
     StoryListItemState,
     'current_collecting' | 'current_in_progress' | 'current_quota_exhausted' | 'current_generated'
   >;
-  memoryCount: number;
+  momentCount: number;
   daysUntilGeneration: number;
   milestoneLevel: null | '1' | '3' | '10' | '15+';
   // Populated when listItemState === 'current_generated' — lets the mobile
@@ -188,9 +188,9 @@ export interface StoryPhoto {
 }
 
 // A narrative unit = one Block. Photos are already filtered + cropped by the
-// image layer; text comes from Prompt 2. `memoryIds` may be >1 (merged unit).
+// image layer; text comes from Prompt 2. `momentIds` may be >1 (merged unit).
 export interface StoryBlock {
-  memoryIds:   string[];
+  momentIds:   string[];
   text:        string;                 // 30-50 words; empty allowed for Block-Text
   photos:      StoryPhoto[];           // ≤ 3, source-agnostic
   blockLayout: BlockLayout;
@@ -220,7 +220,7 @@ export interface StoryBodyChapter {
 export interface StoryClosingSection {
   type:     'closing';
   headline: string;                    // fixed product copy, NOT LLM-generated
-  stats:    { memories: number; photos: number }; // month totals, incl. non-shown
+  stats:    { moments: number; photos: number }; // month totals, incl. non-shown
 }
 
 // StoryDocument v3 — stored in stories.document JSONB when pipeline = two-phase-v3

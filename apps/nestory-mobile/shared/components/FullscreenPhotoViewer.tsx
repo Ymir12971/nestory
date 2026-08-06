@@ -22,7 +22,7 @@ interface FullscreenPhotoViewerProps {
   onDismiss:    () => void;
 }
 
-/** Full-screen swipeable photo viewer, opened by tapping a thumbnail (e.g. H-04 Memory Detail carousel). */
+/** Full-screen swipeable photo viewer, opened by tapping a thumbnail (e.g. H-04 Moment Detail carousel). */
 export function FullscreenPhotoViewer({ visible, photoUrls, initialIndex, onDismiss }: FullscreenPhotoViewerProps) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();

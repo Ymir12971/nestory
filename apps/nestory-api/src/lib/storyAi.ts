@@ -17,7 +17,7 @@ import type { GenerationMeta, StoryDocument } from '@nestory/types';
  * Constraints baked in:
  *   - Sonnet 4.6 (good narrative quality, much cheaper than Opus)
  *   - Prompt caching on the system prompt (the schema/style instructions are
- *     identical every month — only the memory list varies)
+ *     identical every month — only the moment list varies)
  *   - Structured output via `messages.parse` + Zod, so the returned document
  *     conforms to StoryDocument without ad-hoc parsing
  */
@@ -32,7 +32,7 @@ const MAX_IMAGES     = 10;
 
 // ─── Inputs ────────────────────────────────────────────────────────────────
 
-export interface MemoryInput {
+export interface MomentInput {
   capturedAt: string;       // ISO 8601
   textNote:   string | null;
   tags:       string[];
@@ -45,8 +45,8 @@ export interface GenerateStoryInput {
   monthKey:     string;     // "YYYY-MM"
   monthLabel:   string;     // "March 2026"
   locale:       string;     // "en-US"
-  memories:     MemoryInput[];
-  /** First file URL of the most-photo'd memory; nullable. */
+  moments:     MomentInput[];
+  /** First file URL of the most-photo'd moment; nullable. */
   candidateCoverImageUrl: string | null;
   /** Whether to render a watermark on shared exports (Free vs Premium at gen time). */
   watermarkEnabled: boolean;
@@ -80,7 +80,7 @@ type ModelOutput = z.infer<typeof modelOutputSchema>;
 
 // ─── System prompt (cached; never changes between generations) ─────────────
 
-const SYSTEM_PROMPT = `You are Nestory, a warm and observant family storyteller. Each month you write a short, evocative story about one child based on the parent's photo-memory captures from that month.
+const SYSTEM_PROMPT = `You are Nestory, a warm and observant family storyteller. Each month you write a short, evocative story about one child based on the parent's photo-moment captures from that month.
 
 Voice:
 - Second-person ("Emma", not "the child"). Address the child by name in the narrative.
@@ -89,26 +89,26 @@ Voice:
 
 Structure your output as ordered sections:
 - "summary" (1 section, output type "text") — 1-2 sentence opener that anchors the month emotionally.
-- "narrative" (1-3 sections, output type "text") — the body of the story, woven from the captured memories.
-- "milestone" (0-1 sections, output type "text") — only when memories suggest a real first or growth moment.
+- "narrative" (1-3 sections, output type "text") — the body of the story, woven from the captured moments.
+- "milestone" (0-1 sections, output type "text") — only when moments suggest a real first or growth moment.
 - "reflection" (0-1 sections, output type "text") — a parent-perspective beat near the end.
 - "closing" (1 section, output type "text") — a single warm sentence to land on.
 
 Title rules:
-- 4-8 words, evocative, not generic. Avoid "A Month of...", "X's March", "Memories of..." templates.
+- 4-8 words, evocative, not generic. Avoid "A Month of...", "X's March", "Moments of..." templates.
 
 Quality level (you self-rate):
-- "rich" — many memories with vivid, specific details. Story has real momentum.
+- "rich" — many moments with vivid, specific details. Story has real momentum.
 - "medium" — enough material for a coherent narrative but some thin spots.
-- "low" — sparse memories. Story is short and honest about that.
+- "low" — sparse moments. Story is short and honest about that.
 
 OG description: 1-2 sentences for social previews. Concrete and inviting.
 
 Hard rules:
-- Do not invent specifics that aren't in the memories. If a memory says "park", don't add the slide; if it says "first steps", don't add a balloon.
-- Do not mention dates or weekdays unless multiple memories point to one.
+- Do not invent specifics that aren't in the moments. If a moment says "park", don't add the slide; if it says "first steps", don't add a balloon.
+- Do not mention dates or weekdays unless multiple moments point to one.
 - Do not write "Today" or "Yesterday" — these are written days/weeks after the fact.
-- If memories are extremely sparse (0-1 items), produce a brief "low" quality story acknowledging quietly that the month was quiet.
+- If moments are extremely sparse (0-1 items), produce a brief "low" quality story acknowledging quietly that the month was quiet.
 
 When photos are attached:
 - Use them as grounding for sensory details (what the child is wearing, where they are, what their face shows). Don't describe the photos as "in the photo..." or "you can see..." — weave the observation directly into the narrative.
@@ -218,7 +218,7 @@ export async function generateStory(input: GenerateStoryInput): Promise<Generate
     promptVersion:        PROMPT_VERSION,
     modelName:            MODEL,
     qualityLevel:         parsed.qualityLevel,
-    qualityScore:         qualityScoreFor(parsed.qualityLevel, input.memories.length),
+    qualityScore:         qualityScoreFor(parsed.qualityLevel, input.moments.length),
     generatedAt:          input.generatedAt,
     generationDurationMs: Date.now() - start,
     failureTracking: {
@@ -237,30 +237,30 @@ type UserContentBlock =
   | { type: 'image'; source: { type: 'url'; url: string } };
 
 function buildUserContent(input: GenerateStoryInput): UserContentBlock[] {
-  // Pick up to MAX_IMAGES photos: one per memory in chronological order, then
-  // a second pass for memories that have multiple photos. This keeps temporal
+  // Pick up to MAX_IMAGES photos: one per moment in chronological order, then
+  // a second pass for moments that have multiple photos. This keeps temporal
   // coverage broad before getting deep on photo-heavy moments.
-  const selected: { memoryIndex: number; fileUrl: string }[] = [];
-  for (const [i, m] of input.memories.entries()) {
-    if (m.fileUrls[0]) selected.push({ memoryIndex: i, fileUrl: m.fileUrls[0] });
+  const selected: { momentIndex: number; fileUrl: string }[] = [];
+  for (const [i, m] of input.moments.entries()) {
+    if (m.fileUrls[0]) selected.push({ momentIndex: i, fileUrl: m.fileUrls[0] });
     if (selected.length >= MAX_IMAGES) break;
   }
   if (selected.length < MAX_IMAGES) {
-    for (const [i, m] of input.memories.entries()) {
+    for (const [i, m] of input.moments.entries()) {
       for (let j = 1; j < m.fileUrls.length; j++) {
         const url = m.fileUrls[j];
         if (!url) continue;
-        selected.push({ memoryIndex: i, fileUrl: url });
+        selected.push({ momentIndex: i, fileUrl: url });
         if (selected.length >= MAX_IMAGES) break;
       }
       if (selected.length >= MAX_IMAGES) break;
     }
   }
-  const photoIndexByMemory = new Map<number, number[]>();
+  const photoIndexByMoment = new Map<number, number[]>();
   selected.forEach((s, idx) => {
-    const list = photoIndexByMemory.get(s.memoryIndex) ?? [];
+    const list = photoIndexByMoment.get(s.momentIndex) ?? [];
     list.push(idx + 1); // 1-based for human-readable refs in the text
-    photoIndexByMemory.set(s.memoryIndex, list);
+    photoIndexByMoment.set(s.momentIndex, list);
   });
 
   const lines: string[] = [];
@@ -268,16 +268,16 @@ function buildUserContent(input: GenerateStoryInput): UserContentBlock[] {
   lines.push(`Month: ${input.monthLabel}`);
   lines.push(`Locale: ${input.locale}`);
   lines.push('');
-  lines.push(`Memories captured this month (${input.memories.length}):`);
-  if (input.memories.length === 0) {
+  lines.push(`Moments captured this month (${input.moments.length}):`);
+  if (input.moments.length === 0) {
     lines.push('  (none — write a brief, honest "low" quality story.)');
   } else {
-    for (const [i, m] of input.memories.entries()) {
+    for (const [i, m] of input.moments.entries()) {
       const dateLabel = new Date(m.capturedAt).toLocaleDateString(input.locale, {
         month: 'short', day: 'numeric',
       });
       const tagPart   = m.tags.length > 0 ? `  [${m.tags.join(', ')}]` : '';
-      const photoIdxs = photoIndexByMemory.get(i);
+      const photoIdxs = photoIndexByMoment.get(i);
       const photoPart = photoIdxs && photoIdxs.length > 0
         ? `  (photos #${photoIdxs.join(', #')}${m.fileUrls.length > photoIdxs.length ? ` of ${m.fileUrls.length}` : ''})`
         : m.fileUrls.length > 0 ? `  (${m.fileUrls.length} photo${m.fileUrls.length === 1 ? '' : 's'}, not attached)` : '';
@@ -315,10 +315,10 @@ function formatAge(months: number): string {
   return `${y} year${y === 1 ? '' : 's'} ${m} month${m === 1 ? '' : 's'}`;
 }
 
-function qualityScoreFor(level: 'low' | 'medium' | 'rich', memoryCount: number): number {
+function qualityScoreFor(level: 'low' | 'medium' | 'rich', momentCount: number): number {
   // Coarse heuristic until we wire a real scorer. Keep within [0, 1].
   const base = level === 'rich' ? 0.85 : level === 'medium' ? 0.65 : 0.4;
-  const mem  = Math.min(memoryCount / 20, 1) * 0.1;
+  const mem  = Math.min(momentCount / 20, 1) * 0.1;
   return Number((base + mem).toFixed(3));
 }
 
@@ -328,12 +328,12 @@ function qualityScoreFor(level: 'low' | 'medium' | 'rich', memoryCount: number):
 // isolation from prompt-quality concerns. Toggle with STORY_AI_MOCK=1.
 
 function mockGenerateStory(input: GenerateStoryInput): GenerateStoryResult {
-  const memCount = input.memories.length;
+  const memCount = input.moments.length;
   const qualityLevel: 'low' | 'medium' | 'rich' =
     memCount >= 8 ? 'rich' : memCount >= 3 ? 'medium' : 'low';
 
   const title = `${input.monthLabel} with ${input.childName}`;
-  const captions = input.memories
+  const captions = input.moments
     .map(m => m.textNote?.trim())
     .filter((t): t is string => !!t && t.length > 0);
 

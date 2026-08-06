@@ -174,7 +174,7 @@ export function AccountScreen() {
           <View style={styles.handle} />
           <Text style={styles.sheetTitle}>Delete your account?</Text>
           <Text style={styles.sheetBody}>
-            All your data — Stories, Memories, Profiles — will be permanently removed. This can't be undone.
+            All your data — Stories, Moments, Profiles — will be permanently removed. This can't be undone.
           </Text>
 
           {isPremium && (

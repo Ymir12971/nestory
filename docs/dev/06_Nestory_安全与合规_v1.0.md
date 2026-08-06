@@ -59,7 +59,7 @@ if (!['image/jpeg', 'image/png', 'image/heif'].includes(type?.mime)) {
 | 限制 | 阈值 | 检查位置 |
 |---|---|---|
 | 单文件大小 | ≤ 10MB | Fastify `multipart` 配置 + service 写入前再校验 |
-| 单条 Memory 照片数 | ≤ 10 张 | route 层校验 photos.length |
+| 单条 Moment 照片数 | ≤ 10 张 | route 层校验 photos.length |
 | 用户日上传总量 | ≤ 500 MB | Redis 计数器，按 IANA 时区跨日重置 |
 
 ### 2.3 EXIF 隐私

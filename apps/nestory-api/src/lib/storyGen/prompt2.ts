@@ -15,8 +15,8 @@ export interface P2Input {
   monthDisplay:  string;
   structure:     StructureDecision;
   laidOut:       LaidOutChapter[];
-  /** id → original text, surviving memories only (dropped/skipped filtered out). */
-  memoryTexts:   Record<string, string>;
+  /** id → original text, surviving moments only (dropped/skipped filtered out). */
+  momentTexts:   Record<string, string>;
 }
 
 const writingSchema = z.object({
@@ -46,12 +46,12 @@ Voice & style:
 - Show, don't tell. Let emotion surface through concrete actions, expressions,
   and scenes. Do NOT state the emotion outright.
 - Avoid generic clichés ("growing up so fast") and meta-sentimentality
-  ("precious memories", "a moment to treasure") — they carry zero information
+  ("precious moments", "a moment to treasure") — they carry zero information
   and apply to any child.
 - Warm, specific, present-tense.
 
 Truthfulness:
-- Rewrite, never invent. Only describe what the memories actually say.
+- Rewrite, never invent. Only describe what the moments actually say.
 - Honour real emotion. Sadness / worry / fear may be told, with a gentle,
   resilient lens. NEVER force "happy / joyful / beautiful" onto a clearly
   negative event.
@@ -62,7 +62,7 @@ Chapter cohesion (important):
   links its units. Every unit's paragraph must serve that thread and connect
   to the previous unit with transitions (time progression, cause/effect,
   emotional continuity) — e.g. "By mid-month...", "And then...".
-- When a unit merges multiple memories, fuse them into ONE flowing paragraph
+- When a unit merges multiple moments, fuse them into ONE flowing paragraph
   (not stitched fragments).
 
 Length limits:
@@ -90,13 +90,13 @@ function buildUserPrompt(input: P2Input): string {
     'Per-unit photo counts & layout (context only; do NOT choose or reorder photos):',
     JSON.stringify(photosContext),
     '',
-    'Original memory texts (id → text), your rewriting source:',
-    JSON.stringify(input.memoryTexts),
+    'Original moment texts (id → text), your rewriting source:',
+    JSON.stringify(input.momentTexts),
     '',
     'For EACH chapter in chapter_order:',
     '  1. First write an internal one-line "narrative_thread" that links its units.',
     '  2. Write a chapter "title" (≤ 8 words).',
-    "  3. For each unit, write one paragraph (30–50 words) fusing its memory_ids'",
+    "  3. For each unit, write one paragraph (30–50 words) fusing its moment_ids'",
     '     texts, serving the thread, connected to the previous unit.',
     'Then write:',
     '  - "opening": 1–2 paragraphs setting the month\'s mood.',

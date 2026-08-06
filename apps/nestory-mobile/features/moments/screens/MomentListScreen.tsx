@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, Modal, Pressable, RefreshControl, ScrollView,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
-import type { Memory } from '@nestory/types';
+import type { Moment } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { useAssetMonths, useAssets, useChildren } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
@@ -14,10 +14,10 @@ interface DayGroup {
   key:       string;        // YYYY-MM-DD
   dayNum:    string;
   monthAbbr: string;
-  memories:  Memory[];
+  moments:  Moment[];
 }
 
-function groupByDay(items: Memory[]): DayGroup[] {
+function groupByDay(items: Moment[]): DayGroup[] {
   const map = new Map<string, DayGroup>();
   for (const m of items) {
     const d = new Date(m.capturedAt);
@@ -28,18 +28,18 @@ function groupByDay(items: Memory[]): DayGroup[] {
         key,
         dayNum:    String(d.getDate()),
         monthAbbr: MONTH_LABELS[d.getMonth()]!,
-        memories:  [],
+        moments:  [],
       };
       map.set(key, group);
     }
-    group.memories.push(m);
+    group.moments.push(m);
   }
-  // Newest day first; within a day, newest memory first (server already returns desc, but be safe).
+  // Newest day first; within a day, newest moment first (server already returns desc, but be safe).
   return [...map.values()]
     .sort((a, b) => (a.key < b.key ? 1 : -1))
     .map(g => ({
       ...g,
-      memories: [...g.memories].sort(
+      moments: [...g.moments].sort(
         (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
       ),
     }));
@@ -49,7 +49,7 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-export function MemoryListScreen() {
+export function MomentListScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const childrenQ = useChildren();
@@ -63,10 +63,10 @@ export function MemoryListScreen() {
   const activeChildId = activeChild?.id ?? '';
   const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
-  // Redesign filter rules (H-First Memory / Normal list annotations):
-  // months shown = months that HAVE memories + the current month (always),
+  // Redesign filter rules (H-First Moment / Normal list annotations):
+  // months shown = months that HAVE moments + the current month (always),
   // newest first (current month leftmost); gap months are hidden entirely,
-  // so the timeline implicitly starts at the first memory's month.
+  // so the timeline implicitly starts at the first moment's month.
   const monthsQ = useAssetMonths(activeChildId);
   const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const filterKeys = useMemo(() => {
@@ -91,7 +91,7 @@ export function MemoryListScreen() {
         <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
-        <Text style={styles.navTitle}>Memories</Text>
+        <Text style={styles.navTitle}>Moments</Text>
         <View style={styles.navSpacer} />
       </View>
 
@@ -134,19 +134,19 @@ export function MemoryListScreen() {
           <ActivityIndicator color={theme.text.brand} />
         </View>
       ) : assetsQ.isError ? (
-        // H-Memories couldn't load: pull down to refresh (annotation)
+        // H-Moments couldn't load: pull down to refresh (annotation)
         <ScrollView
           contentContainerStyle={styles.center}
           refreshControl={
             <RefreshControl refreshing={assetsQ.isRefetching} onRefresh={() => void assetsQ.refetch()} />
           }
         >
-          <Text style={styles.emptyText}>Your memories couldn't load.</Text>
+          <Text style={styles.emptyText}>Your moments couldn't load.</Text>
           <Text style={styles.retryText}>Pull down to refresh</Text>
         </ScrollView>
       ) : groups.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No memories this month yet.</Text>
+          <Text style={styles.emptyText}>No moments this month yet.</Text>
         </View>
       ) : (
         <ScrollView
@@ -168,17 +168,17 @@ export function MemoryListScreen() {
               </View>
 
               <View style={styles.dayCards}>
-                {group.memories.map((memory, cardIndex) => {
-                  const cover = memory.files[0];
-                  const photoCount = memory.files.length;
+                {group.moments.map((moment, cardIndex) => {
+                  const cover = moment.files[0];
+                  const photoCount = moment.files.length;
                   return (
                     <Pressable
-                      key={memory.id}
+                      key={moment.id}
                       style={[
-                        styles.memoryCard,
-                        cardIndex < group.memories.length - 1 && styles.memoryCardGap,
+                        styles.momentCard,
+                        cardIndex < group.moments.length - 1 && styles.momentCardGap,
                       ]}
-                      onPress={() => router.push(`/memory/${memory.id}`)}
+                      onPress={() => router.push(`/moment/${moment.id}`)}
                     >
                       <View style={styles.cardPhotoWrap}>
                         {cover ? (
@@ -195,9 +195,9 @@ export function MemoryListScreen() {
                       </View>
                       <View style={styles.cardBody}>
                         <Text style={styles.cardText} numberOfLines={2}>
-                          {memory.textNote ?? '(no caption)'}
+                          {moment.textNote ?? '(no caption)'}
                         </Text>
-                        <Text style={styles.cardTime}>{formatTime(memory.capturedAt)}</Text>
+                        <Text style={styles.cardTime}>{formatTime(moment.capturedAt)}</Text>
                       </View>
                     </Pressable>
                   );
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 0,
   },
-  memoryCard: {
+  momentCard: {
     flexDirection: 'row',
     alignItems: 'center',
     height: CARD_H,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.m,
     gap: theme.spacing.m,
   },
-  memoryCardGap: {
+  momentCardGap: {
     marginBottom: theme.spacing.s,
   },
   cardPhotoWrap: {

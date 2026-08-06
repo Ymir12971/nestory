@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MEMORY_CONSTRAINTS } from '@nestory/types';
+import { MOMENT_CONSTRAINTS } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { TagPickerSheet } from '@/shared/components/TagPickerSheet';
@@ -15,7 +15,7 @@ import { useGoBack } from '@/shared/hooks/useGoBack';
 import { showToast } from '@/features/ui/toast';
 import { track } from '@/shared/lib/analytics';
 
-const MAX_PHOTOS = MEMORY_CONSTRAINTS.maxPhotos;
+const MAX_PHOTOS = MOMENT_CONSTRAINTS.maxPhotos;
 
 function formatCapturedAt(d: Date): string {
   const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -23,14 +23,14 @@ function formatCapturedAt(d: Date): string {
   return `${datePart} · ${timePart}`;
 }
 
-export function AddMemoryScreen() {
+export function AddMomentScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const pickFromLibrary = usePhotoPicker({ multiple: true });
   const takePhoto       = usePhotoCamera();
   const childrenQ = useChildren();
   const createAsset     = useCreateAsset();
-  // Entry mode from the Add Memory popup: note (keyboard fast path), camera
+  // Entry mode from the Add Moment popup: note (keyboard fast path), camera
   // (launch camera first), album (launch picker first). Undefined = plain open.
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const [noteText, setNoteText]       = useState('');
@@ -45,15 +45,15 @@ export function AddMemoryScreen() {
   const photoStripRef = useRef<ScrollView>(null);
 
   // Redesign save rule: text is the ONLY activation condition — photos alone
-  // can't save, text alone can (MEMORY_CONSTRAINTS.textRequiredToSave).
+  // can't save, text alone can (MOMENT_CONSTRAINTS.textRequiredToSave).
   const hasText     = noteText.trim().length > 0;
-  const canSave     = (MEMORY_CONSTRAINTS.textRequiredToSave ? hasText : hasText || photos.length > 0) && !saving;
+  const canSave     = (MOMENT_CONSTRAINTS.textRequiredToSave ? hasText : hasText || photos.length > 0) && !saving;
 
   // Cap note length; exceeding shows a 2s toast (H-Add "Just a note" annotation).
   const onChangeNote = (text: string) => {
-    if (text.length > MEMORY_CONSTRAINTS.maxTextChars) {
-      showToast({ type: 'warning', message: `Notes are limited to ${MEMORY_CONSTRAINTS.maxTextChars} characters.` });
-      setNoteText(text.slice(0, MEMORY_CONSTRAINTS.maxTextChars));
+    if (text.length > MOMENT_CONSTRAINTS.maxTextChars) {
+      showToast({ type: 'warning', message: `Notes are limited to ${MOMENT_CONSTRAINTS.maxTextChars} characters.` });
+      setNoteText(text.slice(0, MOMENT_CONSTRAINTS.maxTextChars));
       return;
     }
     setNoteText(text);
@@ -87,7 +87,7 @@ export function AddMemoryScreen() {
       });
 
       const now = new Date();
-      track('memory_saved', {
+      track('moment_saved', {
         photoCount: photos.length,
         charCount:  noteText.trim().length,
         isBackfill: capturedAt.getFullYear() !== now.getFullYear() ||
@@ -96,7 +96,7 @@ export function AddMemoryScreen() {
 
       goBack();
     } catch (e: any) {
-      setSaveError(e?.message ?? 'Failed to save memory. Please try again.');
+      setSaveError(e?.message ?? 'Failed to save moment. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -126,7 +126,7 @@ export function AddMemoryScreen() {
       const room = MAX_PHOTOS - prev.length;
       const accepted = picked.slice(0, room);
       if (accepted.length < picked.length) {
-        showToast({ type: 'warning', message: `Maximum ${MAX_PHOTOS} photos per memory.` });
+        showToast({ type: 'warning', message: `Maximum ${MAX_PHOTOS} photos per moment.` });
       }
       return [...prev, ...accepted];
     });
@@ -158,7 +158,7 @@ export function AddMemoryScreen() {
         <Pressable hitSlop={8} onPress={goBack}>
           <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
         </Pressable>
-        <Text style={styles.navTitle}>New Memory</Text>
+        <Text style={styles.navTitle}>New Moment</Text>
         <View style={styles.navSpacer} />
       </View>
 

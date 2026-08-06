@@ -41,7 +41,7 @@
 
 ### 决策记录
 
-- **React 18 monorepo 单版本**（[memory](../../../memory/project_react_version_unification.md)） — nestory-web 暂留 18 直到需要 React-19-only 功能或 Expo 升 SDK 54+
+- **React 18 monorepo 单版本**（[moment](../../../moment/project_react_version_unification.md)） — nestory-web 暂留 18 直到需要 React-19-only 功能或 Expo 升 SDK 54+
 - **Session pooler** 替代 direct connection — 既解 IPv6 问题也是 Railway 部署需要
 
 ### Blockers / 风险
@@ -99,10 +99,10 @@
 
 ### 决策记录
 
-- [Vicol sync 2026-05-01](../../../memory/project_vicol_sync_20260501.md) — delete=hard delete / H-04 read-only banner / Subscription text 不改
-- [Deployment](../../../memory/project_deployment_decisions.md) — Vercel + Railway 从 day 1；单 Supabase 项目至 TestFlight 前一周
-- [External account schedule](../../../memory/project_external_account_schedule.md) — Apple/Google 注册推迟到 5-10 周
-- [Architecture philosophy](../../../memory/feedback_pragmatic_architecture.md) — defer abstraction until N=2
+- [Vicol sync 2026-05-01](../../../moment/project_vicol_sync_20260501.md) — delete=hard delete / H-04 read-only banner / Subscription text 不改
+- [Deployment](../../../moment/project_deployment_decisions.md) — Vercel + Railway 从 day 1；单 Supabase 项目至 TestFlight 前一周
+- [External account schedule](../../../moment/project_external_account_schedule.md) — Apple/Google 注册推迟到 5-10 周
+- [Architecture philosophy](../../../moment/feedback_pragmatic_architecture.md) — defer abstraction until N=2
 
 ---
 
@@ -116,7 +116,7 @@
 | 🟢 Mobile Web bundle | 编译通 + 跑通（dev session bypass） |
 | 🟢 Backend API | 8 个 endpoint 模块 + 5 个 /internal + uploads/sign + auth + audit + rate limit |
 | 🟢 Database | Supabase 12 张表 + seed + post-init 索引 + RLS |
-| 🟢 Storage | Supabase Storage memories / avatars buckets + signed URL 流程 |
+| 🟢 Storage | Supabase Storage moments / avatars buckets + signed URL 流程 |
 | 🟢 Story Pipeline | BullMQ + worker + cron dispatcher + MOCK generator 端到端 |
 | 🟢 Audit / Abuse logs | 写入 + 查询验证 |
 | 🟡 Mobile session | dev bypass，未接真 OAuth |
@@ -159,7 +159,7 @@
 
 ### 决策记录
 
-- 链接到 memory/ 里相应文件，或简述决策内容 + why
+- 链接到 moment/ 里相应文件，或简述决策内容 + why
 
 ### Blockers / 风险
 

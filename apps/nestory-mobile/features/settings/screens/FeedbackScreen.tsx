@@ -12,7 +12,7 @@ import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { showToast } from '@/features/ui/toast';
 
 // ST-feedback (2026-07 redesign): the 10% off idea program. Text OR photos
-// activates Send (unlike Add Memory, which requires text). Submission happens
+// activates Send (unlike Add Moment, which requires text). Submission happens
 // on "All Done" in the thanks sheet so the (editable) email rides along.
 
 const HOW_IT_WORKS = [
@@ -65,7 +65,7 @@ export function FeedbackScreen() {
     });
   };
 
-  // Either text or photos activates Send (FEEDBACK_CONSTRAINTS — unlike Add Memory).
+  // Either text or photos activates Send (FEEDBACK_CONSTRAINTS — unlike Add Moment).
   const canSend = (feedbackText.trim().length > 0 || photos.length > 0) && !sending;
 
   const handleAllDone = async () => {
@@ -132,7 +132,7 @@ export function FeedbackScreen() {
             />
           </View>
 
-          {/* Photos — same flow as Add Memory, ≤ 9 */}
+          {/* Photos — same flow as Add Moment, ≤ 9 */}
           <View style={styles.section}>
             <Text style={styles.photoLabel}>Add photos (optional)</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoStrip}>

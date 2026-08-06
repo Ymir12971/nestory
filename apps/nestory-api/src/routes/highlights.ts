@@ -67,7 +67,7 @@ function serializeHighlight(row: any): Highlight {
 // ---------- Routes ----------
 
 export async function highlightsRoutes(app: FastifyInstance) {
-  // POST /highlights — 标记 memory 为 highlight；R-04 配额检查
+  // POST /highlights — 标记 moment 为 highlight；R-04 配额检查
   app.post('/', async (req, reply) => {
     const body = parseBody(highlightCreateSchema, req);
 
@@ -76,12 +76,12 @@ export async function highlightsRoutes(app: FastifyInstance) {
       where:  { ...whereNotDeleted, id: body.assetId, userId: req.userId, childId: body.childId },
       include: { files: { orderBy: { displayOrder: 'asc' } } },
     });
-    if (!asset) throw Errors.notFound('Memory', body.assetId);
+    if (!asset) throw Errors.notFound('Moment', body.assetId);
 
     // 多张照片必须传 coverFileId，单张可省
     let coverFileId = body.coverFileId ?? null;
     if (asset.files.length > 1 && !coverFileId) {
-      throw Errors.validation('coverFileId is required when memory has multiple photos');
+      throw Errors.validation('coverFileId is required when moment has multiple photos');
     }
     if (coverFileId && !asset.files.some(f => f.id === coverFileId)) {
       throw Errors.validation('coverFileId does not belong to this asset');

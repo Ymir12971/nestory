@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import type { Child } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { PaywallModal } from '@/shared/components/PaywallModal';
-import { AddMemoryEntrySheet } from '@/shared/components/AddMemoryEntrySheet';
+import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
 import { formatAge } from '@/shared/lib/formatAge';
 import { useAssets, useChildren, useSubscription, useStories, useSetActiveChild } from '@/api';
 
@@ -51,11 +51,11 @@ export function HomeScreen() {
     subQ.data?.subscriptionStatus === 'premium_active' ||
     subQ.data?.subscriptionStatus === 'trial_active';
 
-  // memory count for current month — driven by Stories endpoint
+  // moment count for current month — driven by Stories endpoint
   const storiesQ = useStories({ childId: activeChild?.id ?? '' });
-  const memoryCount = storiesQ.data?.currentMonth.memoryCount ?? 0;
+  const momentCount = storiesQ.data?.currentMonth.momentCount ?? 0;
 
-  // Latest memories with photos — drives the hero carousel.
+  // Latest moments with photos — drives the hero carousel.
   const currentMonthKey = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -65,9 +65,9 @@ export function HomeScreen() {
     month:   currentMonthKey,
   });
   const carouselPhotos = useMemo(() => {
-    const memories = monthAssetsQ.data?.data ?? [];
-    return memories
-      .flatMap(m => m.files.map(f => ({ id: f.id, fileUrl: f.fileUrl, memoryId: m.id })))
+    const moments = monthAssetsQ.data?.data ?? [];
+    return moments
+      .flatMap(m => m.files.map(f => ({ id: f.id, fileUrl: f.fileUrl, momentId: m.id })))
       .slice(0, 6);
   }, [monthAssetsQ.data]);
 
@@ -152,11 +152,11 @@ export function HomeScreen() {
         </View>
 
         {carouselPhotos.length === 0 ? (
-          /* Empty state — no memory photos this month */
+          /* Empty state — no moment photos this month */
           <View style={styles.emptyHero}>
             <View style={styles.emptyHeroCard}>
               <RemixIcon name="image-add-line" size={48} color={theme.text.onColor} />
-              <Text style={styles.emptyHeroTitle}>No memories yet</Text>
+              <Text style={styles.emptyHeroTitle}>No moments yet</Text>
               <Text style={styles.emptyHeroBody}>
                 Tap below to capture your first moment.
               </Text>
@@ -179,7 +179,7 @@ export function HomeScreen() {
               {carouselPhotos.map((p, i) => (
                 <Pressable
                   key={p.id}
-                  onPress={() => router.push(`/memory/${p.memoryId}`)}
+                  onPress={() => router.push(`/moment/${p.momentId}`)}
                   style={i < carouselPhotos.length - 1 ? { marginRight: PHOTO_GAP } : undefined}
                 >
                   <Image source={{ uri: p.fileUrl }} style={styles.photoCenter} />
@@ -222,16 +222,16 @@ export function HomeScreen() {
           </View>
         </Pressable>
 
-        {/* Monthly summary row — taps to memory list */}
-        {memoryCount > 0 && (
+        {/* Monthly summary row — taps to moment list */}
+        {momentCount > 0 && (
         <Pressable
           style={styles.summaryRow}
-          onPress={() => router.push('/memory/list')}
+          onPress={() => router.push('/moment/list')}
         >
           <View style={styles.summaryLeft}>
             <RemixIcon name="chat-smile-ai-line" size={20} color={theme.text.primary} />
             <Text style={styles.summaryText}>
-              {memoryCount} {memoryCount === 1 ? 'memory' : 'memories'} this month
+              {momentCount} {momentCount === 1 ? 'moment' : 'moments'} this month
             </Text>
           </View>
           <View style={styles.summaryRight}>
@@ -255,7 +255,7 @@ export function HomeScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.button}
           >
-            <Text style={styles.buttonLabel}>+ Add Memory</Text>
+            <Text style={styles.buttonLabel}>+ Add Moment</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -345,11 +345,11 @@ export function HomeScreen() {
         onDismiss={() => setPaywallVisible(false)}
       />
 
-      <AddMemoryEntrySheet
+      <AddMomentEntrySheet
         visible={addEntryVisible}
         onSelect={(entryMode) => {
           setAddEntryVisible(false);
-          router.push(`/memory/add?mode=${entryMode}`);
+          router.push(`/moment/add?mode=${entryMode}`);
         }}
         onDismiss={() => setAddEntryVisible(false)}
       />

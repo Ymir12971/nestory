@@ -12,7 +12,7 @@
 
 **背景**：决策 5（见 `docs/dev/ARCH-DECISIONS-API-DB-20260501.md`）引入"软删 + 30 天恢复窗"机制，**Figma 里完全没这个流程**。
 
-**适用范围**：users / children / raw_assets（Memory）/ highlights — 用户主动删除这些资源时默认走软删，30 天后 cron 物理清除；用户可在窗口期内恢复。
+**适用范围**：users / children / raw_assets（Moment）/ highlights — 用户主动删除这些资源时默认走软删，30 天后 cron 物理清除；用户可在窗口期内恢复。
 
 **当前 API 行为**：
 - `DELETE /resource/:id` → 软删（默认）
@@ -24,31 +24,31 @@
 
 1. **"最近删除"列表入口在哪**：
    - 选 a：Settings → Data & Privacy 下加一行 "Recently Deleted"
-   - 选 b：Memory List / Highlights / Profile List 各页顶部加 "Trash" 入口
+   - 选 b：Moment List / Highlights / Profile List 各页顶部加 "Trash" 入口
    - 选 c：合并到一个 Trash 全局页（跨资源类型）
-2. **删除按钮文案**：当前 H-04 / HL-02 上是 "Delete Memory" / "Remove Highlight"，是否改为 "Move to Trash"？
+2. **删除按钮文案**：当前 H-04 / HL-02 上是 "Delete Moment" / "Remove Highlight"，是否改为 "Move to Trash"？
 3. **硬删（"Delete Forever"）入口**：仅在 Trash 列表内提供，还是允许从详情页直接 hard delete？
 4. **30 天倒计时怎么展示**：Trash 列表每条上显示 "Auto-delete in 22 days"？还是不显示？
-5. **恢复后的位置**：恢复一个软删的 Memory 后，回到原月份位置还是新加到当月？
-6. **多档案场景**：删孩子档案进 Trash，期间该档案的 Memories 是否还能看？（当前实现：父档案软删后子查询会被 middleware 过滤掉，相当于不可见）
+5. **恢复后的位置**：恢复一个软删的 Moment 后，回到原月份位置还是新加到当月？
+6. **多档案场景**：删孩子档案进 Trash，期间该档案的 Moments 是否还能看？（当前实现：父档案软删后子查询会被 middleware 过滤掉，相当于不可见）
 
 **临时实现**：mobile 还没接 trash UI；当前 API 已经支持，但屏幕上还没有"最近删除"入口。
 
-**确认 (vicol, 2026-05-01)**：MVP **不做** Trash / 恢复窗。Memory / Highlight 用户删除时**直接彻底删除**，不走软删路径，不暴露 trash / restore 入口。users / children 的软删策略待 Justin 单独评估后对齐。
+**确认 (vicol, 2026-05-01)**：MVP **不做** Trash / 恢复窗。Moment / Highlight 用户删除时**直接彻底删除**，不走软删路径，不暴露 trash / restore 入口。users / children 的软删策略待 Justin 单独评估后对齐。
 
 ---
 
-### ~~Q6 · R-08 历史月份 Memory 编辑限制的 UX 表达（🟠 中）~~
+### ~~Q6 · R-08 历史月份 Moment 编辑限制的 UX 表达（🟠 中）~~
 
-**背景**：R-08 规定历史月份的 Memory 不可编辑/删除（避免影响已生成的 Story 内容连贯性）。
+**背景**：R-08 规定历史月份的 Moment 不可编辑/删除（避免影响已生成的 Story 内容连贯性）。
 
 **API 已实现**：`PATCH /assets/:id` 和 `DELETE /assets/:id` 在历史月份直接返回 `403 STORY_READ_ONLY`。
 
-**当前 mobile 行为**：进入历史 Memory Detail 时，编辑按钮静默 disabled（仅靠服务端返回的 `isEditable: false` 字段判断），用户没有任何提示。
+**当前 mobile 行为**：进入历史 Moment Detail 时，编辑按钮静默 disabled（仅靠服务端返回的 `isEditable: false` 字段判断），用户没有任何提示。
 
-**需要 vicol 决策**：是否需要在历史 Memory 详情页加一个 banner / tooltip 说明"This memory is from a past month and can no longer be edited"？还是保持静默？
+**需要 vicol 决策**：是否需要在历史 Moment 详情页加一个 banner / tooltip 说明"This moment is from a past month and can no longer be edited"？还是保持静默？
 
-**确认 (vicol, 2026-05-01)**：**不新增**额外提示组件。H-03 列表层不区分只读/可编辑为预期行为。以 **Figma H-04 Memory Detail (Read Only)** 为准对齐实现；若当前仅静默 disabled 且与 Figma 只读态不一致，按 Figma 调整。
+**确认 (vicol, 2026-05-01)**：**不新增**额外提示组件。H-03 列表层不区分只读/可编辑为预期行为。以 **Figma H-04 Moment Detail (Read Only)** 为准对齐实现；若当前仅静默 disabled 且与 Figma 只读态不一致，按 Figma 调整。
 
 ---
 

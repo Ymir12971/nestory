@@ -7,27 +7,27 @@ import { theme } from '@/shared/theme';
 import { useAsset, usePresetTags, useUpdateAsset, useUserTags } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
-export function MemoryTagsScreen() {
+export function MomentTagsScreen() {
   const router = useRouter();
   const goBack = useGoBack();
-  const { memoryId } = useLocalSearchParams<{ memoryId?: string }>();
+  const { momentId } = useLocalSearchParams<{ momentId?: string }>();
 
-  const memoryQ      = useAsset(memoryId ?? null);
+  const momentQ      = useAsset(momentId ?? null);
   const presetTagsQ  = usePresetTags();
   const userTagsQ    = useUserTags();
-  const updateAsset  = useUpdateAsset(memoryId ?? '');
+  const updateAsset  = useUpdateAsset(momentId ?? '');
 
   const [selected, setSelected]       = useState<Set<string>>(new Set());
   const [customInput, setCustomInput] = useState('');
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState<string | null>(null);
 
-  // Hydrate selected from existing memory tags once it loads.
+  // Hydrate selected from existing moment tags once it loads.
   useEffect(() => {
-    if (memoryQ.data && selected.size === 0) {
-      setSelected(new Set(memoryQ.data.tags));
+    if (momentQ.data && selected.size === 0) {
+      setSelected(new Set(momentQ.data.tags));
     }
-  }, [memoryQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [momentQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = (tag: string) => {
     setSelected(prev => {
@@ -46,7 +46,7 @@ export function MemoryTagsScreen() {
   };
 
   const handleDone = async () => {
-    if (!memoryId) {
+    if (!momentId) {
       goBack();
       return;
     }
@@ -77,8 +77,8 @@ export function MemoryTagsScreen() {
     return out;
   })();
 
-  const isLoading = memoryQ.isLoading || presetTagsQ.isLoading;
-  const isError   = memoryQ.isError || presetTagsQ.isError;
+  const isLoading = momentQ.isLoading || presetTagsQ.isLoading;
+  const isError   = momentQ.isError || presetTagsQ.isError;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -87,16 +87,16 @@ export function MemoryTagsScreen() {
           <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
         </Pressable>
         <Text style={styles.navTitle}>Tags</Text>
-        <Pressable hitSlop={8} onPress={handleDone} disabled={saving || !memoryId}>
-          <Text style={[styles.doneBtn, (saving || !memoryId) && { opacity: 0.5 }]}>
+        <Pressable hitSlop={8} onPress={handleDone} disabled={saving || !momentId}>
+          <Text style={[styles.doneBtn, (saving || !momentId) && { opacity: 0.5 }]}>
             {saving ? 'Saving…' : 'Done'}
           </Text>
         </Pressable>
       </View>
 
-      {!memoryId ? (
+      {!momentId ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>Open from a memory to edit its tags.</Text>
+          <Text style={styles.emptyText}>Open from a moment to edit its tags.</Text>
         </View>
       ) : isLoading ? (
         <View style={styles.center}>
@@ -105,7 +105,7 @@ export function MemoryTagsScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Text style={styles.emptyText}>Failed to load tags.</Text>
-          <Pressable onPress={() => { memoryQ.refetch(); presetTagsQ.refetch(); }}>
+          <Pressable onPress={() => { momentQ.refetch(); presetTagsQ.refetch(); }}>
             <Text style={styles.retryText}>Tap to retry</Text>
           </Pressable>
         </View>

@@ -49,7 +49,7 @@ export function ChildProfileListScreen() {
           </View>
           <Text style={styles.emptyTitle}>No child profiles yet</Text>
           <Text style={styles.emptyBody}>
-            Add a child to start capturing memories.
+            Add a child to start capturing moments.
           </Text>
         </View>
       );

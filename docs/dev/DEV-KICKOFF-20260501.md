@@ -9,7 +9,7 @@
 ### ✅ 已落地（端到端可跑）
 
 - **Vicol sync 决策（2026-05-01）已全部实现** — 见 `docs/sync-to-vicol.md`
-  - Memory / Highlight 删除走硬删（不做 Trash UI）
+  - Moment / Highlight 删除走硬删（不做 Trash UI）
   - H-04 Read Only 黄色 banner 已对齐 Figma 102:573
   - 订阅文案 / 颜色 token / Welcome 渐变保持现状
   - Remix Icon 在 Android 走 SVG 矢量，无平台差异
@@ -35,9 +35,9 @@
 
 ### ⏳ 仍是 mock / 待接
 
-- `MemoryDetailScreen` — `MOCK_MEMORY`（阻塞：尚无真实 memory，需先做 photo upload）
-- `MemoryEditScreen` / `HighlightDetailScreen` / 各 Story 屏
-- `AddMemoryScreen` — 阻塞：photo upload 未做
+- `MomentDetailScreen` — `MOCK_MOMENT`（阻塞：尚无真实 moment，需先做 photo upload）
+- `MomentEditScreen` / `HighlightDetailScreen` / 各 Story 屏
+- `AddMomentScreen` — 阻塞：photo upload 未做
 - `SignInScreen` 假 OAuth（`setDevSession` → 路由到 onboarding/profile）
 - `client.ts.getAuthToken()` `__DEV__` 返 `dev-<userId>` 假 token
 - 后端 `auth.ts` `__DEV__` 直接从 token 提 userId
@@ -93,7 +93,7 @@ Demo seed completed
 upsert 幂等。要清空：
 ```sql
 DELETE FROM users WHERE id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
--- CASCADE 自动清下游（children / subscription / memories / highlights / stories）
+-- CASCADE 自动清下游（children / subscription / moments / highlights / stories）
 ```
 
 ### 2.4 起 API + Mobile
@@ -132,15 +132,15 @@ pnpm demo                         # 终端 2：mobile 在 :8081（Expo Web）
 - [x] ~~接 `ChildProfileListScreen` GET /children~~
 - [x] ~~接 `ChildProfileEditScreen` GET + PATCH /children/:id~~
 - [x] ~~接 `HomeScreen` 的 children / subscription / stories~~
-- [ ] 接 `MemoryDetailScreen` GET /assets/:id — **阻塞**，要等 photo upload 跑通才有真数据可读
-- [ ] **AddMemoryScreen + photo upload 到 Supabase Storage** — 解锁后续 memory / highlight / 头像所有链路
+- [ ] 接 `MomentDetailScreen` GET /assets/:id — **阻塞**，要等 photo upload 跑通才有真数据可读
+- [ ] **AddMomentScreen + photo upload 到 Supabase Storage** — 解锁后续 moment / highlight / 头像所有链路
 
 ### 下周（May 6 – May 12）— 编辑 / 删除 / Highlight 链路
 
-- [ ] `MemoryEditScreen` PATCH /assets/:id
+- [ ] `MomentEditScreen` PATCH /assets/:id
 - [ ] `HighlightDetailScreen` DELETE /highlights/:id
 - [ ] HL-02 mark / unmark 流程
-- [ ] **Photo upload 到 Supabase Storage** — 阻塞项；当前所有 avatar / memory file 字段都没法塞真实 URL，POST 时会跳过
+- [ ] **Photo upload 到 Supabase Storage** — 阻塞项；当前所有 avatar / moment file 字段都没法塞真实 URL，POST 时会跳过
 
 ### 后续（May 13+）— OAuth / Story 生成
 
@@ -159,7 +159,7 @@ pnpm demo                         # 终端 2：mobile 在 :8081（Expo Web）
 | 条目 | 改动 | 文件 |
 |---|---|---|
 | Q5 删除改硬删 | R-08 检查前移；highlight 物理删；mobile 默认 hard=true | [assets.ts](../../apps/nestory-api/src/routes/assets.ts) · [highlights.ts](../../apps/nestory-api/src/routes/highlights.ts) · [api/assets.ts](../../apps/nestory-mobile/api/assets.ts) |
-| Q6 H-04 Read Only banner | 黄色 Notify banner，对齐 Figma 102:573 | [MemoryDetailScreen.tsx](../../apps/nestory-mobile/features/memories/screens/MemoryDetailScreen.tsx) |
+| Q6 H-04 Read Only banner | 黄色 Notify banner，对齐 Figma 102:573 | [MomentDetailScreen.tsx](../../apps/nestory-mobile/features/moments/screens/MomentDetailScreen.tsx) |
 | Q7 / Q1 / Q2 / 图标 | 文档确认，无需改动 | — |
 
 ### Contract Audit（共 9 项）
@@ -171,8 +171,8 @@ pnpm demo                         # 终端 2：mobile 在 :8081（Expo Web）
 | 3 | `PresetTag` 改为 `string` 别名（与实际响应对齐） | [tag.ts](../../packages/types/src/tag.ts) |
 | 4 | `serializeChild` 注入 `activeChildId`；POST 自动激活首个 child | [children.ts](../../apps/nestory-api/src/routes/children.ts) |
 | 6 | `ChildCreate.avatarBase64` → `avatarUrl` | [child.ts](../../packages/types/src/child.ts) |
-| 7 | POST/PATCH /assets 显式抛 `EMPTY_MEMORY`（替换 zod refine） | [assets.ts](../../apps/nestory-api/src/routes/assets.ts) |
-| 8 | PATCH/DELETE /assets 历史月份保护改用 `MEMORY_EDIT_RESTRICTED` | [assets.ts](../../apps/nestory-api/src/routes/assets.ts) |
+| 7 | POST/PATCH /assets 显式抛 `EMPTY_MOMENT`（替换 zod refine） | [assets.ts](../../apps/nestory-api/src/routes/assets.ts) |
+| 8 | PATCH/DELETE /assets 历史月份保护改用 `MOMENT_EDIT_RESTRICTED` | [assets.ts](../../apps/nestory-api/src/routes/assets.ts) |
 | 9 | PATCH /assets zod 删除死字段 `isHighlight` | [assets.ts](../../apps/nestory-api/src/routes/assets.ts) |
 | 13 | tags trim + 大小写不敏感去重；POST/PATCH 写入前归一 | [assets.ts](../../apps/nestory-api/src/routes/assets.ts) |
 
@@ -187,7 +187,7 @@ pnpm demo                         # 终端 2：mobile 在 :8081（Expo Web）
 | ChildProfileScreen 单位切换 | height/weight 共用 `unitSystem` → 拆成 `heightSystem` + `weightSystem` | 同上 |
 | ChildProfileListScreen | 移除 `MOCK_PROFILES`；改 `useChildren()`；加 loading / error / empty 三态；`formatBirthDate` 渲染 "Born Mar 15, 2025" | [ChildProfileListScreen.tsx](../../apps/nestory-mobile/features/settings/screens/ChildProfileListScreen.tsx) |
 | ChildProfileEditScreen | 移除 `MOCK_PROFILE`；wrapper（`useChild(id)` 加载守卫）+ `EditForm` 子组件，`key={child.id}` 强制 remount；提交走 `useUpdateChild(id)` PATCH，gender / height / weight 条件拼 body | [ChildProfileEditScreen.tsx](../../apps/nestory-mobile/features/settings/screens/ChildProfileEditScreen.tsx) |
-| HomeScreen | 移除 `MOCK_PROFILES` / `MOCK_IS_PREMIUM` / `MOCK_MEMORY_COUNT`；`useChildren` 选 active → `useStories({childId})` 取 memoryCount；`useSubscription` 推 isPremium；`useSetActiveChild` 接 profile 切换；`formatAge` 月转年；profile stats card → push `/settings/profiles/[id]` | [HomeScreen.tsx](../../apps/nestory-mobile/features/home/screens/HomeScreen.tsx) |
+| HomeScreen | 移除 `MOCK_PROFILES` / `MOCK_IS_PREMIUM` / `MOCK_MOMENT_COUNT`；`useChildren` 选 active → `useStories({childId})` 取 momentCount；`useSubscription` 推 isPremium；`useSetActiveChild` 接 profile 切换；`formatAge` 月转年；profile stats card → push `/settings/profiles/[id]` | [HomeScreen.tsx](../../apps/nestory-mobile/features/home/screens/HomeScreen.tsx) |
 
 ### 工具链 / 配置
 
@@ -214,7 +214,7 @@ pnpm demo                         # 终端 2：mobile 在 :8081（Expo Web）
 | 15 | `GET /children/trash` 缺失 | 同上 |
 | 19 | `Subscription.status` 字段命名重复 | 接 RevenueCat 时统一 |
 | 20 | `User.name` 非空但 OAuth 未接入 | OAuth 集成 sprint（已通过 seed 缓解） |
-| 21–22 | `daysUntilGeneration` 写死 7 / `memoryCount` 永远 null | Story 生成 worker 实现时一起做 |
+| 21–22 | `daysUntilGeneration` 写死 7 / `momentCount` 永远 null | Story 生成 worker 实现时一起做 |
 | 25 | `LinkedProvider.providerUserId` 未暴露 | Settings · Account 解绑 UI 时再补 |
 
 ---
@@ -224,7 +224,7 @@ pnpm demo                         # 终端 2：mobile 在 :8081（Expo Web）
 软删基础设施（schema 字段 + 索引）已就绪，**但 30 天清理 cron 还没写**：
 - 无 SQL 清理脚本 / 无 Node worker / 无 Railway cron / 无 pg_cron
 - ARCH-DECISIONS 文档第 7 步，预计 1 天工作量
-- Memory / Highlight 已改硬删，cron 影响面收窄到 users / children
+- Moment / Highlight 已改硬删，cron 影响面收窄到 users / children
 - 优先级：等 OAuth 接入有真实账号删除流程后再做
 
 ---

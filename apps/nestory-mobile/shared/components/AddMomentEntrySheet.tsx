@@ -1,33 +1,33 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import RemixIcon from 'react-native-remix-icon';
-import { ADD_MEMORY_ENTRY_OPTIONS, type AddMemoryEntryOption } from '@nestory/types';
+import { ADD_MOMENT_ENTRY_OPTIONS, type AddMomentEntryOption } from '@nestory/types';
 import { theme } from '@/shared/theme';
 
-// H-Add Memory Popup (2026-07 redesign): tapping "Add Memory" opens this sheet
+// H-Add Moment Popup (2026-07 redesign): tapping "Add Moment" opens this sheet
 // with 3 entry paths (Justin 2026-07-15: 3 options, config-driven). Each routes
-// into the Add Memory page with a different starting mode.
+// into the Add Moment page with a different starting mode.
 
-const OPTION_META: Record<AddMemoryEntryOption, { icon: string; label: string }> = {
+const OPTION_META: Record<AddMomentEntryOption, { icon: string; label: string }> = {
   note:   { icon: 'quill-pen-line', label: 'Just a Note' },
   camera: { icon: 'camera-line',    label: 'Take a photo' },
   album:  { icon: 'image-line',     label: 'Choose from Album' },
 };
 
-interface AddMemoryEntrySheetProps {
+interface AddMomentEntrySheetProps {
   visible:   boolean;
-  onSelect:  (mode: AddMemoryEntryOption) => void;
+  onSelect:  (mode: AddMomentEntryOption) => void;
   onDismiss: () => void;
 }
 
-export function AddMemoryEntrySheet({ visible, onSelect, onDismiss }: AddMemoryEntrySheetProps) {
+export function AddMomentEntrySheet({ visible, onSelect, onDismiss }: AddMomentEntrySheetProps) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
       <Pressable style={styles.scrim} onPress={onDismiss} />
       <View style={styles.sheet}>
         <View style={styles.handle} />
-        <Text style={styles.title}>Add Memory</Text>
+        <Text style={styles.title}>Add Moment</Text>
 
-        {ADD_MEMORY_ENTRY_OPTIONS.map((opt, i) => (
+        {ADD_MOMENT_ENTRY_OPTIONS.map((opt, i) => (
           <View key={opt}>
             {i > 0 && <View style={styles.divider} />}
             <Pressable
