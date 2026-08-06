@@ -166,12 +166,26 @@ export type BlockLayout =
 
 export type CoverLayout = 'Cover-A' | 'Cover-B';
 
+/**
+ * A photo as rendered in a Story. `url` + `ratio` are always present; the
+ * srcset/placeholder fields come from the §7.2 stage-2 pipeline (pre-cropped
+ * WebP/JPEG variants) and are absent on documents generated before it — the
+ * renderer degrades to plain `url` + object-fit.
+ */
+export interface StoryPhoto {
+  url:               string;          // largest JPEG variant, or the original
+  ratio:             PhotoRatio;
+  srcsetWebp?:       string;          // "…750.webp 750w, …1500.webp 1500w"
+  srcsetJpeg?:       string;
+  placeholderColor?: string;          // "#rrggbb" LQIP, derived from blurhash
+}
+
 // A narrative unit = one Block. Photos are already filtered + cropped by the
 // image layer; text comes from Prompt 2. `memoryIds` may be >1 (merged unit).
 export interface StoryBlock {
   memoryIds:   string[];
   text:        string;                 // 30-50 words; empty allowed for Block-Text
-  photos:      { url: string; ratio: PhotoRatio }[]; // ≤ 3, source-agnostic
+  photos:      StoryPhoto[];           // ≤ 3, source-agnostic
   blockLayout: BlockLayout;
 }
 

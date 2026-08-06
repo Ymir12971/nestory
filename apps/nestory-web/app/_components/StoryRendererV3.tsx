@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import type { StoryBlock, StoryBodyChapter, StoryDocumentV3 } from '@nestory/types';
+import type { StoryBlock, StoryBodyChapter, StoryDocumentV3, StoryPhoto } from '@nestory/types';
 import styles from './StoryRendererV3.module.css';
 
 /**
@@ -158,10 +158,33 @@ function ratioClass(ratio: string): string {
   return styles.r43!;
 }
 
-function Img({ url, ratio }: { url: string; ratio: string }) {
-  // 目标比例由图片层决定;§7.2 阶段二预裁切上线前用 object-fit:cover 顶替
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img className={`${styles.blockImg} ${ratioClass(ratio)}`} src={url} alt="" />;
+// 图片层已按目标比例预裁切(§7.2 阶段二);老文档没有变体字段时回落到原图 +
+// object-fit。placeholderColor 是 blurhash 解出的均色,做零 JS 的 LQIP 底色。
+const SIZES = '(max-width: 480px) 100vw, 480px';
+
+function Img({ photo }: { photo: StoryPhoto }) {
+  const cls = `${styles.blockImg} ${ratioClass(photo.ratio)}`;
+  const style = photo.placeholderColor ? { backgroundColor: photo.placeholderColor } : undefined;
+  if (!photo.srcsetJpeg) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className={cls} style={style} src={photo.url} alt="" loading="lazy" decoding="async" />;
+  }
+  return (
+    <picture>
+      {photo.srcsetWebp && <source type="image/webp" srcSet={photo.srcsetWebp} sizes={SIZES} />}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        className={cls}
+        style={style}
+        src={photo.url}
+        srcSet={photo.srcsetJpeg}
+        sizes={SIZES}
+        alt=""
+        loading="lazy"
+        decoding="async"
+      />
+    </picture>
+  );
 }
 
 function Block({ block }: { block: StoryBlock }) {
@@ -174,7 +197,7 @@ function Block({ block }: { block: StoryBlock }) {
   if (layout === 'Block-Single-H') {
     return (
       <div className={styles.block}>
-        <Img url={photos[0]!.url} ratio={photos[0]!.ratio} />
+        <Img photo={photos[0]!} />
         <p className={styles.blockText}>{text}</p>
       </div>
     );
@@ -184,7 +207,7 @@ function Block({ block }: { block: StoryBlock }) {
     // 短文:图文并排,顶对齐
     return (
       <div className={`${styles.block} ${styles.blockRow}`}>
-        <div className={styles.rowImgHalf}><Img url={photos[0]!.url} ratio="3:4" /></div>
+        <div className={styles.rowImgHalf}><Img photo={photos[0]!} /></div>
         <p className={`${styles.blockText} ${styles.rowTextHalf}`}>{text}</p>
       </div>
     );
@@ -194,7 +217,7 @@ function Block({ block }: { block: StoryBlock }) {
     // 长文:文字绕图(float),续排图下
     return (
       <div className={`${styles.block} ${styles.blockFloatWrap}`}>
-        <div className={styles.floatImg}><Img url={photos[0]!.url} ratio="3:4" /></div>
+        <div className={styles.floatImg}><Img photo={photos[0]!} /></div>
         <p className={styles.blockText}>{text}</p>
       </div>
     );
@@ -206,7 +229,7 @@ function Block({ block }: { block: StoryBlock }) {
     return (
       <div className={styles.block}>
         <div className={both43 ? styles.duoStack : styles.duoRow}>
-          {photos.slice(0, 2).map((p, i) => <Img key={i} url={p.url} ratio={p.ratio} />)}
+          {photos.slice(0, 2).map((p, i) => <Img key={i} photo={p} />)}
         </div>
         <p className={styles.blockText}>{text}</p>
       </div>
@@ -217,10 +240,10 @@ function Block({ block }: { block: StoryBlock }) {
   const [hero, ...rest] = photos;
   return (
     <div className={styles.block}>
-      <Img url={hero!.url} ratio={hero!.ratio} />
+      <Img photo={hero!} />
       {rest.length > 0 && (
         <div className={styles.duoRow}>
-          {rest.slice(0, 2).map((p, i) => <Img key={i} url={p.url} ratio={p.ratio} />)}
+          {rest.slice(0, 2).map((p, i) => <Img key={i} photo={p} />)}
         </div>
       )}
       <p className={styles.blockText}>{text}</p>

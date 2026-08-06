@@ -4,6 +4,7 @@ import { type StoryGenConfig, getStoryGenConfig } from './config';
 import { runPrompt1, type P1Memory, type StructureDecision } from './prompt1';
 import { runPrompt2 } from './prompt2';
 import { layoutChapters, type PhotoMeta } from './imageLayer';
+import { buildStoryPhotos } from './imagePipeline';
 import { assemble, AssembleValidationError } from './assemble';
 
 // storyGen v3 — 两段 LLM + 中间确定性图片层 (StoryGenPrompts v1.0 全流水线).
@@ -95,6 +96,21 @@ export async function generateStoryV3(
     lookup,
     cfg,
   );
+
+  // ── 代码层 · 图片管线(§7.2 阶段二:按版式预裁切 + 多尺寸 WebP)──────
+  // 逐块替换成 CDN 变体;整批失败也只是回落到原图,不影响故事本身。
+  const childSlug = input.childName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'child';
+  const photoKeyPrefix = `${input.monthKey}/${childSlug}`;
+  let photoIdx = 0;
+  for (const ch of laidOut) {
+    for (const block of ch.blocks) {
+      if (block.photos.length === 0) continue;
+      block.photos = await buildStoryPhotos(
+        block.photos.map(p => ({ url: p.url, ratio: p.ratio, blurhash: p.blurhash })),
+        `${photoKeyPrefix}/${photoIdx++}`,
+      );
+    }
+  }
 
   // ── Prompt 2 · 文案(校验失败重试一次,§3.5)────────────────────────
   const memoryTexts: Record<string, string> = {};

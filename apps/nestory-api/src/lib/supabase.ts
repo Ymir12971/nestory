@@ -15,14 +15,16 @@ export function getSupabase(): SupabaseClient {
   return _client;
 }
 
-export type StorageBucket = 'memories' | 'avatars';
+export type StorageBucket = 'memories' | 'avatars' | 'stories';
 
 const BUCKET_CONFIG: Record<StorageBucket, { public: boolean }> = {
   memories: { public: true },
   avatars:  { public: true },
+  // Story 渲染用的预裁切/多尺寸变体(§7.2 阶段二)。Story 不可变,可长缓存。
+  stories:  { public: true },
 };
 
-const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/heif'];
+const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/heif', 'image/webp'];
 const FILE_SIZE_LIMIT = 10 * 1024 * 1024;
 
 /**

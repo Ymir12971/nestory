@@ -35,6 +35,8 @@ export interface PhotoMeta {
   qualityTier?: QualityTier;
   /** Laplacian variance from §7.2; else undefined → resolution used as proxy. */
   sharpness?: number;
+  /** §7.2 stage-1 blurhash; carried through so assembly can derive an LQIP color. */
+  blurhash?: string;
 }
 
 /** Structure-decision input (subset of Prompt 1 output we need here). */
@@ -53,10 +55,11 @@ export type LayoutDecision =
   | 'Block-Duo'
   | 'Block-Grid';
 
+export interface LaidOutPhoto { url: string; ratio: PhotoRatio; blurhash?: string | undefined }
 export interface LaidOutBlock {
   memoryIds: string[];
   layout:    LayoutDecision;
-  photos:    { url: string; ratio: PhotoRatio }[];
+  photos:    LaidOutPhoto[];
 }
 export interface LaidOutChapter {
   themeKey: string;
@@ -129,12 +132,12 @@ function pickLayout(memoryIds: string[], photos: ResolvedPhoto[], cfg: StoryGenC
   if (n === 1) {
     const p = photos[0]!;
     return p.orient === 'portrait'
-      ? { memoryIds, layout: 'Block-Single-V', photos: [{ url: p.url, ratio: '3:4' }] }
-      : { memoryIds, layout: 'Block-Single-H', photos: [{ url: p.url, ratio: '4:3' }] }; // square → 4:3
+      ? { memoryIds, layout: 'Block-Single-V', photos: [{ url: p.url, ratio: '3:4', blurhash: p.blurhash }] }
+      : { memoryIds, layout: 'Block-Single-H', photos: [{ url: p.url, ratio: '4:3', blurhash: p.blurhash }] }; // square → 4:3
   }
 
   if (n === 2) {
-    return { memoryIds, layout: 'Block-Duo', photos: photos.map(p => ({ url: p.url, ratio: duoRatio(p) })) };
+    return { memoryIds, layout: 'Block-Duo', photos: photos.map(p => ({ url: p.url, ratio: duoRatio(p), blurhash: p.blurhash })) };
   }
 
   // n === 3 → Block-Grid: Hero (non-3:4) + Duo slot.
@@ -153,8 +156,8 @@ function pickLayout(memoryIds: string[], photos: ResolvedPhoto[], cfg: StoryGenC
     memoryIds,
     layout: 'Block-Grid',
     photos: [
-      { url: hero.url, ratio: hero.orient === 'square' ? '1:1' : '4:3' },
-      ...rest.map(p => ({ url: p.url, ratio: duoRatio(p) })),
+      { url: hero.url, ratio: hero.orient === 'square' ? '1:1' : '4:3', blurhash: hero.blurhash },
+      ...rest.map(p => ({ url: p.url, ratio: duoRatio(p), blurhash: p.blurhash })),
     ],
   };
 }
@@ -163,9 +166,9 @@ function gridAllVertical(memoryIds: string[], photos: ResolvedPhoto[], cfg: Stor
   const best = [...photos].sort((a, b) => b.sharpness - a.sharpness);
   switch (cfg.image.gridAllVerticalPolicy) {
     case 'demote-to-single-v':
-      return { memoryIds, layout: 'Block-Single-V', photos: [{ url: best[0]!.url, ratio: '3:4' }] };
+      return { memoryIds, layout: 'Block-Single-V', photos: [{ url: best[0]!.url, ratio: '3:4', blurhash: best[0]!.blurhash }] };
     case 'demote-to-duo':
-      return { memoryIds, layout: 'Block-Duo', photos: best.slice(0, 2).map(p => ({ url: p.url, ratio: '3:4' as PhotoRatio })) };
+      return { memoryIds, layout: 'Block-Duo', photos: best.slice(0, 2).map(p => ({ url: p.url, ratio: '3:4' as PhotoRatio, blurhash: p.blurhash })) };
     case 'crop-hero-to-4x3':
     default:
       // Crop the sharpest portrait to 4:3 for the Hero; keep the other two portrait.
@@ -173,8 +176,8 @@ function gridAllVertical(memoryIds: string[], photos: ResolvedPhoto[], cfg: Stor
         memoryIds,
         layout: 'Block-Grid',
         photos: [
-          { url: best[0]!.url, ratio: '4:3' },
-          ...best.slice(1, 3).map(p => ({ url: p.url, ratio: '3:4' as PhotoRatio })),
+          { url: best[0]!.url, ratio: '4:3', blurhash: best[0]!.blurhash },
+          ...best.slice(1, 3).map(p => ({ url: p.url, ratio: '3:4' as PhotoRatio, blurhash: p.blurhash })),
         ],
       };
   }
@@ -190,6 +193,7 @@ function duoRatio(p: ResolvedPhoto): PhotoRatio {
 type Orientation = 'landscape' | 'portrait' | 'square';
 interface ResolvedPhoto {
   url:       string;
+  blurhash?: string | undefined;
   orient:    Orientation;
   tier:      QualityTier;
   /** Sort key for "keep the best": real Laplacian if present, else pixel area. */
@@ -202,6 +206,7 @@ function resolve(p: PhotoMeta, cfg: StoryGenConfig): ResolvedPhoto {
   const orient: Orientation = w === h ? 'square' : w > h ? 'landscape' : 'portrait';
   return {
     url:       p.url,
+    blurhash:  p.blurhash,
     orient,
     tier:      p.qualityTier ?? deriveTier(w, h, p.sharpness, cfg),
     sharpness: p.sharpness ?? w * h, // pixel area proxy when Laplacian unknown
