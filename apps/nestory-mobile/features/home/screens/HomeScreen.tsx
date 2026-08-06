@@ -1,16 +1,42 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, ImageBackground, Modal, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  ImageBackground,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
-import type { Child } from '@nestory/types';
-import { theme, palette } from '@/shared/theme';
+import type { Child, Moment } from '@nestory/types';
+import { BottomSheet } from '@/shared/components/BottomSheet';
+import { Button } from '@/shared/components/Button';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
 import { formatAge } from '@/shared/lib/formatAge';
-import { useAssets, useChildren, useSubscription, useStories, useSetActiveChild } from '@/api';
+import { palette, theme } from '@/shared/theme';
+import { useAssetMonths, useAssets, useChildren, useSetActiveChild, useSubscription } from '@/api';
 
+// Home tab (Figma H- row). Two layouts, switched on whether any Moment exists:
+//
+//   no Moments yet      H-Home Empty 731:1270 — hero image behind a white
+//                       headline + avatar row, then a centred camera tile,
+//                       prompt line and the Add CTA.
+//   any Moment          H-First Memory 731:1304 / H-Normal Memory list
+//                       731:1370 — plain header (avatar + name), year/month
+//                       Filter, date-grouped timeline, floating CTA.
+//
+// The pre-redesign hero photo carousel, three-up Stats card and
+// "N moments this month · View All" summary row appear nowhere in the H- row
+// and were removed (Justin 2026-08-05, 方案 A). /moment/list retired with them.
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SWITCHER_GENDER_LABEL: Record<string, string> = { girl: 'Girl', boy: 'Boy' };
 
 /** "2y 4mo old, Girl" — gender omitted for prefer_not_to_say (Figma). */
@@ -20,17 +46,35 @@ function profileSubtitle(child: Child): string {
   return gender ? `${age}, ${gender}` : age;
 }
 
-const SCREEN_W = Dimensions.get('window').width;
+interface DayGroup {
+  key: string; // YYYY-MM-DD
+  dayNum: string;
+  monthAbbr: string;
+  moments: Moment[];
+}
 
-const PHOTO_CENTER_W = 225;
-const PHOTO_CENTER_H = 300;
-const PHOTO_SIDE_W   = 195;
-const PHOTO_SIDE_H   = 260;
-const PHOTO_GAP      = 12;
-
-// Horizontal padding to center the active (center) photo
-const CAROUSEL_PADDING = (SCREEN_W - PHOTO_CENTER_W) / 2;
-
+function groupByDay(items: Moment[]): DayGroup[] {
+  const map = new Map<string, DayGroup>();
+  for (const m of items) {
+    const d = new Date(m.capturedAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    let group = map.get(key);
+    if (!group) {
+      group = { key, dayNum: String(d.getDate()), monthAbbr: MONTH_LABELS[d.getMonth()]!, moments: [] };
+      map.set(key, group);
+    }
+    group.moments.push(m);
+  }
+  // Newest day first; newest Moment first within a day.
+  return [...map.values()]
+    .sort((a, b) => (a.key < b.key ? 1 : -1))
+    .map((g) => ({
+      ...g,
+      moments: [...g.moments].sort(
+        (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
+      ),
+    }));
+}
 
 export function HomeScreen() {
   const router = useRouter();
@@ -38,41 +82,49 @@ export function HomeScreen() {
   const [switcherVisible, setSwitcherVisible] = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [addEntryVisible, setAddEntryVisible] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
 
-  const childrenQ    = useChildren();
-  const subQ         = useSubscription();
-  const setActive    = useSetActiveChild();
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-indexed
+  const [yearPickerVisible, setYearPickerVisible] = useState(false);
 
-  const profiles     = childrenQ.data ?? [];
-  const activeChild  = profiles.find(p => p.isActive) ?? profiles[0];
-  const isMulti      = profiles.length > 1;
-  const isPremium    =
+  const childrenQ = useChildren();
+  const subQ = useSubscription();
+  const setActive = useSetActiveChild();
+
+  const profiles = childrenQ.data ?? [];
+  const activeChild = profiles.find((p) => p.isActive) ?? profiles[0];
+  const activeChildId = activeChild?.id ?? '';
+  const isMulti = profiles.length > 1;
+  const isPremium =
     subQ.data?.subscriptionStatus === 'premium_active' ||
     subQ.data?.subscriptionStatus === 'trial_active';
 
-  // moment count for current month — driven by Stories endpoint
-  const storiesQ = useStories({ childId: activeChild?.id ?? '' });
-  const momentCount = storiesQ.data?.currentMonth.momentCount ?? 0;
+  // Filter rules (H-First Memory / Normal list annotations): months shown =
+  // months that HAVE Moments + the current month (always), newest first so the
+  // current month is leftmost. Gap months stay hidden, which makes the timeline
+  // start at the first Moment's month.
+  const monthsQ = useAssetMonths(activeChildId);
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const filterKeys = useMemo(() => {
+    const keys = new Set<string>([currentKey]);
+    for (const m of monthsQ.data ?? []) keys.add(m.monthKey);
+    return [...keys].sort((a, b) => (a < b ? 1 : -1)); // DESC
+  }, [monthsQ.data, currentKey]);
 
-  // Latest moments with photos — drives the hero carousel.
-  const currentMonthKey = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }, []);
-  const monthAssetsQ = useAssets({
-    childId: activeChild?.id ?? '',
-    month:   currentMonthKey,
-  });
-  const carouselPhotos = useMemo(() => {
-    const moments = monthAssetsQ.data?.data ?? [];
-    return moments
-      .flatMap(m => m.files.map(f => ({ id: f.id, fileUrl: f.fileUrl, momentId: m.id })))
-      .slice(0, 6);
-  }, [monthAssetsQ.data]);
+  const availableYears = useMemo(
+    () => [...new Set(filterKeys.map((k) => Number(k.slice(0, 4))))],
+    [filterKeys],
+  );
+  const yearKeys = filterKeys.filter((k) => Number(k.slice(0, 4)) === selectedYear);
 
-  // Loading guard — wait for children + subscription so the screen has minimum
-  // viable data to render. Stories will resolve as a secondary call.
+  const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+  const assetsQ = useAssets({ childId: activeChildId, month: monthKey });
+  const groups = useMemo(() => groupByDay(assetsQ.data?.data ?? []), [assetsQ.data]);
+
+  /** No Moment in any month → the H-Home Empty layout. */
+  const hasAnyMoments = (monthsQ.data?.length ?? 0) > 0;
+
   if (childrenQ.isLoading || subQ.isLoading) {
     return (
       <View style={[styles.root, styles.center]}>
@@ -84,20 +136,24 @@ export function HomeScreen() {
   if (childrenQ.isError || subQ.isError) {
     return (
       <View style={[styles.root, styles.center]}>
-        <Text style={styles.errorText}>Failed to load home.</Text>
-        <Pressable onPress={() => { childrenQ.refetch(); subQ.refetch(); }}>
+        <Text style={styles.emptyText}>Failed to load home.</Text>
+        <Pressable
+          onPress={() => {
+            childrenQ.refetch();
+            subQ.refetch();
+          }}
+        >
           <Text style={styles.retryText}>Tap to retry</Text>
         </Pressable>
       </View>
     );
   }
 
-  // No children yet — user shouldn't normally reach here without onboarding,
-  // but if they do, send them back to set up.
+  // No children yet — shouldn't happen post-onboarding, but recover gracefully.
   if (!activeChild) {
     return (
       <View style={[styles.root, styles.center]}>
-        <Text style={styles.errorText}>No child profile yet.</Text>
+        <Text style={styles.emptyText}>No child profile yet.</Text>
         <Pressable onPress={() => router.push('/onboarding/profile')}>
           <Text style={styles.retryText}>Set up profile</Text>
         </Pressable>
@@ -105,17 +161,9 @@ export function HomeScreen() {
     );
   }
 
-  const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / (PHOTO_CENTER_W + PHOTO_GAP));
-    setActiveIndex(Math.max(0, Math.min(carouselPhotos.length - 1, idx)));
-  };
-
-  const handleAvatarRowPress = () => {
-    if (isMulti) {
-      setSwitcherVisible(true);
-    } else {
-      router.push(`/settings/profiles/${activeChild.id}`);
-    }
+  const openSwitcher = () => {
+    if (isMulti) setSwitcherVisible(true);
+    else router.push(`/settings/profiles/${activeChild.id}`);
   };
 
   const handleSwitch = (id: string) => {
@@ -123,154 +171,239 @@ export function HomeScreen() {
     setSwitcherVisible(false);
   };
 
+  /** avatarRow 731:1277 / 731:1374 — 28px avatar + name, switch affordance when multi. */
+  const avatarRow = (onHero: boolean) => (
+    <Pressable style={styles.avatarRow} hitSlop={8} onPress={openSwitcher}>
+      {activeChild.avatarUrl ? (
+        <Image
+          source={{ uri: activeChild.avatarUrl }}
+          style={[styles.avatar, !onHero && styles.avatarRinged]}
+        />
+      ) : (
+        <View style={[styles.avatar, !onHero && styles.avatarRinged]} />
+      )}
+      <Text style={[styles.childName, onHero && styles.childNameOnHero]}>{activeChild.name}</Text>
+      {isMulti && (
+        <RemixIcon
+          name="arrow-up-down-line"
+          size={24}
+          color={onHero ? theme.text.onColor : theme.text.primary}
+        />
+      )}
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <ImageBackground
-        source={require('@/assets/images/home-hero-bg.png')}
-        style={styles.hero}
-        resizeMode="cover"
-      >
-        <View style={{ height: insets.top }} />
-
-        {/* Header: avatar row + settings */}
-        <View style={styles.header}>
-          <Pressable
-            style={styles.avatarRow}
-            hitSlop={8}
-            onPress={handleAvatarRowPress}
-          >
-            <View style={styles.avatar} />
-            <Text style={styles.childName}>{activeChild.name}</Text>
-            {isMulti && (
-              <RemixIcon name="arrow-up-down-line" size={24} color={theme.text.onColor} />
-            )}
-          </Pressable>
-          <Pressable hitSlop={8} onPress={() => router.push('/settings')}>
-            <RemixIcon name="settings-line" size={24} color={theme.text.onColor} />
-          </Pressable>
-        </View>
-
-        {carouselPhotos.length === 0 ? (
-          /* Empty state — no moment photos this month */
-          <View style={styles.emptyHero}>
-            <View style={styles.emptyHeroCard}>
-              <RemixIcon name="image-add-line" size={48} color={theme.text.onColor} />
-              <Text style={styles.emptyHeroTitle}>No moments yet</Text>
-              <Text style={styles.emptyHeroBody}>
-                Tap below to capture your first moment.
-              </Text>
-            </View>
+      {assetsQ.isError && hasAnyMoments ? (
+        /* H-Memories couldn't load 774:3710 — header keeps a hairline, the
+           Filter is hidden, and the Abnormal block centres in the body.
+           Pull-to-refresh stays per the annotation. */
+        <>
+          <View style={[styles.plainHeader, styles.headerRuled, { paddingTop: insets.top }]}>
+            {avatarRow(false)}
           </View>
-        ) : (
-          <>
+          <ScrollView
+            contentContainerStyle={styles.abnormalWrap}
+            refreshControl={
+              <RefreshControl
+                refreshing={assetsQ.isRefetching}
+                onRefresh={() => void assetsQ.refetch()}
+              />
+            }
+          >
+            <View style={styles.abnormal}>
+              {/* Design uses global-off-line; not in this react-native-remix-icon
+                  build, so the equivalent wifi-off-line stands in. */}
+              <RemixIcon name="wifi-off-line" size={48} color={theme.text.secondary} />
+              <View style={styles.abnormalText}>
+                <Text style={styles.abnormalTitle}>Memories couldn't load</Text>
+                <Text style={styles.abnormalBody}>Check your connection and try again.</Text>
+              </View>
+            </View>
+          </ScrollView>
+        </>
+      ) : hasAnyMoments ? (
+        <>
+          {/* header 731:1373 */}
+          <View style={[styles.plainHeader, { paddingTop: insets.top }]}>{avatarRow(false)}</View>
+
+          {/* Filter 744:2530 */}
+          <View style={styles.filterBar}>
+            <Pressable style={styles.yearSelector} onPress={() => setYearPickerVisible(true)}>
+              <Text style={styles.yearText}>{selectedYear}</Text>
+              <RemixIcon name="arrow-down-s-line" size={24} color={theme.text.primary} />
+            </Pressable>
+
+            <View style={styles.filterDivider} />
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              snapToInterval={PHOTO_CENTER_W + PHOTO_GAP}
-              decelerationRate="fast"
-              onMomentumScrollEnd={onCarouselScroll}
-              style={styles.carouselScroll}
-              contentContainerStyle={[
-                styles.carouselContent,
-                { paddingHorizontal: CAROUSEL_PADDING },
-              ]}
+              contentContainerStyle={styles.monthPills}
             >
-              {carouselPhotos.map((p, i) => (
-                <Pressable
-                  key={p.id}
-                  onPress={() => router.push(`/moment/${p.momentId}`)}
-                  style={i < carouselPhotos.length - 1 ? { marginRight: PHOTO_GAP } : undefined}
-                >
-                  <Image source={{ uri: p.fileUrl }} style={styles.photoCenter} />
-                </Pressable>
+              {yearKeys.map((key) => {
+                const monthNum = Number(key.slice(5, 7));
+                const active = monthNum === selectedMonth;
+                return (
+                  <Pressable
+                    key={key}
+                    style={[styles.monthPill, active && styles.monthPillActive]}
+                    onPress={() => setSelectedMonth(monthNum)}
+                  >
+                    <Text style={[styles.monthPillLabel, active && styles.monthPillLabelActive]}>
+                      {MONTH_LABELS[monthNum - 1]!}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* timeline 731:1400 */}
+          {assetsQ.isLoading ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={theme.text.brand} />
+            </View>
+          ) : groups.length === 0 ? (
+            /* H-Current month empty 731:2602 — same camera tile as first run,
+               different copy, and the Filter stays visible above it */
+            <View style={styles.monthEmpty}>
+              <View style={styles.emptyPrompt}>
+                <View style={styles.cameraTile}>
+                  <RemixIcon name="camera-line" size={72} color={palette.primary[500]} />
+                </View>
+                <Text style={styles.emptyTitle}>Anything to keep this month?</Text>
+                <Text style={styles.emptyHint}>A photo or a quick note :)</Text>
+              </View>
+            </View>
+          ) : (
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.timeline}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={assetsQ.isRefetching}
+                  onRefresh={() => void assetsQ.refetch()}
+                />
+              }
+            >
+              {groups.map((group) => (
+                <View key={group.key} style={styles.dayGroup}>
+                  <View style={styles.timelineLeft}>
+                    <View style={styles.dateBadge}>
+                      <Text style={styles.dateBadgeDay}>{group.dayNum}</Text>
+                      <Text style={styles.dateBadgeMonth}>{group.monthAbbr}</Text>
+                    </View>
+                    {/* 731:1407 — the rail continues under every date chip */}
+                    <View style={styles.connectorLine} />
+                  </View>
+
+                  <View style={styles.dayCards}>
+                    {group.moments.map((moment, cardIndex) => {
+                      const cover = moment.files[0];
+                      const photoCount = moment.files.length;
+                      return (
+                        <Pressable
+                          key={moment.id}
+                          style={[
+                            styles.momentCard,
+                            cardIndex < group.moments.length - 1 && styles.momentCardGap,
+                          ]}
+                          onPress={() => router.push(`/moment/${moment.id}`)}
+                        >
+                          {cover && (
+                            <View style={styles.cardPhotoWrap}>
+                              <Image source={{ uri: cover.fileUrl }} style={styles.cardPhotoImg} />
+                              {photoCount > 1 && (
+                                <View style={styles.photoBadge}>
+                                  <RemixIcon name="image-line" size={10} color={theme.text.onColor} />
+                                  <Text style={styles.photoBadgeCount}>{photoCount}</Text>
+                                </View>
+                              )}
+                            </View>
+                          )}
+                          {/* memContent 42:39 — one 72-tall text block, no time line */}
+                          <View style={styles.cardBody}>
+                            <Text style={styles.cardText} numberOfLines={3}>
+                              {moment.textNote ?? '(no caption)'}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
               ))}
             </ScrollView>
+          )}
 
-            {carouselPhotos.length > 1 && (
-              <View style={styles.dots}>
-                {carouselPhotos.map((p, i) => (
-                  <View key={p.id} style={i === activeIndex ? styles.dotActive : styles.dotInactive} />
-                ))}
-              </View>
-            )}
-          </>
-        )}
-      </ImageBackground>
-
-      {/* ── Body ─────────────────────────────────────────────── */}
-      <View style={styles.body}>
-        {/* Stats card — Figma annotation: 点击直接跳 ST-03 Edit */}
-        <Pressable
-          style={styles.statsCard}
-          onPress={() => router.push(`/settings/profiles/${activeChild.id}`)}
-        >
-          <View style={styles.statCol}>
-            {/* Product-wide age rule: "2y 4mo old" — tile splits value/suffix */}
-            <Text style={styles.statValue}>{formatAge(activeChild.birthDate).replace(/ old$/, '')}</Text>
-            <Text style={styles.statLabel}>old</Text>
+          {/* cta 731:1468 — floating block with an upward shadow */}
+          <View style={styles.floatingCta}>
+            <Button label="+ Add Memory" onPress={() => setAddEntryVisible(true)} />
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCol}>
-            <Text style={styles.statValue}>{activeChild.heightValue ?? '—'}</Text>
-            <Text style={styles.statLabel}>{activeChild.heightUnit ?? 'cm'}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCol}>
-            <Text style={styles.statValue}>{activeChild.weightValue ?? '—'}</Text>
-            <Text style={styles.statLabel}>{activeChild.weightUnit ?? 'kg'}</Text>
-          </View>
-        </Pressable>
-
-        {/* Monthly summary row — taps to moment list */}
-        {momentCount > 0 && (
-        <Pressable
-          style={styles.summaryRow}
-          onPress={() => router.push('/moment/list')}
-        >
-          <View style={styles.summaryLeft}>
-            <RemixIcon name="chat-smile-ai-line" size={20} color={theme.text.primary} />
-            <Text style={styles.summaryText}>
-              {momentCount} {momentCount === 1 ? 'moment' : 'moments'} this month
-            </Text>
-          </View>
-          <View style={styles.summaryRight}>
-            <Text style={styles.viewAllText}>View All</Text>
-            <RemixIcon name="arrow-right-s-line" size={14} color={theme.text.brand} />
-          </View>
-        </Pressable>
-        )}
-      </View>
-
-      {/* ── CTA ──────────────────────────────────────────────── */}
-      <View style={styles.cta}>
-        <Text style={styles.ctaPrompt}>Did your little one smile today?</Text>
-        <Pressable
-          style={({ pressed }) => [styles.buttonWrap, pressed && { opacity: 0.85 }]}
-          onPress={() => setAddEntryVisible(true)}
-        >
-          <LinearGradient
-            colors={[palette.primary[500], palette.primary[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.button}
+        </>
+      ) : (
+        <>
+          {/* header 731:1271 — hero art behind the headline and avatar row */}
+          <ImageBackground
+            source={require('@/assets/images/home-hero-bg.png')}
+            style={styles.heroHeader}
+            imageStyle={styles.heroImage}
+            resizeMode="cover"
           >
-            <Text style={styles.buttonLabel}>+ Add Moment</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
+            <View style={{ height: insets.top }} />
+            <View style={styles.heroHeadlineBlock}>
+              <Text style={styles.heroHeadline}>Turn every moment into a Moment</Text>
+            </View>
+            <View style={styles.heroAvatarBlock}>{avatarRow(true)}</View>
+          </ImageBackground>
 
-      {/* ── Profile Switcher Sheet ────────────────────────────── */}
-      <Modal
-        visible={switcherVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSwitcherVisible(false)}
-      >
-        <Pressable style={styles.sheetScrim} onPress={() => setSwitcherVisible(false)} />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
-          {/* Drag handle */}
-          <View style={styles.sheetHandle} />
+          {/* body 731:1282 */}
+          <View style={styles.emptyBody}>
+            <View style={styles.emptyPrompt}>
+              <View style={styles.cameraTile}>
+                <RemixIcon name="camera-4-line" size={72} color={palette.primary[500]} />
+              </View>
+              <Text style={styles.emptyTitle}>Start with {activeChild.name}'s first Moment</Text>
+            </View>
+            <View style={styles.emptyCtaBlock}>
+              <Text style={styles.emptyHint}>A photo or a quick note :)</Text>
+              <Button label="+ Add Memory" onPress={() => setAddEntryVisible(true)} />
+            </View>
+          </View>
+        </>
+      )}
+
+      {/* Year picker */}
+      <BottomSheet visible={yearPickerVisible} onRequestClose={() => setYearPickerVisible(false)}>
+        <View style={styles.sheetPad}>
+          <Text style={styles.sheetTitle}>Select Year</Text>
+          {availableYears.map((y) => (
+            <Pressable
+              key={y}
+              style={styles.yearRow}
+              onPress={() => {
+                setSelectedYear(y);
+                // Land on that year's newest visible month (pills are DESC).
+                const first = filterKeys.find((k) => Number(k.slice(0, 4)) === y);
+                if (first) setSelectedMonth(Number(first.slice(5, 7)));
+                setYearPickerVisible(false);
+              }}
+            >
+              <Text style={[styles.yearRowLabel, y === selectedYear && styles.yearRowLabelActive]}>
+                {y}
+              </Text>
+              {y === selectedYear && <RemixIcon name="check-line" size={20} color={theme.text.brand} />}
+            </Pressable>
+          ))}
+        </View>
+      </BottomSheet>
+
+      {/* Profile Switcher — H-Sheet · Profile Switcher · Free / Premium */}
+      <BottomSheet visible={switcherVisible} onRequestClose={() => setSwitcherVisible(false)}>
+        <View style={styles.sheetPad}>
           <Text style={styles.sheetTitle}>Switch Profile</Text>
           {!isPremium && (
             <Text style={styles.sheetSubtitle}>
@@ -290,17 +423,12 @@ export function HomeScreen() {
                 disabled={isActive || isLocked}
               >
                 {profile.avatarUrl ? (
-                  <Image
-                    source={{ uri: profile.avatarUrl }}
-                    style={[styles.profileAvatar, isLocked && styles.profileAvatarDimmed]}
-                  />
+                  <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} />
                 ) : (
-                  <View style={[styles.profileAvatar, isLocked && styles.profileAvatarDimmed]} />
+                  <View style={styles.profileAvatar} />
                 )}
                 <View style={styles.profileTextCol}>
-                  <Text style={[styles.profileName, isLocked && styles.profileNameDimmed]}>
-                    {profile.name}
-                  </Text>
+                  <Text style={styles.profileName}>{profile.name}</Text>
                   <Text style={styles.profileSub}>{profileSubtitle(profile)}</Text>
                 </View>
                 {isActive && (
@@ -314,30 +442,27 @@ export function HomeScreen() {
           })}
 
           {!isPremium && (
-            <>
-              <Pressable
-                style={({ pressed }) => [styles.upgradeCta, pressed && { opacity: 0.85 }]}
-                onPress={() => { setSwitcherVisible(false); setPaywallVisible(true); }}
-              >
-                <LinearGradient
-                  colors={[palette.accent[500], palette.accent[400]]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.upgradeBtn}
-                >
-                  <Text style={styles.upgradeBtnLabel}>Upgrade to Premium</Text>
-                </LinearGradient>
-              </Pressable>
-              <Pressable
-                style={styles.benefitsLink}
-                onPress={() => { setSwitcherVisible(false); setPaywallVisible(true); }}
-              >
-                <Text style={styles.benefitsLinkLabel}>View Premium benefits</Text>
-              </Pressable>
-            </>
+            <View style={styles.switcherCta}>
+              <Button
+                label="Upgrade to Premium"
+                type="premium"
+                onPress={() => {
+                  setSwitcherVisible(false);
+                  setPaywallVisible(true);
+                }}
+              />
+              <Button
+                label="View Premium benefits"
+                type="text"
+                onPress={() => {
+                  setSwitcherVisible(false);
+                  setPaywallVisible(true);
+                }}
+              />
+            </View>
           )}
         </View>
-      </Modal>
+      </BottomSheet>
 
       <PaywallModal
         visible={paywallVisible}
@@ -357,309 +482,295 @@ export function HomeScreen() {
   );
 }
 
+const DATE_BADGE_W = 35;
+const CARD_PHOTO = 72;
+const CARD_H = 92;
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: theme.surface.default,
-  },
+  root: { flex: 1, backgroundColor: theme.surface.default },
   center: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: theme.spacing.s,
   },
-  errorText: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
+  emptyText: { ...theme.typography.body, color: theme.text.secondary },
+  retryText: { ...theme.typography.buttonLabelM, color: theme.text.brand },
+
+  // ── Populated header (731:1373) ────────────────────────────────────────────
+  plainHeader: {
+    paddingHorizontal: theme.spacing.xl, // 20
   },
-  retryText: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
+  // The couldn't-load state draws a hairline under the header (774:3711)
+  headerRuled: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border.default,
   },
 
-  // Hero
-  hero: {
-    width: '100%',
-  },
-  header: {
-    flexDirection: 'row',
+  // DS Abnormal · Type=WebIssue (774:3808) — 300 wide, p24, gap20
+  abnormalWrap: {
+    flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.l,
+    paddingBottom: theme.spacing.safeBtm,
+  },
+  abnormal: {
+    width: 300,
+    alignItems: 'center',
+    padding: theme.spacing.xxl, // 24
+    gap: theme.spacing.xl, // 20
+  },
+  abnormalText: { alignSelf: 'stretch', gap: theme.spacing.s },
+  abnormalTitle: {
+    ...theme.typography.body,
+    color: theme.text.primary,
+    textAlign: 'center',
+  },
+  abnormalBody: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+    textAlign: 'center',
   },
   avatarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    paddingVertical: theme.spacing.l, // 16
   },
   avatar: {
-    width: 40,
-    height: 40,
+    width: 28,
+    height: 28,
     borderRadius: 20,
     backgroundColor: theme.surface.brandSubtle,
   },
-  childName: {
-    ...theme.typography.h1,
-    color: theme.text.onColor,
+  avatarRinged: {
+    borderWidth: 2,
+    borderColor: theme.surface.brand, // 731:1375
   },
-  carouselScroll: {
-    height: PHOTO_CENTER_H,
-    marginTop: theme.spacing.s,
+  childName: { ...theme.typography.h2, color: theme.text.primary },
+  childNameOnHero: { color: theme.text.onColor },
+
+  // ── Hero header, empty state (731:1271) ───────────────────────────────────
+  heroHeader: {
+    paddingBottom: theme.spacing.s, // 8
+    borderBottomLeftRadius: theme.radius.l,
+    borderBottomRightRadius: theme.radius.l,
+    overflow: 'hidden',
   },
-  carouselContent: {
-    alignItems: 'flex-end',
-  },
-  photoCenter: {
-    width: PHOTO_CENTER_W,
-    height: PHOTO_CENTER_H,
-    borderRadius: theme.radius.l,
-    backgroundColor: theme.border.default,
-  },
-  photoSide: {
-    width: PHOTO_SIDE_W,
-    height: PHOTO_SIDE_H,
-    borderRadius: theme.radius.l,
-    backgroundColor: theme.border.default,
-  },
-  dots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: theme.spacing.m,
-  },
-  dotActive: {
-    width: 18,
-    height: 6,
-    borderRadius: theme.radius.s,
-    backgroundColor: theme.text.brand,
-  },
-  dotInactive: {
-    width: 6,
-    height: 6,
-    borderRadius: theme.radius.s,
-    borderWidth: 1,
-    borderColor: theme.border.strong,
-  },
-  emptyHero: {
-    height: PHOTO_CENTER_H + 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  heroImage: { height: 480 },
+  heroHeadlineBlock: {
     paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
   },
-  emptyHeroCard: {
-    alignItems: 'center',
-    gap: theme.spacing.s,
-    paddingHorizontal: theme.spacing.xxl,
-  },
-  emptyHeroTitle: {
-    ...theme.typography.h2,
+  heroHeadline: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: 32,
+    lineHeight: 40,
     color: theme.text.onColor,
-    textAlign: 'center',
   },
-  emptyHeroBody: {
-    ...theme.typography.body,
-    color: theme.text.onColor,
-    textAlign: 'center',
-    opacity: 0.85,
+  heroAvatarBlock: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.m, // 12 — the hero row is tighter than the plain one
   },
 
-  // Body
-  body: {
+  // ── Empty body (731:1282) ─────────────────────────────────────────────────
+  emptyBody: {
     flex: 1,
-    backgroundColor: theme.surface.default,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.l,
-    paddingBottom: theme.spacing.safeBtm,
-    gap: theme.spacing.l,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 102,
+    gap: theme.spacing.xxl, // 24
   },
-  statsCard: {
+  emptyPrompt: { width: 238, alignItems: 'center', gap: theme.spacing.s },
+  // timeline 731:2602 — the empty-month block centres in the timeline area
+  monthEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: theme.spacing.l,
+  },
+  cameraTile: {
+    width: 128,
+    height: 128,
+    borderRadius: theme.radius.l,
+    backgroundColor: theme.surface.brandSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  emptyTitle: {
+    ...theme.typography.body,
+    color: palette.neutral.black,
+    textAlign: 'center',
+  },
+  emptyCtaBlock: { alignSelf: 'stretch', alignItems: 'center', gap: theme.spacing.s },
+  emptyHint: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    textAlign: 'center',
+  },
+
+  // ── Filter (744:2530) ─────────────────────────────────────────────────────
+  filterBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 40,
+    paddingLeft: theme.spacing.xl,
+    paddingVertical: theme.spacing.xs,
+    gap: theme.spacing.s,
+  },
+  yearSelector: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  yearText: { ...theme.typography.h4, color: theme.text.primary },
+  filterDivider: { width: 1, height: 20, backgroundColor: theme.border.default },
+  monthPills: { gap: theme.spacing.s, paddingRight: theme.spacing.xl },
+  monthPill: {
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.border.brand,
+    backgroundColor: theme.surface.card,
+  },
+  monthPillActive: {
+    backgroundColor: theme.surface.brand,
+    borderColor: theme.surface.brand,
+  },
+  monthPillLabel: { ...theme.typography.tagBadge, color: theme.text.brand },
+  monthPillLabelActive: { color: theme.text.onColor },
+
+  // ── Timeline (731:1400) ───────────────────────────────────────────────────
+  scroll: { flex: 1 },
+  timeline: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.l,
+    paddingBottom: 196, // clears the floating CTA + tab bar (731:1467)
+  },
+  dayGroup: {
+    flexDirection: 'row',
+    gap: theme.spacing.s,
+    marginBottom: theme.spacing.l,
+  },
+  timelineLeft: { width: DATE_BADGE_W, alignItems: 'center' },
+  dateBadge: {
+    width: DATE_BADGE_W,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.m,
+    backgroundColor: theme.surface.brandSubtle,
+    alignItems: 'center',
+  },
+  dateBadgeDay: { ...theme.typography.h2, color: theme.text.brand },
+  dateBadgeMonth: { ...theme.typography.caption, color: theme.text.brand },
+  connectorLine: {
+    flex: 1,
+    width: 2,
+    marginTop: theme.spacing.xs,
+    marginBottom: -theme.spacing.l,
+    backgroundColor: theme.border.default,
+  },
+  dayCards: { flex: 1 },
+
+  // MemoryCard 290:2523
+  momentCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    height: CARD_H,
     backgroundColor: theme.surface.card,
     borderWidth: 1,
     borderColor: theme.border.default,
-    borderRadius: theme.radius.l,
-    height: 76,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.l,
+    borderRadius: theme.radius.m,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: 10,
+    gap: theme.spacing.m,
   },
-  statCol: {
-    flex: 1,
+  momentCardGap: { marginBottom: theme.spacing.m },
+  cardPhotoWrap: {
+    width: CARD_PHOTO,
+    height: CARD_PHOTO,
+    borderRadius: theme.radius.m,
+    backgroundColor: palette.neutral[200],
+    overflow: 'hidden',
+  },
+  cardPhotoImg: { width: CARD_PHOTO, height: CARD_PHOTO },
+  photoBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    height: 18,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'flex-end',
+    gap: 2,
+    backgroundColor: theme.overlay.scrim, // overlay-65
+    borderRadius: theme.radius.s, // 6
+    paddingHorizontal: 4,
   },
-  statValue: {
-    ...theme.typography.h2,
-    color: theme.text.primary,
+  photoBadgeCount: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 9,
+    lineHeight: 12,
+    color: theme.text.onColor,
   },
-  statLabel: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
+  cardBody: { flex: 1, height: CARD_PHOTO, overflow: 'hidden' },
+  cardText: { ...theme.typography.body, color: theme.text.primary },
+
+  // ── Floating CTA (731:1468) ───────────────────────────────────────────────
+  floatingCta: {
+    backgroundColor: theme.surface.default,
+    paddingHorizontal: 20,
+    paddingVertical: theme.spacing.l,
+    shadowColor: '#e3e3e3',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  statDivider: {
-    width: 1,
-    height: 36,
-    backgroundColor: theme.border.default,
+
+  // ── Sheets ────────────────────────────────────────────────────────────────
+  sheetPad: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.s,
+    gap: theme.spacing.s,
   },
-  summaryRow: {
+  sheetTitle: { ...theme.typography.h2, color: theme.text.primary },
+  sheetSubtitle: { ...theme.typography.body, color: theme.text.secondary },
+
+  yearRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.surface.card,
-    borderWidth: 1,
-    borderColor: theme.border.default,
-    borderRadius: theme.radius.l,
-    height: 46,
-    paddingHorizontal: theme.spacing.l,
     paddingVertical: theme.spacing.m,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border.default,
   },
-  summaryLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  summaryText: {
-    ...theme.typography.body,
-    color: theme.text.primary,
-  },
-  summaryRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  viewAllText: {
-    fontFamily: 'Manrope_500Medium',
-    fontSize: 16,
-    color: theme.text.brand,
-  },
+  yearRowLabel: { ...theme.typography.body, color: theme.text.primary },
+  yearRowLabelActive: { color: theme.text.brand, fontFamily: 'Manrope_600SemiBold' },
 
-  // CTA
-  cta: {
-    backgroundColor: theme.surface.default,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.safeBtm,
-    gap: theme.spacing.s,
-  },
-
-  // Profile Switcher Sheet
-  sheetScrim: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  sheet: {
-    backgroundColor: theme.surface.default,
-    borderTopLeftRadius: theme.radius.l,
-    borderTopRightRadius: theme.radius.l,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
-    gap: theme.spacing.s,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.border.strong,
-    alignSelf: 'center',
-    marginBottom: theme.spacing.s,
-  },
-  sheetTitle: {
-    ...theme.typography.h3,
-    color: theme.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  sheetSubtitle: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
-    marginBottom: theme.spacing.s,
-  },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.m,
     paddingVertical: theme.spacing.m,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border.default,
   },
-  profileRowDimmed: {
-    opacity: 0.45,
-  },
+  profileRowDimmed: { opacity: 0.5 },
   profileAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.surface.brand,
-  },
-  profileAvatarDimmed: {
-    backgroundColor: theme.surface.disabled,
-  },
-  profileTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  profileName: {
-    ...theme.typography.h3,
-    color: theme.text.primary,
-  },
-  profileNameDimmed: {
-    color: theme.text.secondary,
-  },
-  profileSub: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
-  },
-  currentBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.brand,
-  },
-  currentBadgeLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.onColor,
-  },
-  ctaPrompt: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
-    textAlign: 'center',
-  },
-  buttonWrap: {
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: theme.surface.brandSubtle,
-  },
-  button: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
-  upgradeCta: {
-    marginTop: theme.spacing.s,
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: theme.surface.brandSubtle,
-  },
-  upgradeBtn: {
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  upgradeBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.premium,
-  },
-  benefitsLink: {
+    width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.surface.brandSubtle,
   },
-  benefitsLinkLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
+  profileTextCol: { flex: 1, gap: 2 },
+  profileName: { ...theme.typography.h3, color: theme.text.primary },
+  profileSub: { ...theme.typography.caption, color: theme.text.secondary },
+  currentBadge: {
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.surface.successSubtle,
   },
+  currentBadgeLabel: { ...theme.typography.tagBadge, color: theme.text.success },
+  switcherCta: { gap: theme.spacing.s, paddingTop: theme.spacing.s },
 });

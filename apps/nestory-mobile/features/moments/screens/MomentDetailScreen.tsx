@@ -1,24 +1,20 @@
 import { useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Moment } from '@nestory/types';
-import { theme } from '@/shared/theme';
+import { palette, theme } from '@/shared/theme';
 import { useAsset, useSubscription } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { Button } from '@/shared/components/Button';
+import { NavBar } from '@/shared/components/NavBar';
 import { FullscreenPhotoViewer } from '@/shared/components/FullscreenPhotoViewer';
 import { MomentEditGateSheet } from '@/shared/components/MomentEditGateSheet';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 
-const SCREEN_W = Dimensions.get('window').width;
-
-const PHOTO_CENTER_W = 225;
-const PHOTO_CENTER_H = 300;
-const PHOTO_SIDE_W   = 195;
-const PHOTO_SIDE_H   = 260;
-const PHOTO_GAP      = 12;
-const CAROUSEL_PADDING = (SCREEN_W - PHOTO_CENTER_W) / 2;
+// Photo cells match the Add page: 3 × 107 + 2 × 16 = 353 across the padded body.
+const PHOTO_CELL = 107;
 
 function formatCapturedAt(iso: string): string {
   const d = new Date(iso);
@@ -44,13 +40,7 @@ export function MomentDetailScreen() {
         </View>
       ) : momentQ.isError || !momentQ.data ? (
         <View style={styles.center}>
-          <View style={styles.navBar}>
-            <Pressable hitSlop={8} onPress={goBack}>
-              <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
-            </Pressable>
-            <Text style={styles.navTitle}>Moment</Text>
-            <View style={styles.navSpacer} />
-          </View>
+          <NavBar title="Memory" onBack={goBack} />
           <Text style={styles.errorText}>Failed to load moment.</Text>
           <Pressable onPress={() => momentQ.refetch()}>
             <Text style={styles.retryText}>Tap to retry</Text>
@@ -69,8 +59,6 @@ function Body({ moment }: { moment: Moment }) {
   const router = useRouter();
   const goBack = useGoBack();
   const subQ = useSubscription();
-  const dotCount = moment.files.length;
-  const [activeIndex, setActiveIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [gateVisible, setGateVisible] = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
@@ -86,84 +74,48 @@ function Body({ moment }: { moment: Moment }) {
     else setGateVisible(true);
   };
 
-  const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / (PHOTO_CENTER_W + PHOTO_GAP));
-    setActiveIndex(Math.max(0, Math.min(dotCount - 1, idx)));
-  };
-
   return (
     <>
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>Moment</Text>
-        <Pressable hitSlop={8} onPress={onEditPress}>
-          <Text style={styles.editButton}>Edit</Text>
-        </Pressable>
-      </View>
+      {/* NavBar Type=withButton (743:3280) — Edit is a DS Text button */}
+      <NavBar
+        title="Memory"
+        onBack={goBack}
+        right={<Button label="Edit" type="text" style={styles.editBtn} onPress={onEditPress} />}
+      />
 
+      {/* body 743:3213 — note first, then a 3-up photo grid, then the meta row */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
-        {moment.files.length > 0 && (
-          <>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={PHOTO_CENTER_W + PHOTO_GAP}
-              decelerationRate="fast"
-              onMomentumScrollEnd={onCarouselScroll}
-              style={styles.carouselScroll}
-              contentContainerStyle={[
-                styles.carouselContent,
-                { paddingHorizontal: CAROUSEL_PADDING },
-              ]}
-            >
-              {moment.files.map((f, i) => (
-                <Pressable key={f.id} onPress={() => setViewerIndex(i)}>
-                  <Image
-                    source={{ uri: f.fileUrl }}
-                    style={[
-                      styles.photoCenter,
-                      i < moment.files.length - 1 ? { marginRight: PHOTO_GAP } : null,
-                    ]}
-                  />
-                </Pressable>
-              ))}
-            </ScrollView>
+        {moment.textNote ? <Text style={styles.noteText}>{moment.textNote}</Text> : null}
 
-            {dotCount > 1 && (
-              <View style={styles.dots}>
-                {Array.from({ length: dotCount }).map((_, i) => (
-                  <View key={i} style={i === activeIndex ? styles.dotActive : styles.dotInactive} />
-                ))}
-              </View>
-            )}
-          </>
+        {moment.files.length > 0 && (
+          <View style={styles.photoGrid}>
+            {moment.files.map((f, i) => (
+              <Pressable key={f.id} onPress={() => setViewerIndex(i)}>
+                <Image source={{ uri: f.fileUrl }} style={styles.photoCell} />
+              </Pressable>
+            ))}
+          </View>
         )}
 
-        <View style={styles.body}>
-          {moment.textNote ? (
-            <Text style={styles.noteText}>{moment.textNote}</Text>
-          ) : null}
-
-          {moment.tags.length > 0 && (
-            <View style={styles.tagsRow}>
-              {moment.tags.map(tag => (
-                <View key={tag} style={styles.tagPill}>
-                  <Text style={styles.tagLabel}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <View style={styles.metaRow}>
-            <RemixIcon name="time-line" size={16} color={theme.text.secondary} />
-            <Text style={styles.metaText}>{formatCapturedAt(moment.capturedAt)}</Text>
+        {/* Tags aren't drawn in the frame but the annotation lists them as part
+            of the view page, and Tags ship as a feature — kept. */}
+        {moment.tags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {moment.tags.map((tag) => (
+              <View key={tag} style={styles.tagPill}>
+                <Text style={styles.tagLabel}>{tag}</Text>
+              </View>
+            ))}
           </View>
+        )}
+
+        <View style={styles.metaRow}>
+          <RemixIcon name="time-line" size={16} color={theme.text.secondary} />
+          <Text style={styles.metaText}>{formatCapturedAt(moment.capturedAt)}</Text>
         </View>
       </ScrollView>
 
@@ -219,73 +171,28 @@ const styles = StyleSheet.create({
     color: theme.text.brand,
   },
 
-  navBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xl,
-    height: 56,
-  },
-  navTitle: {
-    ...theme.typography.h3,
-    color: theme.text.primary,
-  },
-  editButton: {
-    fontFamily: 'Manrope_500Medium',
-    fontSize: 16,
-    lineHeight: 22,
-    color: theme.text.brand,
-  },
-  navSpacer: { width: 40 },
-
-  carouselScroll: {
-    height: PHOTO_CENTER_H,
-    marginTop: theme.spacing.s,
-  },
-  carouselContent: {
-    alignItems: 'flex-end',
-  },
-  photoCenter: {
-    width: PHOTO_CENTER_W,
-    height: PHOTO_CENTER_H,
-    borderRadius: theme.radius.l,
-    backgroundColor: theme.border.default,
-  },
-  photoSide: {
-    width: PHOTO_SIDE_W,
-    height: PHOTO_SIDE_H,
-    borderRadius: theme.radius.l,
-    backgroundColor: theme.border.default,
-  },
-  dots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: theme.spacing.m,
-  },
-  dotActive: {
-    width: 18,
-    height: 6,
-    borderRadius: theme.radius.s,
-    backgroundColor: theme.text.brand,
-  },
-  dotInactive: {
-    width: 6,
-    height: 6,
-    borderRadius: theme.radius.s,
-    borderWidth: 1,
-    borderColor: theme.border.strong,
-  },
+  // The design instances the DS Text button at 36 tall in the nav bar
+  editBtn: { height: 36 },
 
   scroll: { flex: 1 },
-  scrollContent: {
-    paddingBottom: theme.spacing.xl,
-  },
   body: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
+    paddingHorizontal: theme.spacing.xl, // 20
+    paddingTop: theme.spacing.l, // 16
+    paddingBottom: theme.spacing.safeBtm, // 34
+    gap: theme.spacing.l, // 16
+  },
+
+  // 743:3215 — same 3-up 107px grid as the Add page
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.spacing.l,
+  },
+  photoCell: {
+    width: PHOTO_CELL,
+    height: PHOTO_CELL,
+    borderRadius: theme.radius.m,
+    backgroundColor: palette.neutral[200],
   },
 
   noteText: {

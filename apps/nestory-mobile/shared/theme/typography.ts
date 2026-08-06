@@ -21,7 +21,9 @@ export const typography = {
   caption:      { fontFamily: 'Inter_400Regular',    fontSize: 14, lineHeight: 16 },
   buttonLabelM: { fontFamily: 'Manrope_700Bold',     fontSize: 16, lineHeight: 22 },
   buttonLabelS: { fontFamily: 'Manrope_600SemiBold', fontSize: 14, lineHeight: 20 },
-  tagBadge:     { fontFamily: 'Inter_500Medium',     fontSize: 12, lineHeight: 16 },
+  // Redesign file (wS1hJeZhXMkUnn8YwLtFcv) defines Tag&Badge at 14/16 — the
+  // 0429 file had it at 12/16. Verified via get_variable_defs, 2026-08-05.
+  tagBadge:     { fontFamily: 'Inter_500Medium',     fontSize: 14, lineHeight: 16 },
 } as const satisfies Record<string, TextStyle>;
 
 export type TypographyVariant = keyof typeof typography;

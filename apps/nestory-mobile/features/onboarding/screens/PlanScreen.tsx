@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showToast } from '@/features/ui/toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import { Button } from '@/shared/components/Button';
+import { NavBar } from '@/shared/components/NavBar';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { queryClient, queryKeys } from '@/api';
@@ -16,7 +17,6 @@ import { track } from '@/shared/lib/analytics';
 // product has no free-trial concept (Handoff §3.1); CTA is a straight purchase.
 // Success → global Welcome-to-Premium page, then on to Home.
 
-const TOTAL_STEPS = 5;
 type Plan = 'yearly' | 'monthly';
 
 const PREMIUM_BENEFITS = [
@@ -68,39 +68,31 @@ export function PlanScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* NavBar */}
-      <View style={styles.navBar}>
-        <View style={styles.navRow}>
-          <Pressable onPress={goBack} hitSlop={8}>
-            <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-          </Pressable>
-        </View>
-        <View style={styles.progress}>
-          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-            <View key={i} style={[styles.progressSegment, styles.progressActive]} />
-          ))}
-        </View>
+      {/* Final onboarding phase — all three progress segments filled (739:1408) */}
+      <NavBar onBack={goBack} progress={{ total: 3, active: 3 }} />
+
+      {/* title 739:1409 — headline only, no subtitle */}
+      <View style={styles.title}>
+        <Text style={styles.headline}>Choose your plan</Text>
       </View>
 
-      {/* Content */}
+      {/* body 755:3033 */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.headline}>Choose your plan</Text>
-
-        {/* Premium card: crown + benefits + plan picker */}
+        {/* Premium card 755:2902: crown + benefits + plan picker */}
         <View style={styles.premiumCard}>
-          <View style={styles.premiumHeader}>
-            <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+          <View style={styles.cardHeader}>
+            <RemixIcon name="vip-crown-2-line" size={24} color={theme.text.premium} />
             <Text style={styles.premiumTitle}>Premium</Text>
           </View>
 
           <View style={styles.benefits}>
-            {PREMIUM_BENEFITS.map(text => (
+            {PREMIUM_BENEFITS.map((text) => (
               <View key={text} style={styles.benefitRow}>
-                <Text style={styles.benefitBullet}>•</Text>
+                <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
                 <Text style={styles.benefitText}>{text}</Text>
               </View>
             ))}
@@ -113,89 +105,79 @@ export function PlanScreen() {
             >
               <View style={styles.planTop}>
                 <Text style={styles.planPrice}>$100</Text>
-                {plan === 'yearly' ? (
-                  <View style={styles.radioChecked}>
-                    <RemixIcon name="check-line" size={12} color={theme.text.onColor} />
-                  </View>
-                ) : (
-                  <View style={styles.radioUnchecked} />
-                )}
+                <RemixIcon
+                  name={plan === 'yearly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
+                  size={20}
+                  color={plan === 'yearly' ? theme.border.premium : theme.border.strong}
+                />
               </View>
-              <Text style={styles.planCaption}>Billed annually</Text>
-              <Text style={styles.planBadge}>~17% Off</Text>
+              <View style={styles.planMeta}>
+                <Text style={styles.planCaption}>Billed annually</Text>
+                <Text style={styles.planBadge}>~17% Off</Text>
+              </View>
             </Pressable>
 
             <Pressable
-              style={[styles.planCard, plan === 'monthly' ? styles.planSelected : styles.planUnselected]}
+              style={[
+                styles.planCard,
+                styles.planCardMonthly,
+                plan === 'monthly' ? styles.planSelected : styles.planUnselected,
+              ]}
               onPress={() => setPlan('monthly')}
             >
               <View style={styles.planTop}>
                 <Text style={styles.planPrice}>$10</Text>
-                {plan === 'monthly' ? (
-                  <View style={styles.radioChecked}>
-                    <RemixIcon name="check-line" size={12} color={theme.text.onColor} />
-                  </View>
-                ) : (
-                  <View style={styles.radioUnchecked} />
-                )}
+                <RemixIcon
+                  name={plan === 'monthly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
+                  size={20}
+                  color={plan === 'monthly' ? theme.border.premium : theme.border.strong}
+                />
               </View>
               <Text style={styles.planCaption}>Billed monthly</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Free card */}
+        {/* Free card 755:2903 */}
         <View style={styles.freeCard}>
-          <Text style={styles.freeTitle}>Free</Text>
+          <View style={styles.cardHeader}>
+            <RemixIcon name="layout-left-2-line" size={24} color={palette.neutral.black} />
+            <Text style={styles.freeTitle}>Free</Text>
+          </View>
           <View style={styles.benefits}>
-            {FREE_ITEMS.map(text => (
+            {FREE_ITEMS.map((text) => (
               <View key={text} style={styles.benefitRow}>
-                <Text style={styles.benefitBullet}>•</Text>
-                <Text style={styles.freeItemText}>{text}</Text>
+                <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.secondary} />
+                <Text style={styles.benefitText}>{text}</Text>
               </View>
             ))}
           </View>
         </View>
       </ScrollView>
 
-      {/* CTAs */}
+      {/* cta 761:2473 — the legal line lives in this block, 12 below the buttons */}
       <View style={styles.cta}>
-        <Pressable
-          style={({ pressed }) => [styles.premiumWrap, (pressed || purchasing) && { opacity: 0.85 }]}
-          onPress={handleSubscribe}
+        <Button
+          label={purchasing ? 'Processing…' : 'Start with Premium'}
+          type="premium"
           disabled={purchasing}
-        >
-          <LinearGradient
-            colors={[palette.accent[500], palette.accent[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.premiumButton}
-          >
-            <Text style={styles.premiumLabel}>
-              {purchasing ? 'Processing…' : 'Start with Premium'}
-            </Text>
-          </LinearGradient>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.freeButton, pressed && { opacity: 0.85 }]}
+          onPress={handleSubscribe}
+        />
+        <Button
+          label="Start with Free"
+          type="text"
+          style={styles.freeButton}
           onPress={() => {
             track('onboarding_complete', { profileCount, plan: 'free' });
             router.replace('/');
           }}
-        >
-          <Text style={styles.freeLabel}>Start with Free</Text>
-        </Pressable>
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footer}>
+        />
         <Text style={styles.footerText}>
-          Auto-renews until canceled. Manage in Settings.{' '}
+          Auto-renews until canceled. Manage in Settings.{'\n'}
           <Text style={styles.footerLink} onPress={() => router.push('/onboarding/terms')}>
             Terms of Service
           </Text>
-          {' · '}
+          <Text style={styles.footerLinkPlain}>{' · '}</Text>
           <Text style={styles.footerLink} onPress={() => router.push('/onboarding/privacy')}>
             Privacy Policy
           </Text>
@@ -210,88 +192,69 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.surface.default,
   },
-  navBar: {
-    paddingHorizontal: theme.spacing.xxl,
-  },
-  navRow: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progress: {
-    flexDirection: 'row',
-    gap: 6,
-    height: 4,
-  },
-  progressSegment: {
-    flex: 1,
-    height: 4,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.border.default,
-  },
-  progressActive: {
-    backgroundColor: theme.surface.brand,
-  },
-
-  scroll: { flex: 1 },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 16,
-    gap: theme.spacing.l,
+  title: {
+    paddingHorizontal: theme.spacing.xl, // 20
+    paddingVertical: theme.spacing.l, // 16
   },
   headline: {
     ...theme.typography.h1,
     color: theme.text.primary,
   },
 
-  // Premium card
+  scroll: { flex: 1 },
+  content: {
+    paddingHorizontal: theme.spacing.xl,
+    gap: theme.spacing.l, // 16
+  },
+
+  // Premium card 755:2902 — radius/m, px16 py12, border/strong (not premium)
   premiumCard: {
     borderWidth: 1,
-    borderColor: theme.text.premium,
-    borderRadius: theme.radius.l,
-    backgroundColor: palette.accent[50],
-    padding: theme.spacing.l,
+    borderColor: theme.border.strong,
+    borderRadius: theme.radius.m,
+    backgroundColor: theme.surface.premiumSubtle,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.m,
     gap: 12,
   },
-  premiumHeader: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing.xs, // 4
   },
   premiumTitle: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 18,
-    lineHeight: 24,
+    ...theme.typography.h2, // Manrope Bold 18/24
     color: theme.text.premium,
   },
-  benefits: { gap: 8 },
+  benefits: { gap: theme.spacing.s }, // 8
   benefitRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: theme.spacing.xs, // 4
   },
-  benefitBullet: { ...theme.typography.body, color: theme.text.primary },
   benefitText: { flex: 1, ...theme.typography.body, color: theme.text.primary },
 
   planRow: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'flex-start',
+    gap: theme.spacing.s, // 8
   },
   planCard: {
     flex: 1,
     borderRadius: theme.radius.m,
     backgroundColor: theme.surface.card,
-    padding: theme.spacing.m,
-    gap: 2,
+    paddingHorizontal: theme.spacing.l, // 16
+    paddingVertical: 14,
+    gap: theme.spacing.s, // 8
   },
+  planCardMonthly: { height: 94 }, // 756:3237 is pinned so both cards align
   planSelected: {
     borderWidth: 2,
-    borderColor: theme.text.premium,
+    borderColor: theme.border.premium, // #f59e0b
   },
   planUnselected: {
     borderWidth: 1,
-    borderColor: theme.border.default,
+    borderColor: theme.border.strong,
   },
   planTop: {
     flexDirection: 'row',
@@ -299,92 +262,50 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   planPrice: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 22,
-    lineHeight: 30,
+    ...theme.typography.h3, // Manrope SemiBold 16/22
     color: theme.text.primary,
   },
-  radioChecked: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: theme.text.premium,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioUnchecked: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: theme.border.strong,
-  },
+  planMeta: { gap: theme.spacing.xs },
   planCaption: { ...theme.typography.caption, color: theme.text.secondary },
-  planBadge: { ...theme.typography.caption, color: theme.text.premium },
+  planBadge: {
+    ...theme.typography.h4, // Manrope SemiBold 14/20
+    color: theme.text.premium,
+  },
 
-  // Free card
+  // Free card 755:2903
   freeCard: {
     borderWidth: 1,
-    borderColor: theme.border.default,
-    borderRadius: theme.radius.l,
+    borderColor: theme.border.strong,
+    borderRadius: theme.radius.m,
     backgroundColor: theme.surface.card,
-    padding: theme.spacing.l,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.m,
     gap: 12,
   },
   freeTitle: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 18,
-    lineHeight: 24,
-    color: theme.text.primary,
+    ...theme.typography.h2,
+    color: palette.neutral.black,
   },
-  freeItemText: { flex: 1, ...theme.typography.body, color: theme.text.secondary },
 
   cta: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.s, // 8
     gap: 12,
-  },
-  premiumWrap: {
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: theme.surface.premiumSubtle,
-  },
-  premiumButton: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  premiumLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.premium,
-  },
-  freeButton: {
-    height: 52,
-    backgroundColor: theme.surface.card,
-    borderWidth: 1,
-    borderColor: theme.border.brand,
-    borderRadius: theme.radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  freeLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: theme.spacing.safeBtm,
     alignItems: 'center',
   },
+  freeButton: { height: 44 },
+  // 761:2476 — legal line sits inside the CTA block; links are underlined and
+  // brand-coloured, the sentence above them is text/secondary
   footerText: {
-    ...theme.typography.caption,
+    ...theme.typography.caption, // Inter Regular 14/16
     color: theme.text.secondary,
     textAlign: 'center',
+    paddingHorizontal: theme.spacing.xl,
+    marginBottom: theme.spacing.safeBtm,
   },
   footerLink: {
-    fontFamily: 'Manrope_600SemiBold',
     color: theme.text.brand,
+    textDecorationLine: 'underline',
   },
+  footerLinkPlain: { color: theme.text.brand },
 });

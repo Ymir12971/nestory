@@ -1,8 +1,9 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Button } from '@/shared/components/Button';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
@@ -36,25 +37,34 @@ export function WelcomeToPremiumScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* title 771:3313 */}
+      <View style={styles.titleBlock}>
+        <Text style={styles.title}>Welcome to Premium!</Text>
+      </View>
+
+      {/* body 771:3316 */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Welcome to Premium!</Text>
-
-        {/* Hero */}
+        {/* currentPlanCard 771:3317 — 160.79° accent/400 → accent/500 with three
+            deeper-amber blobs bleeding off the corners */}
         <LinearGradient
-          colors={[palette.accent[500], palette.accent[400]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={[palette.accent[400], palette.accent[500]]}
+          locations={[0, 0.7071]}
+          start={{ x: 0.336, y: 0.028 }}
+          end={{ x: 0.664, y: 0.972 }}
           style={styles.hero}
         >
-          <RemixIcon name="vip-crown-2-fill" size={32} color={theme.text.onColor} />
+          <View style={[styles.blob, styles.blobTopLeft]} />
+          <View style={[styles.blob, styles.blobRight]} />
+          <View style={[styles.blob, styles.blobTopRight]} />
+          <RemixIcon name="vip-crown-fill" size={41} color={theme.text.onColor} />
           <Text style={styles.heroLabel}>Premium Plan</Text>
         </LinearGradient>
 
-        {/* Plan details */}
+        {/* billingDetailCard 771:3324 */}
         <View style={styles.detailsCard}>
           <DetailRow label="Plan" value={cycle === 'year' ? 'Yearly' : 'Monthly'} />
           <DetailRow label="Price" value={cycle === 'year' ? '$100 / year' : '$10 / month'} />
@@ -62,33 +72,21 @@ export function WelcomeToPremiumScreen() {
           <Text style={styles.autoRenew}>Auto-renews until canceled. Manage in Settings.</Text>
         </View>
 
-        {/* What's included */}
+        {/* includedCard 771:3335 */}
         <View style={styles.includedCard}>
           <Text style={styles.includedTitle}>What's included</Text>
-          {BENEFITS.map(text => (
+          {BENEFITS.map((text) => (
             <View key={text} style={styles.benefit}>
-              <RemixIcon name="vip-crown-2-line" size={16} color={theme.text.premium} />
+              <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
               <Text style={styles.benefitText}>{text}</Text>
             </View>
           ))}
         </View>
       </ScrollView>
 
-      {/* CTA */}
+      {/* cta 771:3357 */}
       <View style={styles.cta}>
-        <Pressable
-          style={({ pressed }) => [styles.ctaBtnWrap, pressed && { opacity: 0.88 }]}
-          onPress={onAllSet}
-        >
-          <LinearGradient
-            colors={[palette.accent[500], palette.accent[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.ctaBtn}
-          >
-            <Text style={styles.ctaBtnLabel}>I'm all set</Text>
-          </LinearGradient>
-        </Pressable>
+        <Button label="I'm all set" type="premium" onPress={onAllSet} />
       </View>
     </SafeAreaView>
   );
@@ -112,40 +110,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingBottom: theme.spacing.xl,
-    gap: theme.spacing.l,
+    padding: theme.spacing.xl, // 20
+    gap: theme.spacing.l, // 16
   },
 
-  title: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 28,
-    lineHeight: 38,
-    color: theme.text.primary,
-    paddingTop: theme.spacing.m,
+  titleBlock: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
   },
+  title: { ...theme.typography.h1, color: theme.text.primary },
 
   hero: {
     borderRadius: theme.radius.l,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    gap: 8,
+    paddingHorizontal: theme.spacing.l, // 16
+    paddingVertical: theme.spacing.xl, // 20
+    gap: theme.spacing.xs, // 4
+    overflow: 'hidden',
   },
   heroLabel: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 26,
-    lineHeight: 34,
+    ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.onColor,
+    textAlign: 'center',
   },
+  blob: { position: 'absolute', borderRadius: theme.radius.full },
+  blobTopLeft: { left: -42, top: -49, width: 140, height: 140, backgroundColor: '#f8aa14' },
+  blobRight: { left: 285, top: 82, width: 63, height: 63, backgroundColor: '#f9b21a' },
+  blobTopRight: { left: 255, top: -11, width: 36, height: 36, backgroundColor: '#f9b21a' },
 
   detailsCard: {
     borderWidth: 1,
-    borderColor: theme.border.default,
+    borderColor: theme.border.default, // neutral/200
     borderRadius: theme.radius.l,
     backgroundColor: theme.surface.card,
     padding: theme.spacing.l,
-    gap: 10,
+    gap: 12,
   },
   detailRow: {
     flexDirection: 'row',
@@ -157,31 +156,32 @@ const styles = StyleSheet.create({
     color: theme.text.secondary,
   },
   detailValue: {
-    ...theme.typography.body,
-    fontFamily: 'Inter_600SemiBold',
+    ...theme.typography.h3, // Manrope SemiBold 16/22
     color: theme.text.primary,
   },
   autoRenew: {
     ...theme.typography.caption,
-    color: theme.text.hint,
+    color: theme.text.secondary,
+    textAlign: 'center',
   },
 
   includedCard: {
+    borderWidth: 1,
+    borderColor: theme.border.default,
     borderRadius: theme.radius.l,
-    backgroundColor: palette.accent[50],
-    padding: theme.spacing.l,
-    gap: 12,
+    backgroundColor: theme.surface.premiumSubtle,
+    paddingHorizontal: theme.spacing.l, // 16
+    paddingVertical: theme.spacing.xl, // 20
+    gap: 14,
   },
   includedTitle: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 18,
-    lineHeight: 24,
+    ...theme.typography.h2, // Manrope Bold 18/24
     color: theme.text.primary,
   },
   benefit: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'flex-start',
+    gap: theme.spacing.xs, // 4
   },
   benefitText: {
     flex: 1,
@@ -191,21 +191,7 @@ const styles = StyleSheet.create({
 
   cta: {
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
+    paddingTop: theme.spacing.s, // 8
     paddingBottom: theme.spacing.safeBtm,
-  },
-  ctaBtnWrap: {
-    width: '100%',
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-  },
-  ctaBtn: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.premium,
   },
 });

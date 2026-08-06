@@ -1,7 +1,6 @@
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
+import { NavBar } from '@/shared/components/NavBar';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
@@ -25,40 +24,23 @@ const TERMS_SECTIONS = [
 ];
 
 export function TermsScreen() {
-  const router = useRouter();
   const goBack = useGoBack();
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* NavBar */}
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>Terms of Service</Text>
-        <View style={styles.navSpacer} />
-      </View>
+      <NavBar title="Terms of Service" onBack={goBack} />
 
-      <ScrollView
-        contentContainerStyle={styles.body}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Last updated */}
+      {/* body 739:1550 — sections sit flat on the page, no card wrapper */}
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <Text style={styles.updatedLabel}>Last updated: January 1, 2025</Text>
+        <Text style={styles.hint}>Please read these terms carefully before using Nestory.</Text>
 
-        {/* Content card */}
-        <View style={styles.card}>
-          <Text style={styles.hint}>
-            Please read these terms carefully before using Nestory.
-          </Text>
-
-          {TERMS_SECTIONS.map((section, i) => (
-            <View key={i} style={styles.section}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-              <Text style={styles.sectionBody}>{section.body}</Text>
-            </View>
-          ))}
-        </View>
+        {TERMS_SECTIONS.map((section, i) => (
+          <View key={i} style={styles.section}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionBody}>{section.body}</Text>
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -67,35 +49,16 @@ export function TermsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
 
-  navBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xxl,
-  },
-  navTitle: { ...theme.typography.h2, color: theme.text.primary },
-  navSpacer: { width: 24 },
-
   body: {
-    paddingTop: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    gap: 8,
+    paddingTop: theme.spacing.l, // 16
+    paddingHorizontal: theme.spacing.xl, // 20
+    paddingBottom: theme.spacing.safeBtm, // 34
+    gap: theme.spacing.s, // 8
   },
 
   updatedLabel: {
     ...theme.typography.caption,
     color: theme.text.secondary,
-  },
-
-  card: {
-    backgroundColor: theme.surface.muted,
-    borderWidth: 1,
-    borderColor: theme.border.default,
-    borderRadius: theme.radius.m,
-    padding: 16,
-    gap: 14,
   },
 
   hint: {

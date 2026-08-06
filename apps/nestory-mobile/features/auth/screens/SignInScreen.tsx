@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
@@ -17,6 +17,7 @@ const DEMO_USER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
 export function SignInScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { session } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [pendingProvider, setPendingProvider] = useState<'apple' | 'google' | null>(null);
@@ -127,13 +128,16 @@ export function SignInScreen() {
   };
 
   return (
+    // linear-gradient(40.9deg, primary/600 3.73%, primary/400 75.07%) — runs
+    // from the bottom-left corner up to the top-right.
     <LinearGradient
       colors={[palette.primary[600], palette.primary[400]]}
-      start={{ x: 0, y: 1 }}
-      end={{ x: 1, y: 0 }}
+      locations={[0.0373, 0.7507]}
+      start={{ x: 0.173, y: 0.878 }}
+      end={{ x: 0.827, y: 0.122 }}
       style={styles.gradient}
     >
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.container}>
        <KeyboardAvoidingView
          style={styles.kav}
          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -143,8 +147,9 @@ export function SignInScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        {/* Top white card: photo + logo */}
-        <View style={styles.card}>
+        {/* Cream panel (739:1136), 330 tall — the status-bar band above it is
+            the same surface/default fill (739:1135), so the inset lives here. */}
+        <View style={[styles.card, { height: 330 + insets.top, paddingTop: insets.top + theme.spacing.l }]}>
           <Image
             source={require('@/assets/images/family-trip-1.png')}
             style={styles.heroImage}
@@ -172,7 +177,7 @@ export function SignInScreen() {
             onPress={handleApplePress}
             disabled={busy}
           >
-            <RemixIcon name="apple-fill" size={22} color={theme.text.brand} />
+            <RemixIcon name="apple-fill" size={24} color={theme.text.brand} />
             <Text style={styles.socialButtonLabel}>
               {pendingProvider === 'apple' ? 'Signing in…' : 'Continue with Apple'}
             </Text>
@@ -183,7 +188,7 @@ export function SignInScreen() {
             onPress={handleGooglePress}
             disabled={busy}
           >
-            <RemixIcon name="google-fill" size={20} color={theme.text.brand} />
+            <RemixIcon name="google-fill" size={24} color={theme.text.brand} />
             <Text style={styles.socialButtonLabel}>
               {pendingProvider === 'google' ? 'Signing in…' : 'Continue with Google'}
             </Text>
@@ -233,7 +238,7 @@ export function SignInScreen() {
         </View>
 
         {/* Footer */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, theme.spacing.safeBtm) }]}>
           <Text style={styles.footerText}>By continuing, you agree to our</Text>
           <Text style={styles.footerText}>
             <Text
@@ -253,7 +258,7 @@ export function SignInScreen() {
         </View>
         </ScrollView>
        </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </LinearGradient>
   );
 }
@@ -278,16 +283,15 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.default,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    overflow: 'hidden',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.l,
-    paddingTop: theme.spacing.l,
+    paddingHorizontal: theme.spacing.xl, // 20
     paddingBottom: theme.spacing.l,
     gap: theme.spacing.l,
   },
   heroImage: {
     width: '100%',
     aspectRatio: 400 / 236,
-    borderRadius: theme.radius.m,
   },
   logo: {
     width: 149,
@@ -296,6 +300,7 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: theme.spacing.xl,
     paddingTop: 50,
+    paddingBottom: theme.spacing.xxl, // 24
     gap: theme.spacing.s,
     alignItems: 'center',
   },
@@ -310,8 +315,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttonGroup: {
-    paddingTop: theme.spacing.l,
-    gap: theme.spacing.s,
+    paddingTop: theme.spacing.xxl, // 24
+    gap: theme.spacing.m, // 12
     alignItems: 'center',
   },
   socialButton: {
@@ -389,8 +394,8 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 'auto',
     alignItems: 'center',
+    paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.safeBtm,
     gap: theme.spacing.xs,
   },
   footerText: {

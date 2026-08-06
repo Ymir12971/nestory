@@ -3,9 +3,10 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MOMENT_CONSTRAINTS } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
+import { Button } from '@/shared/components/Button';
+import { NavBar } from '@/shared/components/NavBar';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { TagPickerSheet } from '@/shared/components/TagPickerSheet';
 import { DateTimePickerSheet } from '@/shared/components/DateTimePickerSheet';
@@ -42,7 +43,6 @@ export function AddMomentScreen() {
   const [dateSheetVisible, setDateSheetVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const photoStripRef = useRef<ScrollView>(null);
 
   // Redesign save rule: text is the ONLY activation condition — photos alone
   // can't save, text alone can (MOMENT_CONSTRAINTS.textRequiredToSave).
@@ -60,8 +60,10 @@ export function AddMomentScreen() {
   };
 
   const children = childrenQ.data ?? [];
-  const activeChildId =
-    children.find(c => c.isActive)?.id ?? children[0]?.id ?? null;
+  const activeChild = children.find(c => c.isActive) ?? children[0];
+  const activeChildId = activeChild?.id ?? null;
+  // Placeholder is name-personalised in the design ("A quick note about Emma's day.")
+  const activeChildName = activeChild?.name ?? 'your little one';
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -101,11 +103,6 @@ export function AddMomentScreen() {
       setSaving(false);
     }
   };
-
-  // Auto-scroll the photo strip so the "+" button stays visible as photos are added.
-  useEffect(() => {
-    photoStripRef.current?.scrollToEnd({ animated: true });
-  }, [photos.length]);
 
   // camera / album entry modes launch their picker once on mount ('note' is
   // handled by autoFocus on the text input).
@@ -153,14 +150,19 @@ export function AddMomentScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* NavBar */}
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>New Moment</Text>
-        <View style={styles.navSpacer} />
-      </View>
+      {/* NavBar Type=withButton (742:3083) — Save lives here, not in a footer */}
+      <NavBar
+        title="Add Memory"
+        onBack={goBack}
+        right={
+          <Button
+            label={saving ? 'Saving…' : 'Save'}
+            type="small"
+            disabled={!canSave}
+            onPress={handleSave}
+          />
+        }
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -168,37 +170,12 @@ export function AddMomentScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Photo Strip */}
-        <ScrollView
-          ref={photoStripRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.photoStrip}
-        >
-          {photos.map((p, i) => (
-            <View key={p.uri} style={styles.photoThumbWrap}>
-              <Image source={{ uri: p.uri }} style={styles.photoThumbImg} />
-              <Pressable
-                style={styles.deleteBadge}
-                hitSlop={6}
-                onPress={() => handleRemovePhoto(i)}
-              >
-                <RemixIcon name="close-line" size={12} color={theme.text.onColor} />
-              </Pressable>
-            </View>
-          ))}
-          {photos.length < MAX_PHOTOS && (
-            <Pressable style={styles.photoAdd} onPress={handleOpenAddPhoto}>
-              <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
-            </Pressable>
-          )}
-        </ScrollView>
-
-        {/* Note Input — autoFocus on the "Just a Note" fast path so the
-            keyboard slides up immediately (annotation) */}
+        {/* memoryInput (742:3148) — the note comes first in the design, with the
+            photo grid under it. autoFocus on the "Just a Note" fast path so the
+            keyboard slides up immediately (annotation). */}
         <TextInput
-          style={styles.noteInput}
-          placeholder="What happened today…"
+          style={[styles.noteInput, noteText.length > 0 && styles.noteInputFilled]}
+          placeholder={`A quick note about ${activeChildName}'s day.`}
           placeholderTextColor={theme.text.hint}
           multiline
           textAlignVertical="top"
@@ -207,39 +184,61 @@ export function AddMomentScreen() {
           autoFocus={mode === 'note'}
         />
 
-        {/* Details List */}
+        {/* Photo grid 742:3086 — 3 columns of 107px cells, 16 apart */}
+        <View style={styles.photoGrid}>
+          {photos.map((p, i) => (
+            <View key={p.uri} style={styles.photoCell}>
+              <Image source={{ uri: p.uri }} style={styles.photoCellImg} />
+              <Pressable
+                style={styles.deleteBadge}
+                hitSlop={6}
+                onPress={() => handleRemovePhoto(i)}
+              >
+                <RemixIcon name="close-line" size={24} color={theme.text.onColor} />
+              </Pressable>
+            </View>
+          ))}
+          {photos.length < MAX_PHOTOS && (
+            <Pressable style={styles.photoAdd} onPress={handleOpenAddPhoto}>
+              <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
+            </Pressable>
+          )}
+        </View>
+
+        {/* detailsList 742:3153 — the design only draws the Memory Date row; the
+            Tags row is kept because Tags ship as a feature (WorkPlan §3 保留). */}
         <View style={styles.detailsList}>
           <Pressable style={styles.detailRow} onPress={() => setTagSheetVisible(true)}>
             <Text style={styles.detailLabel}>Tags</Text>
             <View style={styles.detailRight}>
               {tags.length > 0 ? (
                 <>
-                  {tags.slice(0, 3).map(tag => (
-                    <View key={tag} style={styles.miniChip}>
-                      <Text style={styles.miniChipLabel}>{tag}</Text>
-                    </View>
-                  ))}
-                  {tags.length > 3 && (
-                    <Text style={styles.detailValue}>+{tags.length - 3} more</Text>
+                  <View style={styles.miniChip}>
+                    <Text style={styles.miniChipLabel}>{tags[0]}</Text>
+                  </View>
+                  {tags.length > 1 && (
+                    <Text style={styles.detailValue}>+{tags.length - 1}</Text>
                   )}
                 </>
               ) : (
                 <Text style={styles.detailValue}>Add tags</Text>
               )}
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.hint} />
             </View>
           </Pressable>
 
           <View style={styles.rowDivider} />
 
           <Pressable style={styles.detailRow} onPress={() => setDateSheetVisible(true)}>
-            <Text style={styles.detailLabel}>Date & Time</Text>
+            <Text style={styles.detailLabel}>Memory Date</Text>
             <View style={styles.detailRight}>
               <Text style={styles.detailValue}>{formatCapturedAt(capturedAt)}</Text>
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.hint} />
             </View>
           </Pressable>
         </View>
+
+        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
       </ScrollView>
 
       <PhotoSourceSheet
@@ -263,39 +262,12 @@ export function AddMomentScreen() {
         onDismiss={() => setDateSheetVisible(false)}
       />
 
-      {/* Save CTA */}
-      <View style={styles.cta}>
-        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
-        <Pressable
-          style={({ pressed }) => [styles.saveBtnWrap, pressed && canSave && { opacity: 0.85 }]}
-          onPress={handleSave}
-          disabled={!canSave}
-        >
-          {canSave ? (
-            <LinearGradient
-              colors={[palette.primary[500], palette.primary[400]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.saveButton}
-            >
-              <Text style={styles.saveLabel}>
-                {saving ? 'Saving…' : 'Save'}
-              </Text>
-            </LinearGradient>
-          ) : (
-            <View style={[styles.saveButton, styles.saveButtonDisabled]}>
-              <Text style={[styles.saveLabel, styles.saveLabelDisabled]}>
-                {saving ? 'Saving…' : 'Save'}
-              </Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
 
-const THUMB = 72;
+// Photo cells are 107 across a 353-wide body: 3 × 107 + 2 × 16 = 353 exactly.
+const PHOTO_CELL = 107;
 
 const styles = StyleSheet.create({
   container: {
@@ -303,87 +275,74 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.default,
   },
 
-  // NavBar
-  navBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xl,
-    height: 56,
-  },
-  navTitle: {
-    ...theme.typography.h3,
-    color: theme.text.primary,
-  },
-  navSpacer: {
-    width: 24,
-  },
-
-  // Scroll
+  // body 742:3147
   scroll: { flex: 1 },
   scrollContent: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingBottom: theme.spacing.xl,
-    gap: theme.spacing.l,
+    paddingHorizontal: theme.spacing.xl, // 20
+    paddingTop: theme.spacing.l, // 16
+    paddingBottom: theme.spacing.safeBtm, // 34
+    gap: theme.spacing.l, // 16
   },
 
-  // Photo strip
-  photoStrip: {
-    gap: theme.spacing.s,
-    paddingVertical: theme.spacing.s,
-  },
-  photoThumbWrap: {
-    width: THUMB,
-    height: THUMB,
-  },
-  photoThumbImg: {
-    width: THUMB,
-    height: THUMB,
-    borderRadius: theme.radius.m,
-    backgroundColor: theme.border.strong,
-  },
-  deleteBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoAdd: {
-    width: THUMB,
-    height: THUMB,
-    borderRadius: theme.radius.m,
-    borderWidth: 1.5,
-    borderColor: theme.border.default,
-    borderStyle: 'dashed',
-    backgroundColor: theme.surface.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Note input
+  // memoryInput — MultiLine Input, border/default while empty and border/strong
+  // once it has content (DS Input state rule)
   noteInput: {
-    height: 160,
+    height: 144,
     backgroundColor: theme.surface.card,
     borderWidth: 1,
-    borderColor: theme.border.strong,
-    borderRadius: theme.radius.s,
+    borderColor: theme.border.default,
+    borderRadius: theme.radius.s, // 6
     paddingHorizontal: theme.spacing.l,
-    paddingTop: theme.spacing.m,
+    paddingVertical: theme.spacing.m, // 12
     ...theme.typography.body,
     color: theme.text.primary,
   },
+  noteInputFilled: { borderColor: theme.border.strong },
 
-  // Details list
+  // Photo grid 742:3086
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.l, // 16 on both axes
+  },
+  photoCell: {
+    width: PHOTO_CELL,
+    height: PHOTO_CELL,
+    borderRadius: theme.radius.m,
+    backgroundColor: palette.neutral[200],
+    overflow: 'hidden',
+  },
+  photoCellImg: { width: PHOTO_CELL, height: PHOTO_CELL },
+  // 46:124 — 24px overlay-65 puck at (79, 4) inside the 107 cell
+  deleteBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 79,
+    width: 24,
+    height: 24,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.overlay.scrim,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  photoAdd: {
+    width: PHOTO_CELL,
+    height: PHOTO_CELL,
+    borderRadius: theme.radius.m,
+    borderWidth: 1.5,
+    borderColor: theme.border.default,
+    backgroundColor: theme.surface.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // detailsList 742:3153 — radius/m, rows px16 / py14
   detailsList: {
     backgroundColor: theme.surface.card,
     borderWidth: 1,
     borderColor: theme.border.default,
-    borderRadius: theme.radius.l,
+    borderRadius: theme.radius.m,
     overflow: 'hidden',
   },
   detailRow: {
@@ -391,32 +350,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.l,
-    minHeight: 46,
-    paddingVertical: theme.spacing.m,
+    paddingVertical: 14,
   },
   rowDivider: {
     height: 1,
     backgroundColor: theme.border.default,
-    marginHorizontal: theme.spacing.l,
   },
   detailLabel: {
     ...theme.typography.body,
+    lineHeight: 22, // 742:3163
     color: theme.text.primary,
-  },
-  detailLabelBrand: {
-    ...theme.typography.body,
-    color: theme.text.brand,
   },
   detailRight: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
-    flexWrap: 'wrap',
     justifyContent: 'flex-end',
-    gap: 4,
+    gap: 6,
   },
   detailValue: {
-    ...theme.typography.body,
+    ...theme.typography.caption, // Inter 14/16
     color: theme.text.secondary,
   },
   miniChip: {

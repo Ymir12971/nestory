@@ -1,108 +1,88 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import RemixIcon from 'react-native-remix-icon';
 import { ADD_MOMENT_ENTRY_OPTIONS, type AddMomentEntryOption } from '@nestory/types';
+import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { theme } from '@/shared/theme';
 
-// H-Add Moment Popup (2026-07 redesign): tapping "Add Moment" opens this sheet
-// with 3 entry paths (Justin 2026-07-15: 3 options, config-driven). Each routes
-// into the Add Moment page with a different starting mode.
-
+// H-Add Memory Popup (Figma 742:2985): "Add Memory" title over a bordered list
+// card of 56pt rows, each with a leading glyph and a trailing chevron.
+//
+// The design and its annotation only draw TWO rows — "Just a note" and "Choose
+// from album". The third ("Take a photo") is Justin's 2026-07-15 decision and is
+// config-driven via ADD_MOMENT_ENTRY_OPTIONS, so it stays.
 const OPTION_META: Record<AddMomentEntryOption, { icon: string; label: string }> = {
-  note:   { icon: 'quill-pen-line', label: 'Just a Note' },
-  camera: { icon: 'camera-line',    label: 'Take a photo' },
-  album:  { icon: 'image-line',     label: 'Choose from Album' },
+  note: { icon: 't-box-line', label: 'Just a note' },
+  camera: { icon: 'camera-line', label: 'Take a photo' },
+  album: { icon: 'multi-image-line', label: 'Choose from album' },
 };
 
 interface AddMomentEntrySheetProps {
-  visible:   boolean;
-  onSelect:  (mode: AddMomentEntryOption) => void;
+  visible: boolean;
+  onSelect: (mode: AddMomentEntryOption) => void;
   onDismiss: () => void;
 }
 
 export function AddMomentEntrySheet({ visible, onSelect, onDismiss }: AddMomentEntrySheetProps) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <Pressable style={styles.scrim} onPress={onDismiss} />
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <Text style={styles.title}>Add Moment</Text>
-
-        {ADD_MOMENT_ENTRY_OPTIONS.map((opt, i) => (
-          <View key={opt}>
-            {i > 0 && <View style={styles.divider} />}
-            <Pressable
-              style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
-              onPress={() => onSelect(opt)}
-            >
-              <RemixIcon name={OPTION_META[opt].icon as any} size={22} color={theme.text.brand} />
-              <Text style={styles.optionLabel}>{OPTION_META[opt].label}</Text>
-            </Pressable>
-          </View>
-        ))}
-
-        <Pressable style={styles.cancelBtn} onPress={onDismiss}>
-          <Text style={styles.cancelLabel}>Cancel</Text>
-        </Pressable>
+    <BottomSheet visible={visible} onRequestClose={onDismiss}>
+      <View style={sheetSection.title}>
+        <Text style={styles.title}>Add Memory</Text>
       </View>
-    </Modal>
+
+      <View style={styles.listBlock}>
+        <View style={styles.sourceList}>
+          {ADD_MOMENT_ENTRY_OPTIONS.map((opt, i) => (
+            <View key={opt}>
+              {i > 0 && <View style={styles.divider} />}
+              <Pressable
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                onPress={() => onSelect(opt)}
+              >
+                <RemixIcon
+                  name={OPTION_META[opt].icon as any}
+                  size={24}
+                  color={theme.text.primary}
+                />
+                <Text style={styles.rowLabel}>{OPTION_META[opt].label}</Text>
+                <RemixIcon name="arrow-right-s-line" size={24} color={theme.text.hint} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      </View>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  sheet: {
-    backgroundColor: theme.surface.default,
-    borderTopLeftRadius: theme.radius.l,
-    borderTopRightRadius: theme.radius.l,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.safeBtm + theme.spacing.l,
-    gap: theme.spacing.s,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.border.strong,
-    alignSelf: 'center',
-    marginBottom: theme.spacing.s,
-  },
   title: {
-    ...theme.typography.h3,
+    ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.primary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.s,
   },
-  option: {
+  // bsContent 775:2151 — px16 / py16 around the list card
+  listBlock: {
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.l,
+  },
+  sourceList: {
+    backgroundColor: theme.surface.card,
+    borderWidth: 1,
+    borderColor: theme.border.default,
+    borderRadius: theme.radius.l, // 16
+    overflow: 'hidden',
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.m,
-    height: 52,
-    paddingHorizontal: theme.spacing.s,
-    borderRadius: theme.radius.s,
+    gap: theme.spacing.m, // 12
+    height: 56,
+    paddingHorizontal: theme.spacing.l, // 16
   },
-  optionPressed: {
-    backgroundColor: theme.surface.brandSubtle,
-  },
-  optionLabel: {
+  rowPressed: { backgroundColor: theme.surface.brandSubtle },
+  rowLabel: {
     ...theme.typography.body,
     color: theme.text.primary,
+    flex: 1,
   },
-  divider: {
-    height: 1,
-    backgroundColor: theme.border.default,
-  },
-  cancelBtn: {
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.s,
-  },
-  cancelLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.secondary,
-  },
+  divider: { height: 1, backgroundColor: theme.border.default },
 });

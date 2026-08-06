@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Image,
-  Modal,
   View,
   Text,
   TextInput,
@@ -11,10 +10,13 @@ import {
 } from 'react-native';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import RemixIcon from 'react-native-remix-icon';
 import type { ChildCreate, ChildGender } from '@nestory/types';
+import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
+import { Button } from '@/shared/components/Button';
+import { NavBar } from '@/shared/components/NavBar';
+import { Tag } from '@/shared/components/Tag';
 import { theme, palette } from '@/shared/theme';
 import { useCreateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
@@ -28,143 +30,10 @@ import { useGoBack } from '@/shared/hooks/useGoBack';
 //                     Justin 2026-07-15: don't re-ask for additional children)
 // Save → /onboarding/children (children list), which owns the Add-Another loop.
 
-// ─── Progress bar (5 segments, N filled) ─────────────────────────────────────
-
-function ProgressBar({ filled }: { filled: number }) {
-  return (
-    <View style={pbStyles.row}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <View
-          key={i}
-          style={[pbStyles.segment, i < filled ? pbStyles.active : pbStyles.inactive]}
-        />
-      ))}
-    </View>
-  );
-}
-
-const pbStyles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 6, height: 4 },
-  segment: { flex: 1, borderRadius: theme.radius.full },
-  active: { backgroundColor: theme.surface.brand },
-  inactive: { backgroundColor: theme.border.default },
-});
-
-// ─── NavBar ───────────────────────────────────────────────────────────────────
-
-function NavBar({ onBack, filled }: { onBack: () => void; filled: number }) {
-  return (
-    <View>
-      <View style={nbStyles.row}>
-        <Pressable onPress={onBack} hitSlop={8}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        {/* Right slot intentionally empty for onboarding per Figma */}
-        <View style={nbStyles.placeholder} />
-      </View>
-      <View style={nbStyles.progressWrap}>
-        <ProgressBar filled={filled} />
-      </View>
-    </View>
-  );
-}
-
-const nbStyles = StyleSheet.create({
-  row: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xxl,
-  },
-  placeholder: { width: 24 },
-  progressWrap: { paddingHorizontal: theme.spacing.xxl },
-});
-
-// ─── Primary CTA button ───────────────────────────────────────────────────────
-
-function PrimaryButton({
-  label,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [btnStyles.wrap, pressed && !disabled && { opacity: 0.85 }]}
-      onPress={onPress}
-      disabled={disabled}
-    >
-      {disabled ? (
-        <View style={[btnStyles.gradient, btnStyles.disabled]}>
-          <Text style={btnStyles.labelDisabled}>{label}</Text>
-        </View>
-      ) : (
-        <LinearGradient
-          colors={[palette.primary[500], palette.primary[400]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={btnStyles.gradient}
-        >
-          <Text style={btnStyles.label}>{label}</Text>
-        </LinearGradient>
-      )}
-    </Pressable>
-  );
-}
-
-const btnStyles = StyleSheet.create({
-  wrap: {
-    width: '100%',
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: theme.surface.brandSubtle,
-  },
-  gradient: { height: 52, alignItems: 'center', justifyContent: 'center' },
-  disabled: { backgroundColor: theme.border.default },
-  label: { ...theme.typography.buttonLabelM, color: theme.text.onColor },
-  labelDisabled: { ...theme.typography.buttonLabelM, color: theme.text.hint },
-});
-
-// ─── Selectable tag (gender / relationship) ──────────────────────────────────
-
-function SelectTag({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[tagStyles.base, selected ? tagStyles.selected : tagStyles.unselected]}
-    >
-      <Text style={[tagStyles.label, selected ? tagStyles.labelSelected : tagStyles.labelUnselected]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-const tagStyles = StyleSheet.create({
-  base: { paddingHorizontal: theme.spacing.m, paddingVertical: 6, borderRadius: theme.radius.full },
-  selected: { backgroundColor: theme.surface.brand },
-  unselected: {
-    backgroundColor: theme.surface.brandSubtle,
-    borderWidth: 1,
-    borderColor: theme.border.default,
-  },
-  label: { ...theme.typography.tagBadge },
-  labelSelected: { color: theme.text.onColor },
-  labelUnselected: { color: theme.text.primary },
-});
+// NavBar / progress bar, the CTA button and the gender-relationship tags all
+// come from the shared DS components now — the local copies drifted (5 progress
+// segments instead of 3, 24px nav padding instead of 20, a disabled CTA that
+// kept its 2px ring and used text/hint for the label).
 
 // ─── Unit input row ───────────────────────────────────────────────────────────
 
@@ -195,7 +64,11 @@ function UnitInput({
         placeholderTextColor={theme.text.hint}
       />
       <Pressable onPress={onToggle} style={unitStyles.pill}>
-        <Text style={unitStyles.unitLabel}>{system === 'metric' ? metricUnit : imperialUnit}</Text>
+        {/* 193:1382 — the unit label sits in a fixed 32-wide slot so cm↔ft and
+            kg↔lbs don't shift the chevron */}
+        <View style={unitStyles.unitSlot}>
+          <Text style={unitStyles.unitLabel}>{system === 'metric' ? metricUnit : imperialUnit}</Text>
+        </View>
         <RemixIcon name="arrow-up-down-line" size={16} color={theme.text.brand} />
       </Pressable>
     </View>
@@ -222,6 +95,12 @@ const unitStyles = StyleSheet.create({
     paddingHorizontal: theme.spacing.s,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.radius.full,
+  },
+  unitSlot: {
+    width: 32,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   unitLabel: { ...theme.typography.h2, color: theme.text.brand },
 });
@@ -374,18 +253,22 @@ export function ChildProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <NavBar onBack={onBack} filled={step + 1} />
+      {/* All three child-profile screens sit on segment 1 of 3 in the design
+          (739:1157 / 739:1258 / 816:3347 all fill only the first bar) — the
+          segments track the onboarding phase, not the step within this form. */}
+      <NavBar onBack={onBack} progress={{ total: 3, active: 1 }} />
 
       {/* ── Step 0: Basic info — photo + name + birthday ─────────────────── */}
       {step === 0 && (
-        <View style={styles.body}>
-          <View style={styles.headingGroup}>
+        <>
+          <View style={styles.titleBlock}>
             <Text style={styles.heading}>Tell us about your little one</Text>
             <Text style={styles.subheading}>
               This helps us track milestones and create more appropriate and personal stories.
             </Text>
           </View>
 
+          <View style={styles.body}>
           <View style={styles.photoArea}>
             <Pressable
               style={styles.avatarWrap}
@@ -399,9 +282,12 @@ export function ChildProfileScreen() {
               ) : (
                 <View style={styles.photoCircle} />
               )}
-              <View style={styles.cameraBadge}>
-                <RemixIcon name="camera-line" size={20} color={theme.text.onColor} />
-              </View>
+              {/* 739:1164 — 40px camera glyph centred in the ring, not a corner badge */}
+              {!avatarPhoto && (
+                <View style={styles.cameraGlyph}>
+                  <RemixIcon name="camera-line" size={40} color={palette.primary[500]} />
+                </View>
+              )}
             </Pressable>
             <Text style={styles.photoLabel}>Tap to add a photo</Text>
           </View>
@@ -426,7 +312,8 @@ export function ChildProfileScreen() {
               <Text style={styles.birthdaySelect}>Select</Text>
             </Pressable>
           </View>
-        </View>
+          </View>
+        </>
       )}
 
       {/* ── Step 1: Details (all optional) ───────────────────────────────── */}
@@ -445,21 +332,23 @@ export function ChildProfileScreen() {
           </View>
 
           <View style={styles.detailFields}>
-            <View style={styles.fieldGroup}>
+            <View style={styles.fieldGroupDetails}>
               <Text style={styles.fieldLabel}>Gender</Text>
               <View style={styles.tagRow}>
                 {(['Girl', 'Boy', 'Prefer not to say'] as const).map((g) => (
-                  <SelectTag
+                  <Tag
                     key={g}
                     label={g}
-                    selected={gender === g}
+                    status={gender === g ? 'selected' : 'unselected'}
+                    style={styles.tagRoomy}
+                    labelStyle={styles.tagRoomyLabel}
                     onPress={() => setGender(g)}
                   />
                 ))}
               </View>
             </View>
 
-            <View style={styles.fieldGroup}>
+            <View style={styles.fieldGroupDetails}>
               <Text style={styles.fieldLabel}>Height</Text>
               <HeightInput
                 system={heightState.system}
@@ -473,7 +362,7 @@ export function ChildProfileScreen() {
               />
             </View>
 
-            <View style={styles.fieldGroup}>
+            <View style={styles.fieldGroupDetails}>
               <Text style={styles.fieldLabel}>Weight</Text>
               <UnitInput
                 value={weight}
@@ -503,30 +392,56 @@ export function ChildProfileScreen() {
             </Text>
           </View>
 
-          <View style={styles.tagRow}>
-            {RELATIONSHIPS.map((r) => (
-              <SelectTag
-                key={r}
-                label={r}
-                selected={relationship === r}
-                onPress={() => setRelationship(r)}
-              />
-            ))}
-          </View>
+          {/* 752:1569 — the six kinship tags wrap; "Prefer not to say" sits on
+              its own row; "Other..." shares a row with its free-text input. */}
+          <View style={styles.relationshipGroup}>
+            <View style={styles.tagRow}>
+              {RELATIONSHIPS.slice(0, 6).map((r) => (
+                <Tag
+                  key={r}
+                  label={r}
+                  status={relationship === r ? 'selected' : 'unselected'}
+                  style={styles.tagRoomy}
+                  labelStyle={styles.tagRoomyLabel}
+                  onPress={() => setRelationship(r)}
+                />
+              ))}
+            </View>
 
-          {/* Custom input: enabled only while "Other..." is selected; switching
-              back to a preset disables it but keeps the text (annotation). */}
-          <TextInput
-            style={[
-              styles.textInput,
-              relationship !== 'Other...' && styles.textInputDisabled,
-            ]}
-            value={customRelationship}
-            onChangeText={setCustomRelationship}
-            placeholder="Tell us who you are"
-            placeholderTextColor={theme.text.hint}
-            editable={relationship === 'Other...'}
-          />
+            <View style={styles.tagRow}>
+              <Tag
+                label="Prefer not to say"
+                status={relationship === 'Prefer not to say' ? 'selected' : 'unselected'}
+                style={styles.tagRoomy}
+                labelStyle={styles.tagRoomyLabel}
+                onPress={() => setRelationship('Prefer not to say')}
+              />
+            </View>
+
+            <View style={styles.otherRow}>
+              <Tag
+                label="Other..."
+                status={relationship === 'Other...' ? 'selected' : 'unselected'}
+                style={styles.tagRoomy}
+                labelStyle={styles.tagRoomyLabel}
+                onPress={() => setRelationship('Other...')}
+              />
+              {/* Enabled only while "Other..." is selected; switching back to a
+                  preset disables it but keeps the text (annotation). */}
+              <TextInput
+                style={[
+                  styles.textInput,
+                  styles.otherInput,
+                  relationship !== 'Other...' && styles.textInputDisabled,
+                ]}
+                value={customRelationship}
+                onChangeText={setCustomRelationship}
+                placeholder="e.g. Nana"
+                placeholderTextColor={theme.text.hint}
+                editable={relationship === 'Other...'}
+              />
+            </View>
+          </View>
         </ScrollView>
       )}
 
@@ -535,9 +450,10 @@ export function ChildProfileScreen() {
       {step === 0 && <View style={styles.spacer} />}
 
       {/* CTA ──────────────────────────────────────────────────────────────── */}
-      <View style={styles.cta}>
+      {/* Basic info pads the CTA block 16 from the body; the later two use 12 */}
+      <View style={[styles.cta, step !== 0 && styles.ctaTight]}>
         {saveError && <Text style={styles.errorText}>{saveError}</Text>}
-        <PrimaryButton
+        <Button
           label={createChild.isPending ? 'Saving…' : 'Continue'}
           onPress={onContinue}
           disabled={ctaDisabled}
@@ -559,15 +475,11 @@ export function ChildProfileScreen() {
       </View>
 
       {/* Birthday picker sheet */}
-      <Modal
+      <BottomSheet
         visible={birthdaySheetVisible}
-        transparent
-        animationType="slide"
         onRequestClose={() => setBirthdaySheetVisible(false)}
       >
-        <Pressable style={styles.confirmScrim} onPress={() => setBirthdaySheetVisible(false)} />
-        <View style={styles.confirmSheet}>
-          <View style={styles.confirmHandle} />
+        <View style={sheetSection.body}>
           <View style={styles.datePicker}>
             <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={setMonthIdx} />
             <View style={styles.colDivider} />
@@ -575,7 +487,9 @@ export function ChildProfileScreen() {
             <View style={styles.colDivider} />
             <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={setYearIdx} />
           </View>
-          <PrimaryButton
+        </View>
+        <View style={sheetSection.cta}>
+          <Button
             label="Done"
             onPress={() => {
               setBirthdayTouched(true);
@@ -583,38 +497,39 @@ export function ChildProfileScreen() {
             }}
           />
         </View>
-      </Modal>
+      </BottomSheet>
 
-      {/* Birthday confirm sheet */}
-      <Modal
+      {/* Birthday confirm sheet (739:1224) */}
+      <BottomSheet
         visible={birthdayConfirmVisible}
-        transparent
-        animationType="slide"
         onRequestClose={() => setBirthdayConfirmVisible(false)}
       >
-        <Pressable style={styles.confirmScrim} onPress={() => setBirthdayConfirmVisible(false)} />
-        <View style={styles.confirmSheet}>
-          <View style={styles.confirmHandle} />
+        <View style={sheetSection.title}>
           <Text style={styles.confirmDate}>{formattedBirthday}</Text>
-          <Text style={styles.confirmTitle}>Please confirm the birthday.</Text>
+        </View>
+        <View style={sheetSection.body}>
           <Text style={styles.confirmBody}>
-            Once saved, this date cannot be changed.{'\n'}Please double-check before continuing.
+            Please confirm the birthday.{'\n'}
+            {'\n'}
+            Once saved, this date cannot be changed. Please double-check before continuing.
           </Text>
-          <PrimaryButton
+        </View>
+        <View style={sheetSection.cta}>
+          <Button
             label="Confirm"
             onPress={() => {
               setBirthdayConfirmVisible(false);
               setStep(1);
             }}
           />
-          <Pressable
-            style={styles.backToEditBtn}
+          <Button
+            label="Back to edit"
+            type="text"
+            style={styles.textBtn44}
             onPress={() => setBirthdayConfirmVisible(false)}
-          >
-            <Text style={styles.backToEditLabel}>Back to edit</Text>
-          </Pressable>
+          />
         </View>
-      </Modal>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -622,58 +537,62 @@ export function ChildProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
 
+  // title 752:1760 / body 739:1158 — both px 20 / py 16; the body's own children
+  // are 24 apart, so title-to-body reads as 32.
+  titleBlock: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
+    gap: 6,
+  },
   body: {
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xxl,
+    paddingVertical: theme.spacing.l,
     gap: theme.spacing.xxl,
   },
   scrollBody: { flex: 1 },
   scrollContent: {
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xxl,
+    paddingVertical: theme.spacing.l,
     paddingBottom: 120,
-    gap: theme.spacing.xxl,
+    // title pb 16 + body pt 16 between the heading block and the fields
+    gap: 32,
   },
 
-  headingGroup: { gap: 6 },
+  // More Details / Relationship set the heading-to-subtitle gap at 12 (basic
+  // info uses 6).
+  headingGroup: { gap: 12 },
   heading: { ...theme.typography.h1, color: theme.text.primary },
   subheading: { ...theme.typography.body, color: theme.text.secondary },
 
+  // photoArea 739:1162 — py 24, gap 12
   photoArea: {
     alignItems: 'center',
     gap: theme.spacing.m,
-    paddingTop: theme.spacing.l,
-    paddingBottom: theme.spacing.s,
+    paddingVertical: theme.spacing.xxl,
   },
   avatarWrap: {
     width: 128,
     height: 128,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   photoCircle: {
     width: 128,
     height: 128,
     borderRadius: 64,
     backgroundColor: theme.surface.brandSubtle,
+    borderWidth: 1,
+    borderColor: palette.primary[200], // #a6ecbf ring (739:1163)
   },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.surface.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  cameraGlyph: { position: 'absolute' },
   photoLabel: {
-    fontFamily: 'Manrope_500Medium',
-    fontSize: 16,
-    lineHeight: 22,
+    // DS Button Type=Text label
+    ...theme.typography.buttonLabelM,
     color: theme.text.brand,
   },
 
-  fieldGroup: { gap: theme.spacing.s, width: '100%' },
+  fieldGroup: { gap: 6, width: '100%' },
+  fieldGroupDetails: { gap: theme.spacing.s, width: '100%' }, // 750:2450 uses 8
   fieldLabel: { ...theme.typography.h4, color: theme.text.primary },
   textInput: {
     height: 48,
@@ -686,14 +605,22 @@ const styles = StyleSheet.create({
     color: theme.text.primary,
   },
   textInputDisabled: {
-    backgroundColor: theme.surface.default,
+    // 752:1566 — disabled Input is surface/disabled with a border/disabled edge
+    backgroundColor: theme.surface.disabled,
+    borderColor: theme.border.disabled,
     color: theme.text.hint,
   },
+  otherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.l, // 16
+  },
+  otherInput: { flex: 1 },
 
   birthdayField: {
     height: 48,
     borderWidth: 1,
-    borderColor: theme.border.default,
+    borderColor: theme.border.strong, // 748:2435 uses border/strong, not default
     borderRadius: theme.radius.s,
     backgroundColor: theme.surface.card,
     paddingHorizontal: theme.spacing.l,
@@ -716,8 +643,16 @@ const styles = StyleSheet.create({
   },
   colDivider: { width: 1, backgroundColor: theme.border.default },
 
-  detailFields: { gap: theme.spacing.xl },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.s },
+  detailFields: { gap: 32 }, // 750:2449
+  relationshipGroup: { gap: theme.spacing.l }, // 751:1455
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.l }, // 16
+  // Both onboarding screens instance a roomier tag than the DS default:
+  // px 16 / py 8 with a Body label instead of px 12 / py 6 + Tag&Badge.
+  tagRoomy: {
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.s,
+  },
+  tagRoomyLabel: { ...theme.typography.body },
 
   spacer: { flex: 1, minHeight: 1 },
   cta: {
@@ -725,8 +660,10 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.safeBtm,
     paddingTop: theme.spacing.l,
     gap: theme.spacing.xs,
+    alignItems: 'center',
   },
-  skipBtn: { height: 44, alignItems: 'center', justifyContent: 'center' },
+  ctaTight: { paddingTop: 12 },
+  skipBtn: { height: 40, alignItems: 'center', justifyContent: 'center' },
   skipLabel: { ...theme.typography.buttonLabelM, color: theme.text.brand },
   errorText: {
     ...theme.typography.caption,
@@ -734,48 +671,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Bottom sheets (birthday picker + confirm)
-  confirmScrim: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  confirmSheet: {
-    backgroundColor: theme.surface.default,
-    borderTopLeftRadius: theme.radius.l,
-    borderTopRightRadius: theme.radius.l,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.safeBtm + theme.spacing.l,
-    gap: theme.spacing.m,
-  },
-  confirmHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.border.strong,
-    alignSelf: 'center',
-    marginBottom: theme.spacing.s,
-  },
+  // Bottom-sheet content (shell comes from shared/components/BottomSheet)
   confirmDate: {
     ...theme.typography.h1,
     color: theme.text.primary,
   },
-  confirmTitle: {
-    ...theme.typography.body,
+  confirmBody: {
+    ...theme.typography.body, // Inter Regular 16/20, text/primary — not secondary
     color: theme.text.primary,
   },
-  confirmBody: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
-    lineHeight: 22,
-  },
-  backToEditBtn: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backToEditLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
-  },
+  // The design instances the DS Text button at 44 tall in sheets (775:2325)
+  textBtn44: { height: 44 },
 });

@@ -7,7 +7,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -65,9 +64,19 @@ export function FullscreenPhotoViewer({ visible, photoUrls, initialIndex, onDism
           <RemixIcon name="close-line" size={24} color="#fff" />
         </Pressable>
 
+        {/* DS PhotoIndicator (774:4778) — dots at the bottom, not a "1 / 5"
+            counter at the top: active pill 18×6 in text/brand, the rest 6×6
+            outlined in border/strong. */}
         {photoUrls.length > 1 && (
-          <View style={[styles.counterWrap, { top: insets.top + theme.spacing.m }]}>
-            <Text style={styles.counterText}>{index + 1} / {photoUrls.length}</Text>
+          <View
+            style={[
+              styles.indicator,
+              { bottom: Math.max(insets.bottom, theme.spacing.safeBtm) },
+            ]}
+          >
+            {photoUrls.map((_, i) => (
+              <View key={i} style={i === index ? styles.dotActive : styles.dotInactive} />
+            ))}
           </View>
         )}
       </View>
@@ -88,16 +97,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  counterWrap: {
+  indicator: {
     position: 'absolute',
-    alignSelf: 'center',
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: 4,
-    borderRadius: theme.radius.full,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.s, // 8
   },
-  counterText: {
-    ...theme.typography.caption,
-    color: '#fff',
+  dotActive: {
+    width: 18,
+    height: 6,
+    borderRadius: theme.radius.s, // 6
+    backgroundColor: theme.text.brand,
+  },
+  dotInactive: {
+    width: 6,
+    height: 6,
+    borderRadius: theme.radius.s,
+    borderWidth: 1,
+    borderColor: theme.border.strong,
   },
 });

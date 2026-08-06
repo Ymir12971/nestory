@@ -1,51 +1,58 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { theme, palette } from '@/shared/theme';
-import { useGoBack } from '@/shared/hooks/useGoBack';
+import { Button } from '@/shared/components/Button';
+import { NavBar } from '@/shared/components/NavBar';
+import { palette, theme } from '@/shared/theme';
 
-const TOTAL_STEPS = 5;
-const CURRENT_STEP = 4;
-
+// O-Notification access (Figma 739:1940) — phase 2 of 3 in the onboarding
+// progress bar. The sample is a mock of the real push: the app icon with an
+// unread badge above, the notification row below, both on primary/50.
 export function NotificationsScreen() {
   const router = useRouter();
-  const goBack = useGoBack();
+
+  const requestThenAdvance = async () => {
+    // Annotation: advance only if the user actually enabled notifications;
+    // otherwise stay on this page (Skip remains the explicit way past).
+    const res = await Notifications.requestPermissionsAsync();
+    if (res.granted || res.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
+      router.push('/onboarding/plan');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* NavBar */}
-      <View style={styles.navBar}>
-        <View style={styles.navRow}>
-          <Pressable onPress={goBack} hitSlop={8}>
-            <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-          </Pressable>
-        </View>
-        <View style={styles.progress}>
-          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-            <View
-              key={i}
-              style={[styles.progressSegment, i < CURRENT_STEP && styles.progressActive]}
-            />
-          ))}
-        </View>
+      <NavBar progress={{ total: 3, active: 2 }} />
+
+      {/* title 739:1943 */}
+      <View style={styles.title}>
+        <Text style={styles.headline}>Don't miss a Story</Text>
+        <Text style={styles.subtitle}>Get notified when the monthly Story is ready</Text>
       </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        <View style={styles.titleGroup}>
-          <Text style={styles.headline}>Don't miss a Story</Text>
-          <Text style={styles.subtitle}>Get notified when the monthly Story is ready</Text>
-        </View>
-        {/* Mock push preview (copy from Figma O-Notification access) */}
-        <View style={styles.pushPreview}>
-          <View style={styles.pushIcon}>
-            <RemixIcon name="book-open-fill" size={20} color={theme.text.onColor} />
+      {/* Body 758:1344 → storySample 758:1348 */}
+      <View style={styles.body}>
+        <View style={styles.storySample}>
+          <View style={styles.appIconTile}>
+            <Image
+              source={require('@/assets/images/icon.png')}
+              style={styles.appIcon}
+              resizeMode="contain"
+            />
+            <View style={styles.badge}>
+              <Text style={styles.badgeLabel}>1</Text>
+            </View>
           </View>
-          <View style={styles.pushText}>
-            <Text style={styles.pushApp}>Nestory</Text>
+
+          <View style={styles.pushRow}>
+            <View style={styles.pushIcon}>
+              <Image
+                source={require('@/assets/images/icon.png')}
+                style={styles.pushIconImg}
+                resizeMode="contain"
+              />
+            </View>
             <Text style={styles.pushBody}>
               Your little one's monthly Story is ready. Tap to read.
             </Text>
@@ -53,36 +60,10 @@ export function NotificationsScreen() {
         </View>
       </View>
 
-      <View style={styles.spacer} />
-
-      {/* CTA */}
+      {/* cta 739:1956 */}
       <View style={styles.cta}>
-        <Pressable
-          style={({ pressed }) => [styles.buttonWrap, pressed && { opacity: 0.85 }]}
-          onPress={async () => {
-            // Annotation: advance only if the user actually enabled notifications;
-            // otherwise stay on this page (Skip remains the explicit way past).
-            const res = await Notifications.requestPermissionsAsync();
-            if (res.granted || res.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
-              router.push('/onboarding/plan');
-            }
-          }}
-        >
-          <LinearGradient
-            colors={[palette.primary[500], palette.primary[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.button}
-          >
-            <Text style={styles.buttonLabel}>Enable Notifications</Text>
-          </LinearGradient>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.skipButton, pressed && { opacity: 0.7 }]}
-          onPress={() => router.push('/onboarding/plan')}
-        >
-          <Text style={styles.skipLabel}>Skip</Text>
-        </Pressable>
+        <Button label="Enable Notifications" onPress={requestThenAdvance} />
+        <Button label="Skip" type="text" onPress={() => router.push('/onboarding/plan')} />
       </View>
     </SafeAreaView>
   );
@@ -93,104 +74,84 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.surface.default,
   },
-  navBar: {
-    paddingHorizontal: theme.spacing.xxl,
+
+  title: {
+    paddingHorizontal: theme.spacing.xl, // 20
+    paddingVertical: theme.spacing.l, // 16
+    gap: theme.spacing.s, // 8
   },
-  navRow: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progress: {
-    flexDirection: 'row',
-    gap: 6,
-    height: 4,
-  },
-  progressSegment: {
+  headline: { ...theme.typography.h1, color: theme.text.primary },
+  subtitle: { ...theme.typography.body, color: theme.text.secondary },
+
+  body: {
     flex: 1,
-    height: 4,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.border.default,
-  },
-  progressActive: {
-    backgroundColor: theme.surface.brand,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 8,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
     gap: theme.spacing.xl,
   },
-  titleGroup: {
-    gap: 8,
+  storySample: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xl, // 20
+    gap: theme.spacing.xxl, // 24
+    borderRadius: theme.radius.l,
   },
-  headline: {
-    ...theme.typography.h1,
-    color: theme.text.primary,
+
+  appIconTile: {
+    width: 128,
+    height: 128,
+    borderRadius: 24,
+    backgroundColor: palette.primary[50],
   },
-  subtitle: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
+  appIcon: { width: 128, height: 128 },
+  badge: {
+    position: 'absolute',
+    top: -9,
+    left: 107,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ff5757',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pushPreview: {
+  badgeLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 16,
+    lineHeight: 20,
+    color: theme.text.onColor,
+  },
+
+  // 758:1353 — flat primary/50 row, no card shadow and no app-name line
+  pushRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.m,
-    backgroundColor: theme.surface.card,
-    borderRadius: theme.radius.l,
-    padding: theme.spacing.l,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    gap: 10,
+    width: '100%',
+    padding: 10,
+    borderRadius: theme.radius.m, // 10
+    backgroundColor: palette.primary[50],
   },
   pushIcon: {
     width: 40,
     height: 40,
-    borderRadius: 10,
-    backgroundColor: theme.surface.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: theme.surface.default,
+    overflow: 'hidden',
   },
-  pushText: { flex: 1, gap: 2 },
-  pushApp: { ...theme.typography.h4, color: theme.text.primary },
-  pushBody: { ...theme.typography.caption, color: theme.text.secondary },
-  spacer: {
+  pushIconImg: { width: 40, height: 40 },
+  pushBody: {
+    ...theme.typography.body, // Inter Regular 16/20
+    color: theme.text.primary,
     flex: 1,
   },
+
   cta: {
-    paddingHorizontal: 20,
+    paddingHorizontal: theme.spacing.xl,
     paddingTop: 12,
     paddingBottom: theme.spacing.safeBtm,
-    gap: 4,
+    gap: theme.spacing.xs, // 4
     alignItems: 'center',
-  },
-  buttonWrap: {
-    width: '100%',
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: theme.surface.brandSubtle,
-  },
-  button: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
-  skipButton: {
-    height: 44,
-    minWidth: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.full,
-  },
-  skipLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
   },
 });

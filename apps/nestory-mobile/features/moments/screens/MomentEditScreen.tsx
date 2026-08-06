@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MOMENT_CONSTRAINTS, type Moment, type MomentFile } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
+import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
+import { Button } from '@/shared/components/Button';
+import { NavBar } from '@/shared/components/NavBar';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { showToast } from '@/features/ui/toast';
@@ -31,13 +33,11 @@ export function MomentEditScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>Edit Moment</Text>
-        <View style={styles.navSpacer} />
-      </View>
+      {/* The loaded state renders its own NavBar so Save can live in the right
+          slot (743:4824); these placeholder states just need the bar. */}
+      {(momentQ.isLoading || momentQ.isError || !momentQ.data) && (
+        <NavBar title="Edit Memory" onBack={goBack} />
+      )}
 
       {momentQ.isLoading ? (
         <View style={styles.center}>
@@ -72,18 +72,13 @@ function EditForm({ moment }: { moment: Moment }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
   const [deleting, setDeleting]   = useState(false);
-  const photoStripRef = useRef<ScrollView>(null);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
   const remainingFiles = useMemo(
     () => moment.files.filter(f => !removedFileIds.has(f.id)),
     [moment.files, removedFileIds],
   );
   const totalPhotos = remainingFiles.length + newPhotos.length;
-
-  // Auto-scroll the photo strip so the "+" button stays visible as photos are added.
-  useEffect(() => {
-    photoStripRef.current?.scrollToEnd({ animated: true });
-  }, [totalPhotos]);
 
   const addPickedPhotos = (picked: PickedPhoto[]) => {
     if (picked.length === 0) return;
@@ -168,9 +163,10 @@ function EditForm({ moment }: { moment: Moment }) {
     setDeleting(true);
     try {
       await deleteAsset.mutateAsync({ id: moment.id, hard: true });
-      // Detail page is now stale; pop both detail+edit so user lands on list.
+      // Detail page is now stale; pop both detail+edit so the user lands back on
+      // the Home timeline (annotation: 编辑或删除完成后回到 Memory 列表).
       router.dismissAll();
-      router.replace('/moment/list');
+      router.replace('/');
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to delete moment.');
       setDeleting(false);
@@ -179,40 +175,55 @@ function EditForm({ moment }: { moment: Moment }) {
 
   return (
     <>
+      {/* NavBar Type=withButton (743:4824) — Save sits in the right slot */}
+      <NavBar
+        title="Edit Memory"
+        onBack={goBack}
+        right={
+          <Button
+            label={saving ? 'Saving…' : 'Save'}
+            type="small"
+            disabled={saving || deleting}
+            onPress={handleSave}
+          />
+        }
+      />
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Photo Strip — existing files first, then newly picked */}
-        <ScrollView
-          ref={photoStripRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.photoStrip}
-        >
-          {remainingFiles.map(f => (
-            <View key={f.id} style={styles.photoThumbWrap}>
-              <Image source={{ uri: f.fileUrl }} style={styles.photoThumbImg} />
+        {/* memoryInput first, photo grid under it (743:4826 / 744:2748) */}
+        <TextInput
+          style={[styles.noteInput, noteText.length > 0 && styles.noteInputFilled]}
+          placeholder="A quick note about the day."
+          placeholderTextColor={theme.text.hint}
+          multiline
+          textAlignVertical="top"
+          value={noteText}
+          onChangeText={onChangeNote}
+        />
+
+        <View style={styles.photoGrid}>
+          {remainingFiles.map((f) => (
+            <View key={f.id} style={styles.photoCell}>
+              <Image source={{ uri: f.fileUrl }} style={styles.photoCellImg} />
               <Pressable
                 style={styles.deleteBadge}
                 hitSlop={6}
                 onPress={() => handleRemoveExisting(f)}
               >
-                <RemixIcon name="close-line" size={12} color={theme.text.onColor} />
+                <RemixIcon name="close-line" size={24} color={theme.text.onColor} />
               </Pressable>
             </View>
           ))}
           {newPhotos.map((p, i) => (
-            <View key={`new-${p.uri}`} style={styles.photoThumbWrap}>
-              <Image source={{ uri: p.uri }} style={styles.photoThumbImg} />
-              <Pressable
-                style={styles.deleteBadge}
-                hitSlop={6}
-                onPress={() => handleRemoveNew(i)}
-              >
-                <RemixIcon name="close-line" size={12} color={theme.text.onColor} />
+            <View key={`new-${p.uri}`} style={styles.photoCell}>
+              <Image source={{ uri: p.uri }} style={styles.photoCellImg} />
+              <Pressable style={styles.deleteBadge} hitSlop={6} onPress={() => handleRemoveNew(i)}>
+                <RemixIcon name="close-line" size={24} color={theme.text.onColor} />
               </Pressable>
             </View>
           ))}
@@ -221,22 +232,11 @@ function EditForm({ moment }: { moment: Moment }) {
               <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
             </Pressable>
           )}
-        </ScrollView>
+        </View>
 
-        {/* Note Input */}
-        <TextInput
-          style={styles.noteInput}
-          placeholder="What happened today…"
-          placeholderTextColor={theme.text.hint}
-          multiline
-          textAlignVertical="top"
-          value={noteText}
-          onChangeText={onChangeNote}
-        />
-
-        {/* Details List */}
+        {/* detailsList 774:3685 — the frame only draws Memory Date; the Tags row
+            is kept because Tags ship as a feature. */}
         <View style={styles.detailsList}>
-          {/* Tags */}
           <Pressable
             style={styles.detailRow}
             onPress={() => router.push(`/moment/tags?momentId=${moment.id}`)}
@@ -248,43 +248,59 @@ function EditForm({ moment }: { moment: Moment }) {
                   ? `${moment.tags[0]}${moment.tags.length > 1 ? ` +${moment.tags.length - 1}` : ''}`
                   : 'None'}
               </Text>
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.hint} />
             </View>
           </Pressable>
 
           <View style={styles.rowDivider} />
 
-          {/* Date — read-only here; capture date is fixed at create */}
+          {/* Memory Date — read-only here; capture date is fixed at create */}
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date</Text>
+            <Text style={styles.detailLabel}>Memory Date</Text>
             <Text style={styles.detailValue}>{formatDate(moment.capturedAt)}</Text>
           </View>
         </View>
+
+        {saveError && <Text style={styles.errorInline}>{saveError}</Text>}
       </ScrollView>
 
-      {/* CTA */}
+      {/* cta 743:4885 — the footer only carries Delete Memory */}
       <View style={styles.cta}>
-        {saveError && <Text style={styles.errorInline}>{saveError}</Text>}
-        <Pressable
-          style={({ pressed }) => [styles.saveWrap, pressed && !saving && { opacity: 0.88 }]}
-          onPress={handleSave}
+        <Button
+          label={deleting ? 'Deleting…' : 'Delete Memory'}
+          type="destructive"
+          style={styles.deleteBtn}
           disabled={saving || deleting}
-        >
-          <LinearGradient
-            colors={[palette.primary[500], palette.primary[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.saveBtn}
-          >
-            <Text style={styles.saveBtnLabel}>{saving ? 'Saving…' : 'Save Changes'}</Text>
-          </LinearGradient>
-        </Pressable>
-        <Pressable style={styles.deleteBtn} onPress={handleDelete} disabled={saving || deleting}>
-          <Text style={styles.deleteBtnLabel}>
-            {deleting ? 'Deleting…' : 'Delete Moment'}
-          </Text>
-        </Pressable>
+          onPress={() => setDeleteConfirmVisible(true)}
+        />
       </View>
+
+      {/* H-04 / Sheet · Delete Memory Confirm (annotation copy) */}
+      <BottomSheet
+        visible={deleteConfirmVisible}
+        onRequestClose={() => setDeleteConfirmVisible(false)}
+      >
+        <View style={sheetSection.title}>
+          <Text style={styles.sheetTitle}>Delete this memory?</Text>
+        </View>
+        <View style={sheetSection.body}>
+          <Text style={styles.sheetBody}>
+            This can't be undone. All photos and notes in this memory will be permanently removed.
+          </Text>
+        </View>
+        <View style={sheetSection.cta}>
+          <Button
+            label={deleting ? 'Deleting…' : 'Delete Memory'}
+            type="destructive"
+            disabled={deleting}
+            onPress={() => {
+              setDeleteConfirmVisible(false);
+              void handleDelete();
+            }}
+          />
+          <Button label="Cancel" type="text" onPress={() => setDeleteConfirmVisible(false)} />
+        </View>
+      </BottomSheet>
 
       <PhotoSourceSheet
         visible={photoSourceVisible}
@@ -296,27 +312,13 @@ function EditForm({ moment }: { moment: Moment }) {
   );
 }
 
-const THUMB = 72;
+// 3 × 107 + 2 × 16 = 353, the padded body width
+const PHOTO_CELL = 107;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.surface.default,
-  },
-
-  navBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xl,
-    height: 56,
-  },
-  navTitle: {
-    ...theme.typography.h3,
-    color: theme.text.primary,
-  },
-  navSpacer: {
-    width: 24,
   },
 
   center: {
@@ -334,67 +336,70 @@ const styles = StyleSheet.create({
     color: theme.text.brand,
   },
 
+  // body 743:4825
   scroll: { flex: 1 },
   scrollContent: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingBottom: theme.spacing.xl,
-    gap: theme.spacing.l,
+    paddingHorizontal: theme.spacing.xl, // 20
+    paddingTop: theme.spacing.l, // 16
+    paddingBottom: theme.spacing.safeBtm, // 34
+    gap: theme.spacing.l, // 16
   },
 
-  photoStrip: {
-    gap: theme.spacing.s,
-    paddingVertical: theme.spacing.s,
+  // Photo grid 744:2748 — same geometry as the Add page
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.l,
   },
-  photoThumbWrap: {
-    width: THUMB,
-    height: THUMB,
-  },
-  photoThumbImg: {
-    width: THUMB,
-    height: THUMB,
+  photoCell: {
+    width: PHOTO_CELL,
+    height: PHOTO_CELL,
     borderRadius: theme.radius.m,
-    backgroundColor: theme.border.strong,
+    backgroundColor: palette.neutral[200],
+    overflow: 'hidden',
   },
+  photoCellImg: { width: PHOTO_CELL, height: PHOTO_CELL },
   deleteBadge: {
     position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    top: 4,
+    left: 79,
+    width: 24,
+    height: 24,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.overlay.scrim,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   photoAdd: {
-    width: THUMB,
-    height: THUMB,
+    width: PHOTO_CELL,
+    height: PHOTO_CELL,
     borderRadius: theme.radius.m,
     borderWidth: 1.5,
     borderColor: theme.border.default,
-    borderStyle: 'dashed',
     backgroundColor: theme.surface.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   noteInput: {
-    height: 160,
+    height: 144,
     backgroundColor: theme.surface.card,
     borderWidth: 1,
-    borderColor: theme.border.strong,
+    borderColor: theme.border.default,
     borderRadius: theme.radius.s,
     paddingHorizontal: theme.spacing.l,
-    paddingTop: theme.spacing.m,
+    paddingVertical: theme.spacing.m,
     ...theme.typography.body,
     color: theme.text.primary,
   },
+  noteInputFilled: { borderColor: theme.border.strong },
 
   detailsList: {
     backgroundColor: theme.surface.card,
     borderWidth: 1,
     borderColor: theme.border.default,
-    borderRadius: theme.radius.l,
+    borderRadius: theme.radius.m, // 10
     overflow: 'hidden',
   },
   detailRow: {
@@ -402,14 +407,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.l,
-    minHeight: 46,
-    paddingVertical: theme.spacing.m,
+    paddingVertical: 14,
   },
   rowDivider: {
     height: 1,
     backgroundColor: theme.border.default,
-    marginHorizontal: theme.spacing.l,
   },
+
+  sheetTitle: { ...theme.typography.h1, color: theme.text.primary },
+  sheetBody: { ...theme.typography.body, color: theme.text.primary },
   detailLabel: {
     ...theme.typography.body,
     color: theme.text.primary,
@@ -417,16 +423,17 @@ const styles = StyleSheet.create({
   detailRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   detailValue: {
-    ...theme.typography.body,
+    ...theme.typography.caption, // Inter 14/16
     color: theme.text.secondary,
   },
 
+  // cta 743:4885 — pt4 / pb SafeBtm, gap 8
   cta: {
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
+    paddingTop: theme.spacing.xs,
     paddingBottom: theme.spacing.safeBtm,
     gap: theme.spacing.s,
     alignItems: 'center',
@@ -436,28 +443,8 @@ const styles = StyleSheet.create({
     color: theme.text.error,
     textAlign: 'center',
   },
-  saveWrap: {
-    width: '100%',
-    borderRadius: theme.radius.full,
-    borderWidth: 2,
-    borderColor: palette.primary[50],
-    overflow: 'hidden',
-  },
-  saveBtn: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
-  deleteBtn: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.full,
-  },
+  // The design instances the DS Destructive button at 44 tall here
+  deleteBtn: { height: 44 },
   deleteBtnLabel: {
     fontFamily: 'Manrope_500Medium',
     fontSize: 16,

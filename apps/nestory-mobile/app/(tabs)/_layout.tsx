@@ -5,11 +5,15 @@ import { theme } from '@/shared/theme';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { usePushRegistration } from '@/shared/hooks/usePushRegistration';
 
+// DS TabBar (Figma 48:825): pt 8 / pb SafeBtm-34 over a 44pt tab (24 icon +
+// 4 gap + 16 label) = 86 tall, 1px border/default hairline on top. Labels use
+// the Tag&Badge style — Inter Medium 14/16, not 12.
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   // Register this device's push token once the user is inside the app.
   const { session } = useSession();
   usePushRegistration(!!session);
+  const bottomInset = Math.max(insets.bottom, theme.spacing.safeBtm);
   return (
     <Tabs
       screenOptions={{
@@ -18,20 +22,16 @@ export default function TabsLayout() {
           backgroundColor: theme.surface.default,
           borderTopColor: theme.border.default,
           borderTopWidth: 1,
-          height: 64 + insets.bottom,
-          paddingTop: 8,
-          paddingBottom: insets.bottom + 12,
+          height: 8 + 44 + bottomInset,
+          paddingTop: theme.spacing.s,
+          paddingBottom: bottomInset,
         },
         tabBarIconStyle: {
-          marginBottom: 2,
+          marginBottom: theme.spacing.xs,
         },
         tabBarActiveTintColor: theme.text.brand,
         tabBarInactiveTintColor: theme.text.secondary,
-        tabBarLabelStyle: {
-          fontFamily: 'Inter_500Medium',
-          fontSize: 12,
-          lineHeight: 16,
-        },
+        tabBarLabelStyle: theme.typography.tagBadge,
       }}
     >
       <Tabs.Screen
@@ -57,7 +57,7 @@ export default function TabsLayout() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ color, focused }) => (
-            <RemixIcon name={focused ? 'settings-3-fill' : 'settings-3-line'} size={24} color={color} />
+            <RemixIcon name={focused ? 'settings-fill' : 'settings-line'} size={24} color={color} />
           ),
         }}
       />

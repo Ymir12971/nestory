@@ -1,13 +1,16 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
-import { theme, palette } from '@/shared/theme';
+import { Button } from '@/shared/components/Button';
+import { palette, theme } from '@/shared/theme';
 
 // O-Privacy claim (Figma 752:1639) — static promise page shown right after a
 // successful sign-in, before we ask anything about the child. Single CTA.
-
+//
+// Each promise is a plain icon + text row (24px icon, gap 4, list gap 24) — no
+// cards, no icon chips. The bold lead-in sits in the same text flow as the body
+// copy, in brand green.
 const PROMISES: Array<{ icon: string; title: string; body: string }> = [
   {
     icon: 'lock-2-line',
@@ -15,12 +18,12 @@ const PROMISES: Array<{ icon: string; title: string; body: string }> = [
     body: 'Everything you enter is encrypted and belongs to you.',
   },
   {
-    icon: 'shield-check-line',
+    icon: 'error-warning-line',
     title: 'Never used to train AI.',
     body: "Your child's data will never feed any model.",
   },
   {
-    icon: 'hand-heart-line',
+    icon: 'price-tag-3-line',
     title: 'Never sold or shared.',
     body: 'We follow the data-protection laws in your region and never sell the data to any other third-parties.',
   },
@@ -28,100 +31,109 @@ const PROMISES: Array<{ icon: string; title: string; body: string }> = [
 
 export function PrivacyClaimScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* title 752:1642 */}
+      <View style={styles.title}>
+        <Text style={styles.heading}>
+          <Text style={styles.headingBrand}>Privacy </Text>
+          is of the top importance here
+        </Text>
+        <Text style={styles.subheading}>
+          We're about to ask a few things about your child. Here's our promise before you share
+          anything.
+        </Text>
+      </View>
+
+      {/* body 752:1721 */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headingGroup}>
-          <Text style={styles.heading}>Privacy is of the top importance here</Text>
-          <Text style={styles.subheading}>
-            We're about to ask a few things about your child. Here's our promise before you share anything.
-          </Text>
+        <View style={styles.heroWrap}>
+          <View style={styles.heroTile}>
+            <RemixIcon name="shield-check-line" size={72} color={palette.primary[500]} />
+          </View>
         </View>
 
         <View style={styles.promises}>
-          {PROMISES.map(p => (
-            <View key={p.title} style={styles.promiseCard}>
-              <View style={styles.promiseIcon}>
-                <RemixIcon name={p.icon as any} size={22} color={theme.text.brand} />
-              </View>
-              <View style={styles.promiseText}>
+          {PROMISES.map((p) => (
+            <View key={p.title} style={styles.promiseRow}>
+              <RemixIcon name={p.icon as any} size={24} color={palette.primary[500]} />
+              <Text style={styles.promiseBody}>
                 <Text style={styles.promiseTitle}>{p.title}</Text>
-                <Text style={styles.promiseBody}>{p.body}</Text>
-              </View>
+                {'\n'}
+                {p.body}
+              </Text>
             </View>
           ))}
         </View>
       </ScrollView>
 
-      <View style={styles.cta}>
-        <Pressable
-          style={({ pressed }) => [styles.ctaBtnWrap, pressed && { opacity: 0.85 }]}
+      {/* cta 752:1663 */}
+      <View style={[styles.cta, { paddingBottom: Math.max(insets.bottom, theme.spacing.safeBtm) }]}>
+        <Button
+          label="I understand. Let's start"
           onPress={() => router.replace('/onboarding/profile')}
-        >
-          <LinearGradient
-            colors={[palette.primary[500], palette.primary[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.ctaBtn}
-          >
-            <Text style={styles.ctaBtnLabel}>I understand. Let's start</Text>
-          </LinearGradient>
-        </Pressable>
+        />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
-  scroll: { flex: 1 },
-  content: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: 48,
-    gap: theme.spacing.xxl,
-  },
 
-  headingGroup: { gap: 10 },
+  title: {
+    paddingHorizontal: theme.spacing.xl, // 20
+    paddingVertical: theme.spacing.l, // 16
+    gap: 6,
+  },
   heading: { ...theme.typography.h1, color: theme.text.primary },
+  headingBrand: { color: theme.text.brand },
   subheading: { ...theme.typography.body, color: theme.text.secondary },
 
-  promises: { gap: theme.spacing.m },
-  promiseCard: {
-    flexDirection: 'row',
-    gap: theme.spacing.m,
-    borderWidth: 1,
-    borderColor: theme.border.default,
-    borderRadius: theme.radius.l,
-    backgroundColor: theme.surface.card,
-    padding: theme.spacing.l,
+  scroll: { flex: 1 },
+  body: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
+    gap: theme.spacing.xxl, // 24
   },
-  promiseIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+
+  heroWrap: { alignItems: 'center', gap: theme.spacing.s },
+  heroTile: {
+    width: 128,
+    height: 128,
+    borderRadius: theme.radius.l,
     backgroundColor: theme.surface.brandSubtle,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  promiseText: { flex: 1, gap: 4 },
-  promiseTitle: { ...theme.typography.h4, color: theme.text.primary },
-  promiseBody: { ...theme.typography.body, color: theme.text.secondary },
+
+  promises: { gap: theme.spacing.xxl }, // 24
+  promiseRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.xs, // 4
+  },
+  promiseTitle: {
+    fontFamily: 'Manrope_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22,
+    color: theme.text.brand,
+  },
+  promiseBody: {
+    ...theme.typography.body, // Inter Regular 16/20
+    color: theme.text.secondary,
+    flex: 1,
+  },
 
   cta: {
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.safeBtm,
+    paddingTop: theme.spacing.l, // 16
   },
-  ctaBtnWrap: {
-    width: '100%',
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-  },
-  ctaBtn: { height: 52, alignItems: 'center', justifyContent: 'center' },
-  ctaBtnLabel: { ...theme.typography.buttonLabelM, color: theme.text.onColor },
 });

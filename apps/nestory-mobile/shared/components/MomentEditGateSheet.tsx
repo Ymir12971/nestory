@@ -1,20 +1,24 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { theme, palette } from '@/shared/theme';
+import { StyleSheet, Text, View } from 'react-native';
+import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
+import { Button } from '@/shared/components/Button';
+import { theme } from '@/shared/theme';
 
 // Past-month Moment edit gates (2026-07 redesign; old everyone-read-only R-08
 // is gone). Current-month moments never see these — the caller routes straight
 // to the edit page.
 //
-//   variant="free"    — H-NoPremium request to edit Popup (744:3627): upgrade
-//                       or view benefits; both land on the global Paywall
-//                       (决策 4: unified MVP routing).
-//   variant="premium" — H-Moment Edit Alert (745:1252): heads-up that the
-//                       Story can be regenerated later, then continue to edit.
+//   variant="free"    — H-NoPremium request to edit Popup (744:3627): title
+//                       "Upgrade to Edit", DS Premium CTA, then "View Premium
+//                       benefits" and "Cancel" text buttons. Both premium
+//                       actions land on the global Paywall (决策 4).
+//   variant="premium" — H-Moment Edit Alert (745:1252): title "We have to let
+//                       you know", DS Primary CTA labelled "OK", then "Cancel".
+//
+// Both sheets are title (px20/py16) + body (px20/py16) + cta (px20, py8, gap16).
 
 interface MomentEditGateSheetProps {
-  visible:  boolean;
-  variant:  'free' | 'premium';
+  visible: boolean;
+  variant: 'free' | 'premium';
   /** free: open the paywall. premium: proceed into the edit page. */
   onPrimary: () => void;
   /** free only: "View Premium benefits" secondary link. */
@@ -31,113 +35,49 @@ export function MomentEditGateSheet({
 }: MomentEditGateSheetProps) {
   const isFree = variant === 'free';
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <Pressable style={styles.scrim} onPress={onDismiss} />
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <Text style={styles.title}>
-          {isFree ? 'Upgrade to Edit' : 'We have to let you know'}
-        </Text>
+    <BottomSheet visible={visible} onRequestClose={onDismiss}>
+      <View style={sheetSection.title}>
+        <Text style={styles.title}>{isFree ? 'Upgrade to Edit' : 'We have to let you know'}</Text>
+      </View>
+
+      <View style={sheetSection.body}>
         <Text style={styles.body}>
           {isFree
-            ? 'This Moment was used to create a Story. You can upgrade to Premium to edit and recreate that Story.'
-            : 'This Moment was used to create a Story. As our Premium user, you have the chance to regenerate that Story later.'}
+            ? 'This Memory was used to create a Story.\nYou can upgrade to Premium to edit and recreate that Story.'
+            : 'This Memory was used to create a Story.\n\nAs our Premium user, you have the chance to regenerate that Story later.'}
         </Text>
-
-        <Pressable
-          style={({ pressed }) => [styles.primaryWrap, pressed && { opacity: 0.88 }]}
-          onPress={onPrimary}
-        >
-          <LinearGradient
-            colors={
-              isFree
-                ? [palette.accent[500], palette.accent[400]]
-                : [palette.primary[500], palette.primary[400]]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.primaryBtn}
-          >
-            <Text style={[styles.primaryLabel, isFree ? styles.premiumText : styles.onColorText]}>
-              {isFree ? 'Upgrade to Premium' : 'Continue to Edit'}
-            </Text>
-          </LinearGradient>
-        </Pressable>
-
-        {isFree && onViewBenefits && (
-          <Pressable style={styles.textBtn} onPress={onViewBenefits}>
-            <Text style={styles.textBtnLabel}>View Premium benefits</Text>
-          </Pressable>
-        )}
-
-        <Pressable style={styles.textBtn} onPress={onDismiss}>
-          <Text style={styles.cancelLabel}>Cancel</Text>
-        </Pressable>
       </View>
-    </Modal>
+
+      <View style={styles.cta}>
+        <Button
+          label={isFree ? 'Upgrade to Premium' : 'OK'}
+          type={isFree ? 'premium' : 'primary'}
+          onPress={onPrimary}
+        />
+        {isFree && onViewBenefits && (
+          <Button label="View Premium benefits" type="text" onPress={onViewBenefits} />
+        )}
+        <Button label="Cancel" type="text" onPress={onDismiss} />
+      </View>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  sheet: {
-    backgroundColor: theme.surface.card,
-    borderTopLeftRadius: theme.radius.l,
-    borderTopRightRadius: theme.radius.l,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.safeBtm + theme.spacing.l,
-    gap: theme.spacing.m,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.border.strong,
-    alignSelf: 'center',
-    marginBottom: theme.spacing.s,
-  },
   title: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 24,
-    lineHeight: 32,
+    ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.primary,
   },
   body: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
-    lineHeight: 22,
+    ...theme.typography.body, // Inter Regular 16/20
+    color: theme.text.primary, // not secondary
   },
-  primaryWrap: {
-    width: '100%',
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    marginTop: theme.spacing.s,
-  },
-  primaryBtn: {
-    height: 52,
+  // cta 775:2225 — px20, py8, 16 between buttons
+  cta: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.s,
+    paddingBottom: theme.spacing.s,
+    gap: theme.spacing.l,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryLabel: {
-    ...theme.typography.buttonLabelM,
-  },
-  premiumText: { color: theme.text.premium },
-  onColorText: { color: theme.text.onColor },
-  textBtn: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
-  },
-  cancelLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.secondary,
   },
 });

@@ -1,154 +1,190 @@
 import { useRef, useState } from 'react';
-import { Animated, Dimensions, Image, type ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Animated,
+  Dimensions,
+  Image,
+  type ImageSourcePropType,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Button } from '@/shared/components/Button';
 import { palette, theme } from '@/shared/theme';
 
-const SCREEN_W = Dimensions.get('window').width;
+// O-Welcome-1 (Figma 739:1085) / O-Welcome-2 (739:1104).
+//
+// Both are composed absolutely on a 393×852 frame. Phone aspect ratios barely
+// move (393/852 = 430/932 = 0.461), so scaling every canvas coordinate by
+// SCREEN_W/393 keeps the composition 1:1 across devices; the CTA is pinned to
+// the bottom instead of scaled so it always clears the home indicator.
+const CANVAS_W = 393;
+const K = Dimensions.get('window').width / CANVAS_W;
+const px = (v: number) => v * K;
 
-// Welcome-2 Story 预览网格(6 张,顺序照 Figma 739:1104)
-const GRID_PHOTOS: ImageSourcePropType[] = [
-  require('@/assets/images/welcome-tree.png'),
-  require('@/assets/images/welcome-icecream.png'),
-  require('@/assets/images/welcome-butterfly.png'),
-  require('@/assets/images/welcome-bedtime.png'),
-  require('@/assets/images/welcome-baking.png'),
-  require('@/assets/images/welcome-firststep.png'),
+// Shared backdrop: linear-gradient(213.49deg, primary/300 14.88%, primary/700 91.68%).
+// A CSS angle θ maps to the direction vector (sin θ, −cos θ) in screen space,
+// which for 213.49° runs from the top-right down to the bottom-left corner.
+const GRADIENT_COLORS = [palette.primary[300], palette.primary[700]] as const;
+const GRADIENT_LOCATIONS = [0.14883, 0.91682] as const;
+const GRADIENT_START = { x: 0.776, y: 0.083 };
+const GRADIENT_END = { x: 0.224, y: 0.917 };
+
+function Backdrop({ children }: { children: React.ReactNode }) {
+  return (
+    <LinearGradient
+      colors={GRADIENT_COLORS}
+      locations={GRADIENT_LOCATIONS}
+      start={GRADIENT_START}
+      end={GRADIENT_END}
+      style={s.fill}
+    >
+      {children}
+    </LinearGradient>
+  );
+}
+
+// Figma `cta` frame: full width, pt 24 / px 20 / pb SafeBtm-34, button right-aligned.
+// The button itself is the DS Primary, just narrower than its 353 default.
+function Cta({ label, width, onPress }: { label: string; width: number; onPress: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[s.cta, { paddingBottom: Math.max(insets.bottom, px(34)) }]}>
+      <Button
+        label={label}
+        onPress={onPress}
+        style={{ width: px(width), height: px(52), alignSelf: 'auto' }}
+      />
+    </View>
+  );
+}
+
+// ─── Step 1: "Every little moment, kept as Moment" ───────────────────────────
+
+// Right-hand card column (739:1086): three MomentCards, each with its own photo
+// height, stacked with a 12px gap.
+const W1_CARDS: { photo: ImageSourcePropType; photoH: number; caption: string; tag?: string }[] = [
+  {
+    photo: require('@/assets/images/welcome-bedtime.png'),
+    photoH: 120,
+    caption: 'Fell asleep mid-laugh during bedtime stories.',
+  },
+  {
+    photo: require('@/assets/images/welcome-firststep.png'),
+    photoH: 160,
+    caption: 'Took his first wobbly steps across the room today.',
+    tag: 'First Step',
+  },
+  {
+    photo: require('@/assets/images/welcome-butterfly.png'),
+    photoH: 90,
+    caption: "Caught a tiny butterfly in the park — wouldn't let go.",
+  },
 ];
-const GREEN = palette.primary[500]; // #23ab65
-// 设计稿背景为斜向绿渐变(左上浅 → 右下深)
-const GRADIENT = [palette.primary[400], palette.primary[500], palette.primary[600]] as const;
 
-// ─── Moment Card (Welcome-1 right column) ────────────────────────────────────
-
-function MomentCard({
-  caption,
-  tag,
-  photo,
-}: {
-  caption: string;
-  tag?: string;
-  photo: ImageSourcePropType;
-}) {
+function MomentCard({ photo, photoH, caption, tag }: (typeof W1_CARDS)[number]) {
   return (
     <View style={card.wrap}>
-      <Image source={photo} style={[card.photo, tag && card.photoTall]} resizeMode="cover" />
+      <Image source={photo} style={[card.photo, { height: px(photoH) }]} resizeMode="cover" />
       {tag && (
         <View style={card.tag}>
           <Text style={card.tagLabel}>{tag}</Text>
         </View>
       )}
-      <Text style={card.caption}>{caption}</Text>
+      {/* Card 1's caption is clamped to 3 lines in the design (fixed 48px block) */}
+      <Text style={card.caption} numberOfLines={photoH === 120 ? 3 : undefined}>
+        {caption}
+      </Text>
     </View>
   );
 }
 
 const card = StyleSheet.create({
   wrap: {
-    backgroundColor: theme.surface.card,
-    borderRadius: 12,
-    padding: 10,
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 4,
+    backgroundColor: theme.surface.successSubtle, // #f0fdf4
+    borderWidth: 1,
+    borderColor: theme.border.default,
+    borderRadius: px(theme.radius.l),
+    paddingHorizontal: px(theme.spacing.m),
+    paddingVertical: px(10),
+    gap: px(12),
   },
   photo: {
-    width: '100%',
-    // Figma:无 tag 卡 120×120,带 tag 的 First Step 卡 120×160(见下 photoTall)
-    height: 108,
-    borderRadius: 8,
-  },
-  photoTall: {
-    height: 144,
+    width: px(120),
+    borderRadius: px(theme.radius.m),
+    backgroundColor: palette.neutral[200],
   },
   tag: {
     alignSelf: 'flex-start',
-    backgroundColor: palette.primary[50],
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
     borderWidth: 1,
-    borderColor: palette.primary[200],
+    borderColor: theme.border.brand,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: px(theme.spacing.m),
+    paddingVertical: px(6),
   },
   tagLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    lineHeight: 16,
-    color: palette.primary[700],
+    fontFamily: 'Inter_700Bold',
+    fontSize: px(14),
+    lineHeight: px(16),
+    color: theme.text.brand,
   },
   caption: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: px(14),
+    lineHeight: px(16),
     color: theme.text.primary,
+    width: px(122),
   },
 });
 
-// ─── Step 1: "Every little moment, kept as Moment" ───────────────────────────
-
 function StepOne({ onNext }: { onNext: () => void }) {
+  const insets = useSafeAreaInsets();
   return (
-    <LinearGradient colors={GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fill}>
-      <SafeAreaView style={s.fill} edges={['top', 'bottom']}>
-      <View style={s.w1Body}>
-        {/* Left: 文字在上、插画在下(Figma 739:1586 @32,94 / 739:1585 @0,231) */}
-        <View style={s.w1Left}>
-          <View style={s.w1TextBlock}>
-            {/* 文案照 Figma 原文,仅术语 Memory→Moment(Justin 2026-07-27) */}
-            <Text style={s.w1Pre}>Every little moment,{'\n'}kept as</Text>
-            <Text style={s.w1Hero}>Moment</Text>
-          </View>
-          <Image
-            source={require('@/assets/images/welcome-illustration.png')}
-            style={s.illustration}
-            resizeMode="contain"
-          />
-        </View>
+    <Backdrop>
+      {/* 739:1585 — line-art illustration, bleeds off the left edge */}
+      <Image
+        source={require('@/assets/images/welcome-illustration.png')}
+        style={s.w1Illustration}
+        resizeMode="cover"
+      />
 
-        {/* Right: 3 stacked moment cards */}
-        <View style={s.w1Right}>
-          <MomentCard
-            caption="Fell asleep mid-laugh during bedtime stories."
-            photo={require('@/assets/images/welcome-bedtime.png')}
-          />
-          <MomentCard
-            caption="Took his first wobbly steps across the room today."
-            tag="First Step"
-            photo={require('@/assets/images/welcome-firststep.png')}
-          />
-          <MomentCard
-            caption="Caught a tiny butterfly in the park — wouldn't let go."
-            photo={require('@/assets/images/welcome-butterfly.png')}
-          />
-        </View>
+      {/* 739:1586 */}
+      <View style={s.w1TextBlock}>
+        <Text style={s.heroPre}>Every little moment,{'\n'}kept as</Text>
+        <Text style={s.heroBold}>Moment</Text>
       </View>
 
-      <View style={s.btnRow}>
-        <Pressable
-          style={({ pressed }) => [s.outlineBtn, pressed && s.pressed]}
-          onPress={onNext}
-        >
-          <Text style={s.outlineBtnLabel}>Next →</Text>
-        </Pressable>
+      {/* 739:1086 — Figma puts the column at y=-16 (bleeding under the status
+          bar); on device it starts just below the inset instead (Justin 2026-07-27) */}
+      <View style={[s.w1Column, { top: Math.max(insets.top, px(24)) }]}>
+        {W1_CARDS.map((c) => (
+          <MomentCard key={c.caption} {...c} />
+        ))}
       </View>
-      </SafeAreaView>
-    </LinearGradient>
+
+      <Cta label="Next →" width={146} onPress={onNext} />
+    </Backdrop>
   );
 }
 
 // ─── Step 2: "Every moment, woven into a Story" ──────────────────────────────
 
-const CARD_W = SCREEN_W - 48;
-const GRID_PHOTO_W = (CARD_W - 32 - 8) / 3; // card padding 16×2, two gaps of 4
+// 739:1114 — 3-column masonry collage, 280×193, column gap 10 / row gap 11.
+const W2_COLLAGE: { photo: ImageSourcePropType; left: number; top: number; w: number; h: number }[] = [
+  { photo: require('@/assets/images/welcome-tree.png'), left: 0, top: 0, w: 78, h: 104 },
+  { photo: require('@/assets/images/welcome-icecream.png'), left: 88, top: 0, w: 104, h: 78 },
+  { photo: require('@/assets/images/welcome-butterfly.png'), left: 202, top: 0, w: 78, h: 78 },
+  { photo: require('@/assets/images/welcome-bedtime.png'), left: 0, top: 115, w: 78, h: 78 },
+  { photo: require('@/assets/images/welcome-baking.png'), left: 88, top: 89, w: 104, h: 104 },
+  { photo: require('@/assets/images/welcome-firststep.png'), left: 202, top: 89, w: 78, h: 104 },
+];
 
 function StoryPreviewCard() {
   return (
     <View style={story.card}>
-      {/* 卡头:月份胶囊 + 5 点指示器(Figma Frame 71 / Frame 72) */}
+      {/* 739:2022 — month pill + 5-dot page indicator */}
       <View style={story.headerRow}>
         <View style={story.monthBadge}>
           <Text style={story.monthLabel}>July 2026</Text>
@@ -159,124 +195,145 @@ function StoryPreviewCard() {
           ))}
         </View>
       </View>
-      <View style={story.grid}>
-        {GRID_PHOTOS.map((src, i) => (
-          <Image key={i} source={src} style={story.gridPhoto} resizeMode="cover" />
+
+      <View style={story.collage}>
+        {W2_COLLAGE.map((p, i) => (
+          <Image
+            key={i}
+            source={p.photo}
+            style={[
+              story.collagePhoto,
+              { left: px(p.left), top: px(p.top), width: px(p.w), height: px(p.h) },
+            ]}
+            resizeMode="cover"
+          />
         ))}
       </View>
-      <Text style={story.narrative} numberOfLines={4}>
+
+      <Text style={story.narrative}>
         This month Vincent found his feet, chasing butterflies and tumbling into giggles. Every
-        wobble brought him closer to the world waiting for him.
+        wobble brought him closer to the world waiting for him.{'\n'}...
       </Text>
-      <Text style={story.count}>54 moments</Text>
+
+      <View style={story.footer}>
+        <Text style={story.count}>54 moments</Text>
+      </View>
     </View>
   );
 }
 
 const story = StyleSheet.create({
+  // 739:1111
   card: {
-    backgroundColor: theme.surface.card,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    width: CARD_W,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  stackWrap: {
-    alignItems: 'center',
-    paddingTop: 24,          // 给叠影卡留出上方空间
-  },
-  ghost: {
     position: 'absolute',
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    borderRadius: 16,
+    left: px(40),
+    top: px(162),
+    width: px(312),
+    backgroundColor: theme.surface.card,
+    borderWidth: 1,
+    borderColor: theme.border.default,
+    borderRadius: px(theme.radius.l),
+    padding: px(theme.spacing.l),
+    gap: px(theme.spacing.l),
   },
-  ghostFront: { top: 8,  width: CARD_W - 30, height: 60 },
-  ghostBack:  { top: 0,  width: CARD_W - 78, height: 60, backgroundColor: 'rgba(255,255,255,0.28)' },
-
+  // 739:1109 / 739:1110 — two stacked "previous story" cards peeking out behind
+  ghostBack: {
+    position: 'absolute',
+    left: px(80),
+    top: px(114),
+    width: px(234),
+    height: px(190),
+    backgroundColor: '#d9fae6',
+    borderRadius: px(theme.radius.l),
+  },
+  ghostFront: {
+    position: 'absolute',
+    left: px(56),
+    top: px(138),
+    width: px(282),
+    height: px(228),
+    backgroundColor: '#bfe9d0',
+    borderRadius: px(theme.radius.l),
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  dots: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: palette.primary[200],
-  },
   monthBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: palette.primary[500],
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: theme.surface.brand,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: px(theme.spacing.m),
+    paddingVertical: px(4),
   },
   monthLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    lineHeight: 16,
+    fontFamily: 'Manrope_700Bold',
+    fontSize: px(18),
+    lineHeight: px(24),
     color: theme.text.onColor,
   },
-  grid: {
+  dots: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
+    gap: px(8),
   },
-  gridPhoto: {
-    width: GRID_PHOTO_W,
-    height: 80,
-    borderRadius: 6,
+  dot: {
+    width: px(4),
+    height: px(4),
+    borderRadius: px(2),
+    backgroundColor: palette.primary[100], // #d1f5de
+  },
+  collage: {
+    width: px(280),
+    height: px(193),
+  },
+  collagePhoto: {
+    position: 'absolute',
+    borderRadius: px(theme.radius.m),
+    backgroundColor: palette.neutral[200],
   },
   narrative: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.text.secondary,
+    fontSize: px(14),
+    lineHeight: px(16),
+    color: theme.text.primary,
+    height: px(88),
+    overflow: 'hidden',
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   count: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.text.hint,
+    fontSize: px(14),
+    lineHeight: px(16),
+    color: theme.text.secondary,
   },
 });
 
 function StepTwo({ onEnter }: { onEnter: () => void }) {
   return (
-    <LinearGradient colors={GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fill}>
-      <SafeAreaView style={s.fill} edges={['top', 'bottom']}>
-      <View style={s.w2Body}>
-        {/* 叠影卡(Figma Rectangle 111141367 / …366):主卡后方两层 */}
-        <View style={story.stackWrap}>
-          <View style={[story.ghost, story.ghostBack]} />
-          <View style={[story.ghost, story.ghostFront]} />
-          <StoryPreviewCard />
-        </View>
-        <View style={s.w2TextBlock}>
-          <Text style={s.w2Pre}>Every moment,{'\n'}woven into a</Text>
-          <Text style={s.w2Hero}>Story</Text>
-        </View>
+    <Backdrop>
+      {/* 739:1105 — three concentric rings, #41A86F @20%, 10px stroke */}
+      <View style={s.rings} pointerEvents="none">
+        {[586, 460, 316].map((d) => (
+          <View key={d} style={[s.ring, { width: px(d), height: px(d), borderRadius: px(d / 2) }]} />
+        ))}
       </View>
 
-      <View style={s.btnRow}>
-        <Pressable
-          style={({ pressed }) => [s.outlineBtn, s.outlineBtnWide, pressed && s.pressed]}
-          onPress={onEnter}
-        >
-          <Text style={s.outlineBtnLabel}>Enter Nestory →</Text>
-        </Pressable>
+      <View style={story.ghostBack} />
+      <View style={story.ghostFront} />
+      <StoryPreviewCard />
+
+      {/* 739:1133 */}
+      <View style={s.w2TextBlock}>
+        <Text style={s.heroPre}>Every moment,{'\n'}woven into a</Text>
+        <Text style={s.heroBold}>Story</Text>
       </View>
-      </SafeAreaView>
-    </LinearGradient>
+
+      <Cta label="Enter Nestory →" width={192} onPress={onEnter} />
+    </Backdrop>
   );
 }
 
@@ -310,96 +367,72 @@ export function WelcomeScreen() {
 const s = StyleSheet.create({
   fill: { flex: 1 },
 
-  // Step 1
-  // Figma 393 宽:左栏 0..227、右栏 227..373(146 宽),故 flex 227:146
-  w1Body: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingLeft: 0,
-    paddingRight: 20,
-    gap: 0,
-  },
-  w1Left: {
-    flex: 227,
-    paddingLeft: 32,      // 文字 @x=32
-    paddingTop: 35,       // 文字 @y=94 − status bar 59
-  },
-  // 白描孩子剪影(739:1585,226×542 @0,231):文字下方,左侧出血
-  illustration: {
-    flex: 1,
-    width: '100%',
-    marginLeft: -32,      // 抵消 paddingLeft,插画从屏幕最左开始
-    marginTop: 12,
-  },
-  w1TextBlock: {
-    gap: 0,
-  },
-  w1Pre: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    lineHeight: 21,
-    color: palette.primary[100],
-  },
-  w1Hero: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 34,
-    lineHeight: 42,
+  // Hero copy — Manrope Regular 24/32 over Manrope Bold 32/48, both white
+  heroPre: {
+    fontFamily: 'Manrope_400Regular',
+    fontSize: px(24),
+    lineHeight: px(32),
     color: theme.text.onColor,
   },
-  w1Right: {
-    flex: 146,
-    gap: 12,              // Figma 卡间距 12
-    // 稿中首卡贴顶出血,实机会被状态栏/电池行压住,故下移让开(Justin 2026-07-27)
-    paddingTop: 16,
-    paddingBottom: 12,
+  heroBold: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: px(32),
+    lineHeight: px(48),
+    color: theme.text.onColor,
+  },
+
+  // Step 1
+  w1Illustration: {
+    position: 'absolute',
+    left: 0,
+    top: px(231),
+    width: px(226),
+    height: px(542),
+  },
+  w1TextBlock: {
+    position: 'absolute',
+    left: px(32),
+    top: px(94),
+    width: px(165),
+  },
+  w1Column: {
+    position: 'absolute',
+    left: px(227),
+    width: px(146),
+    gap: px(12),
   },
 
   // Step 2
-  // Figma: 卡 312x409 @40,162;文案左对齐 @x=41
-  w2Body: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-    gap: 28,
-  },
-  w2TextBlock: {
-    alignItems: 'flex-start',
-    gap: 0,
-  },
-  w2Pre: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 20,
-    lineHeight: 28,
-    color: palette.primary[100],
-  },
-  w2Hero: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 44,
-    lineHeight: 52,
-    color: theme.text.onColor,
-  },
-
-  // Shared button
-  // Figma: Button 146×52 @x=227(与右侧卡片列同宽同起点),不是通栏
-  btnRow: {
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    alignItems: 'flex-end',
-  },
-  outlineBtn: {
-    height: 52,
-    width: 146,        // Welcome-1: Figma Button 146x52
+  rings: {
+    position: 'absolute',
+    left: px(87),
+    top: px(545),
+    width: px(586),
+    height: px(586),
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  outlineBtnWide: { width: 192 },   // Welcome-2: Figma Button 192x52
-  outlineBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
+  ring: {
+    position: 'absolute',
+    borderWidth: px(10),
+    borderColor: '#41a86f',
+    opacity: 0.2,
   },
-  pressed: { opacity: 0.75 },
+  w2TextBlock: {
+    position: 'absolute',
+    left: px(41),
+    top: px(598),
+    width: px(165),
+  },
+
+  // CTA
+  cta: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'flex-end',
+    paddingHorizontal: px(20),
+    paddingTop: px(24),
+  },
 });

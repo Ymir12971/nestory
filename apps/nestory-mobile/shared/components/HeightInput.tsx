@@ -36,7 +36,9 @@ export function HeightInput(props: HeightInputProps) {
           placeholderTextColor={theme.text.hint}
         />
         <Pressable style={styles.pill} onPress={props.onToggle}>
-          <Text style={styles.unitLabel}>cm</Text>
+          <View style={styles.unitSlot}>
+            <Text style={styles.unitLabel}>cm</Text>
+          </View>
           <RemixIcon name="arrow-up-down-line" size={16} color={theme.text.brand} />
         </Pressable>
       </View>
@@ -53,7 +55,9 @@ export function HeightInput(props: HeightInputProps) {
         placeholderTextColor={theme.text.hint}
       />
       <Pressable style={styles.pill} onPress={props.onToggle}>
-        <Text style={styles.unitLabel}>ft</Text>
+        <View style={styles.unitSlot}>
+          <Text style={styles.unitLabel}>ft</Text>
+        </View>
         <RemixIcon name="arrow-up-down-line" size={16} color={theme.text.brand} />
       </Pressable>
       <TextInput
@@ -64,7 +68,9 @@ export function HeightInput(props: HeightInputProps) {
         placeholderTextColor={theme.text.hint}
       />
       <Pressable style={styles.pill} onPress={props.onToggle}>
-        <Text style={styles.unitLabel}>in</Text>
+        <View style={styles.unitSlot}>
+          <Text style={styles.unitLabel}>in</Text>
+        </View>
         <RemixIcon name="arrow-up-down-line" size={16} color={theme.text.brand} />
       </Pressable>
     </View>
@@ -238,6 +244,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.s,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.radius.full,
+  },
+  // 193:1382 — fixed 32-wide slot so cm↔ft/in swaps don't shift the chevron
+  unitSlot: {
+    width: 32,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   unitLabel: { ...theme.typography.h2, color: theme.text.brand },
 });

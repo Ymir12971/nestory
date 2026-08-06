@@ -29,7 +29,9 @@ export function showToast(opts: { message: string; type?: ToastType; duration?: 
     id:       _nextId++,
     message:  opts.message,
     type:     opts.type ?? 'info',
-    duration: opts.duration ?? 3200,
+    // DS Toast annotation (329:48): centred on screen for two seconds, then
+    // auto-dismisses — same position and duration for every state.
+    duration: opts.duration ?? 2000,
   };
   _current = msg;
   clearTimer();
