@@ -39,6 +39,13 @@ export interface StoryListItem {
    * once memory-change tracking lands (WorkPlan §6) — optional until then.
    */
   memoriesChanged?: boolean;
+  /**
+   * Server's verdict on whether the regenerate affordance should show
+   * (决策 3 "有占位卡就可以生成"): Premium, the month has memories, nothing is
+   * already in flight, and — for an already-generated month — the memories
+   * actually changed. Clients render the strip on this alone.
+   */
+  canRegenerate?: boolean;
 }
 
 // GET /stories — current_month object

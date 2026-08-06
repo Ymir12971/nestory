@@ -338,6 +338,9 @@ export function StoriesScreen() {
     for (const item of historical) {
       if (item.listItemState === 'historical_generated' && item.id) {
         out.push({ kind: 'generated', item });
+      } else if (item.canRegenerate) {
+        // 生成失败但可补生成的月份:必须独立成卡(Paused 折叠卡没有重生成入口)
+        out.push({ kind: 'no_memories', item });
       } else if (monthsWithMemories.has(item.monthKey)) {
         const last = out[out.length - 1];
         // list is newest-first: extend the fold's older edge (endKey)
@@ -436,7 +439,7 @@ export function StoriesScreen() {
 
           {rows.map(row => {
             if (row.kind === 'generated') {
-              const canRegen = isPremium && row.item.memoriesChanged === true;
+              const canRegen = row.item.canRegenerate === true;
               return (
                 <GeneratedCard
                   key={row.item.monthKey}
@@ -456,7 +459,7 @@ export function StoriesScreen() {
                 />
               );
             }
-            const canRegen = isPremium && row.item.memoriesChanged === true;
+            const canRegen = row.item.canRegenerate === true;
             return (
               <NoMemoriesCard
                 key={row.item.monthKey}

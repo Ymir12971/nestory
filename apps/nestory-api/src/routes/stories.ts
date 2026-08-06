@@ -153,20 +153,38 @@ export async function storiesRoutes(app: FastifyInstance) {
 
     // 历史月份（最多回溯到 child 出生所在月）
     const historicalKeys = buildMonthSeries(curMonthKey, q.year ? 12 : 24).slice(1); // 去掉当月
+    const isPremiumNow =
+      sub?.subscriptionStatus === 'premium_active' || sub?.subscriptionStatus === 'trial_active';
+
     const historical: StoryListItem[] = historicalKeys.map(monthKey => {
       const s = stories.find(st => st.monthKey === monthKey);
-      if (!s) {
+      const monthMemories = memoryCountByMonth.get(monthKey) ?? 0;
+      // 决策 3:有占位卡(= 该月有 memory)且当前是 Premium → 可生成/重生成。
+      // 未成功生成的月份(E01 素材不足、配额尽、失败)也算,只要现在有素材。
+      const isDone = s?.status === 'generated' || s?.status === 'fallback_generated';
+      const inFlight = s?.status === 'generating' || s?.status === 'queued' ||
+                       s?.status === 'pending' || s?.status === 'pending_review';
+      // Handoff 3.4(b)(c):从未尝试过的月份(无行)和断订/配额空窗永不补发。
+      // 只有"尝试过但因素材不足/生成出错而失败"的月份,补了 memory 后可再生成。
+      const declined = (s?.generationMeta as { declined?: string } | null)?.declined;
+      const failedRecoverably =
+        s?.status === 'failed' && declined !== 'FREE_QUOTA_EXHAUSTED';
+
+      // 只有真正生成完成的才是 historical_generated —— 失败/审核中的行若也标成
+      // generated,客户端会渲染成可点卡片,点开必然 409。
+      if (!isDone) {
         return {
           id:               null,
           monthKey,
-          status:           null,
+          status:           (s?.status as StoryStatus) ?? null,
           listItemState:    'historical_not_generated',
           coverImageUrl:    null,
           title:            null,
           isLastFreeStory:  false,
           watermarkEnabled: null,
           generatedAt:      null,
-          memoryCount:      null,
+          memoryCount:      monthMemories,
+          canRegenerate:    isPremiumNow && monthMemories > 0 && !inFlight && failedRecoverably,
         };
       }
       const doc = s.document as StoryDocument | null;
@@ -180,9 +198,15 @@ export async function storiesRoutes(app: FastifyInstance) {
         isLastFreeStory:  s.isLastFreeStory,
         watermarkEnabled: doc?.watermark.enabled ?? null,
         generatedAt:      s.generatedAt?.toISOString() ?? null,
-        memoryCount:      memoryCountByMonth.get(monthKey) ?? 0,
+        memoryCount:      monthMemories,
         // Regenerate 蓝条信号:生成之后该月 memory 又变过(重生成刷新 generatedAt 后自动消失)
         memoriesChanged:
+          s.memoriesChangedAt != null &&
+          s.generatedAt != null &&
+          s.memoriesChangedAt > s.generatedAt,
+        // 已生成的月份要重生成,除了 Premium 还需 memory 真的变过
+        canRegenerate:
+          isPremiumNow &&
           s.memoriesChangedAt != null &&
           s.generatedAt != null &&
           s.memoriesChangedAt > s.generatedAt,
