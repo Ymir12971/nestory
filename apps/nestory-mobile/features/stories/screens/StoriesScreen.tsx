@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { Modal } from 'react-native';
 import type { CurrentMonthStatus, StoryListItem } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Button } from '@/shared/components/Button';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
 import { useAssetMonths, useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
@@ -30,27 +30,37 @@ function parseMonthKey(monthKey: string) {
 
 function CollectingCard({
   data,
+  childName,
   onAddMoment,
   onGenerateNow,
   generating,
 }: {
   data: CurrentMonthStatus;
+  childName: string;
   onAddMoment: () => void;
   onGenerateNow: () => void;
   generating: boolean;
 }) {
   // TODO: use proper milestone-target calculation once design logic is confirmed
   const progress = Math.min(data.momentCount / 15, 1);
+  const { full, monthName } = parseMonthKey(data.monthKey);
   return (
     <View style={styles.cardCollecting}>
       <View style={styles.collectingInner}>
-        <Text style={styles.collectingTitle}>Story in {data.daysUntilGeneration} days…</Text>
+        {/* 744:3973 — "{child}'s {month} Story in N days …" */}
+        <Text style={styles.collectingTitle}>
+          {childName}'s {monthName} Story in {data.daysUntilGeneration} days …
+        </Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
         </View>
-        <Text style={styles.collectingCaption}>
-          {data.momentCount} {data.momentCount === 1 ? 'moment' : 'moments'} so far — your story is starting to take shape.
-        </Text>
+        {/* cgFooter 744:3975 — "{month} {year}  |  N moments" + chevron */}
+        <View style={styles.cardFooter}>
+          <Text style={styles.nsCaption}>
+            {full}  |  {data.momentCount} {data.momentCount === 1 ? 'moment' : 'moments'}
+          </Text>
+          <RemixIcon name="arrow-right-s-line" size={24} color={theme.text.secondary} />
+        </View>
       </View>
       <View style={styles.collectingActions}>
         <Pressable style={styles.addMomentBtn} onPress={onAddMoment}>
@@ -94,7 +104,7 @@ function CurrentGeneratedCard({
       </View>
       <View style={styles.generatedBody}>
         <View style={styles.generatedTextGroup}>
-          <Text style={styles.cardTitle}>{data.title ?? '—'}</Text>
+          <Text style={styles.storyTitle}>{data.title ?? '—'}</Text>
         </View>
         <View style={styles.cardFooter}>
           <Text style={styles.nsCaption}>{data.momentCount} moments</Text>
@@ -116,20 +126,24 @@ function GeneratingCard({ monthKey }: { monthKey: string }) {
       </View>
       <View style={styles.genBody}>
         <Text style={styles.cardTitle}>{full}</Text>
-        <Text style={styles.collectingCaption}>Your Story is on its way — sit tight!</Text>
+        {/* 744:3999 — two lines, per the design */}
+        <Text style={styles.collectingCaption}>
+          Turning this month's moments into a Story.{'\n'}It'll be worth the wait!
+        </Text>
       </View>
     </View>
   );
 }
 
 /** Amber quota banner (DS Property=Locked) — persistent while free & out of stories. */
-function LockedCard({ childName, onUpgrade }: { childName: string; onUpgrade: () => void }) {
+function LockedCard({ onUpgrade }: { onUpgrade: () => void }) {
   return (
     <View style={styles.cardLocked}>
       <View style={styles.lockedContent}>
-        <RemixIcon name="lock-line" size={24} color={theme.text.hint} />
+        <RemixIcon name="lock-line" size={24} color={theme.text.warning} />
+        {/* 44:30 — the design's copy is generic, not name-personalised */}
         <Text style={styles.lockedBody}>
-          You've used your 2 free Stories. Upgrade to keep {childName}'s Stories going.
+          You've used your 2 free Stories. Upgrade to keep recording every month.
         </Text>
       </View>
       <Pressable onPress={onUpgrade}>
@@ -166,7 +180,7 @@ function GeneratedCard({
       {onRegenerate && <RegenerateStrip onPress={onRegenerate} />}
       <View style={styles.generatedBody}>
         <View style={styles.generatedTextGroup}>
-          <Text style={styles.cardTitle}>{item.title ?? '—'}</Text>
+          <Text style={styles.storyTitle}>{item.title ?? '—'}</Text>
         </View>
         <View style={styles.cardFooter}>
           {item.momentCount != null && (
@@ -221,7 +235,8 @@ function PausedCard({ startKey, endKey, kind }: { startKey: string; endKey: stri
   return (
     <View style={styles.cardNotGenerated}>
       <View style={styles.nsImgArea}>
-        <RemixIcon name="lock-line" size={40} color={theme.text.hint} />
+        {/* 744:4883 — same 48px link-unlink glyph as the no-moments card */}
+        <RemixIcon name="link-unlink-m" size={48} color={theme.text.secondary} />
         <Text style={styles.nsImgCaption}>Story paused ({kind} ended)</Text>
       </View>
       <View style={styles.nsBody}>
@@ -241,16 +256,7 @@ function PremiumEndedCard({ childName, onRenew }: { childName: string; onRenew: 
           Your Premium has ended. Renew to keep {childName}'s Stories going.
         </Text>
       </View>
-      <Pressable style={({ pressed }) => [styles.renewWrap, pressed && { opacity: 0.88 }]} onPress={onRenew}>
-        <LinearGradient
-          colors={[palette.accent[500], palette.accent[400]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.renewBtn}
-        >
-          <Text style={styles.renewLabel}>Renew Premium</Text>
-        </LinearGradient>
-      </Pressable>
+      <Button label="Renew Premium" type="premium" style={styles.renewBtn} onPress={onRenew} />
     </View>
   );
 }
@@ -353,13 +359,40 @@ export function StoriesScreen() {
     return out;
   }, [historical, monthsWithMoments]);
 
+  // First entry: nothing but the current month exists yet, so the page shows the
+  // big headline + "how it works" explainer and hides the year filter
+  // (S-Story Empty 821:1534).
+  const noHistory = rows.length === 0;
+  const monthLabel = current ? parseMonthKey(current.monthKey).monthName : '';
+  const generationDayLabel = useMemo(() => {
+    if (!current) return '';
+    const [y, m] = current.monthKey.split('-').map(Number);
+    if (!y || !m) return '';
+    const lastDay = new Date(y, m, 0); // day 0 of next month = last of this one
+    return lastDay.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  }, [current?.monthKey]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Stories</Text>
-        <Text style={styles.headerSubtitle}>Your little one's growth, told by AI</Text>
-      </View>
+      {/* Two header treatments: before any Story exists the page leads with a
+          32px headline (S-Story Empty 821:1536); once there's history it
+          shrinks to an 18px line over a hairline (S-Over one year 731:3338). */}
+      {noHistory ? (
+        <View style={styles.headerEmpty}>
+          <Text style={styles.headerTitleEmpty}>
+            {childName}'s growth, one <Text style={styles.headerTitleBrand}>Story</Text> a month
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {childName}'s monthly <Text style={styles.headerTitleBrand}>Story</Text>
+          </Text>
+        </View>
+      )}
 
+      {/* The year filter only appears once there's history to filter */}
+      {!noHistory && (
       <View style={styles.filterWrap}>
         <View style={styles.filterBar}>
           {availableYears.map(year => {
@@ -378,11 +411,12 @@ export function StoriesScreen() {
           })}
         </View>
       </View>
+      )}
 
       {/* Persistent quota banner — free users out of stories (Locked variant) */}
       {quotaExhausted && !isLoading && (
         <View style={styles.notifyWrap}>
-          <LockedCard childName={childName} onUpgrade={openPaywall} />
+          <LockedCard onUpgrade={openPaywall} />
         </View>
       )}
 
@@ -393,14 +427,19 @@ export function StoriesScreen() {
       ) : isError ? (
         // S-Stories couldn't load: pull down to refresh (annotation)
         <ScrollView
-          contentContainerStyle={styles.center}
+          contentContainerStyle={styles.abnormalWrap}
           refreshControl={
             <RefreshControl refreshing={storiesQ.isRefetching} onRefresh={() => void storiesQ.refetch()} />
           }
         >
-          <RemixIcon name="wifi-off-line" size={40} color={theme.text.hint} />
-          <Text style={styles.emptyText}>Your Stories couldn't load.</Text>
-          <Text style={styles.retryText}>Pull down to refresh</Text>
+          {/* DS Abnormal · Type=WebIssue, same block as H-Memories couldn't load */}
+          <View style={styles.abnormal}>
+            <RemixIcon name="wifi-off-line" size={48} color={theme.text.secondary} />
+            <View style={styles.abnormalText}>
+              <Text style={styles.abnormalTitle}>Stories couldn't load</Text>
+              <Text style={styles.abnormalBody}>Check your connection and try again.</Text>
+            </View>
+          </View>
         </ScrollView>
       ) : (
         <ScrollView
@@ -420,6 +459,7 @@ export function StoriesScreen() {
               {current?.listItemState === 'current_collecting' && !quotaExhausted && (
                 <CollectingCard
                   data={current}
+                  childName={childName}
                   onAddMoment={() => setAddEntryVisible(true)}
                   onGenerateNow={() => void handleGenerateNow()}
                   generating={generateNow.isPending}
@@ -468,6 +508,28 @@ export function StoriesScreen() {
               />
             );
           })}
+
+          {/* 821:1540 — first-entry explainer under the collecting card */}
+          {noHistory && (
+            <View style={styles.explainer}>
+              <View style={styles.explainerHead}>
+                <View style={styles.explainerTile}>
+                  <RemixIcon name="book-open-line" size={72} color={palette.primary[500]} />
+                </View>
+                <Text style={styles.explainerTitle}>How {childName}'s Story works</Text>
+              </View>
+              <View style={styles.explainerSteps}>
+                <Text style={styles.explainerStep}>1.  Add Moments anytime during {monthLabel}</Text>
+                <Text style={styles.explainerStep}>
+                  2.  On {generationDayLabel}, AI writes {childName}'s Story.
+                </Text>
+              </View>
+              <Text style={styles.explainerFootnote}>
+                Stories are made from your Moments — none this month means no Story. Start with one
+                today.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -481,33 +543,31 @@ export function StoriesScreen() {
         <Pressable style={styles.regenScrim} onPress={() => setRegenMonthKey(null)} />
         <View style={styles.regenSheet}>
           <View style={styles.regenHandle} />
-          <Text style={styles.regenTitle}>Regenerate this Story?</Text>
+          <Text style={styles.regenTitle}>You have to know</Text>
           <Text style={styles.regenBody}>
-            We'll create a new Story from this month's updated moments. The new Story will replace the current one — this can't be undone.
+            The existing Story will be covered by the new one.{'\n'}
+            {'\n'}
+            Please confirm if you want to continue.
           </Text>
-          <Pressable
-            style={({ pressed }) => [styles.regenConfirmWrap, pressed && { opacity: 0.88 }]}
-            onPress={() => {
-              const key = regenMonthKey;
-              setRegenMonthKey(null);
-              if (key) {
-                track('story_regenerated', { monthKey: key });
-                void handleGenerateNow(key);
-              }
-            }}
-          >
-            <LinearGradient
-              colors={[palette.primary[500], palette.primary[400]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.regenConfirmBtn}
-            >
-              <Text style={styles.regenConfirmLabel}>Confirm</Text>
-            </LinearGradient>
-          </Pressable>
-          <Pressable style={styles.regenCancelBtn} onPress={() => setRegenMonthKey(null)}>
-            <Text style={styles.regenCancelLabel}>Cancel</Text>
-          </Pressable>
+          <View style={styles.regenCta}>
+            <Button
+              label="Confirm"
+              onPress={() => {
+                const key = regenMonthKey;
+                setRegenMonthKey(null);
+                if (key) {
+                  track('story_regenerated', { monthKey: key });
+                  void handleGenerateNow(key);
+                }
+              }}
+            />
+            <Button
+              label="Cancel"
+              type="text"
+              style={styles.regenCancelBtn}
+              onPress={() => setRegenMonthKey(null)}
+            />
+          </View>
         </View>
       </Modal>
 
@@ -537,36 +597,110 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface.default,
   },
 
-  // Header
-  header: {
+  // DS Abnormal · Type=WebIssue (774:3808)
+  abnormalWrap: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.l,
-    paddingBottom: theme.spacing.s,
+    paddingBottom: theme.spacing.safeBtm,
   },
-  headerTitle: {
-    ...theme.typography.h1,
+  abnormal: {
+    width: 300,
+    alignItems: 'center',
+    padding: theme.spacing.xxl,
+    gap: theme.spacing.xl,
+  },
+  abnormalText: { alignSelf: 'stretch', gap: theme.spacing.s },
+  abnormalTitle: {
+    ...theme.typography.body,
+    color: theme.text.primary,
+    textAlign: 'center',
+  },
+  abnormalBody: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+    textAlign: 'center',
+  },
+
+  // header 821:1536 — first-entry headline, 32px Manrope Bold, no hairline
+  headerEmpty: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
+  },
+  headerTitleEmpty: {
+    fontFamily: 'Manrope_700Bold',
+    fontSize: 32,
+    lineHeight: 40,
     color: theme.text.primary,
   },
-  headerSubtitle: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
+
+  // 821:1540 — "how it works" explainer, only on first entry
+  explainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xxl, // 24
+    paddingTop: theme.spacing.s,
   },
+  explainerHead: { width: 238, alignItems: 'center', gap: theme.spacing.s },
+  explainerTile: {
+    width: 128,
+    height: 128,
+    borderRadius: theme.radius.l,
+    backgroundColor: theme.surface.brandSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  explainerTitle: {
+    ...theme.typography.h3,
+    color: theme.text.primary,
+    textAlign: 'center',
+  },
+  explainerSteps: { alignSelf: 'stretch', gap: theme.spacing.m, alignItems: 'center' },
+  explainerStep: {
+    ...theme.typography.body,
+    color: theme.text.primary,
+    textAlign: 'center',
+  },
+  explainerFootnote: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+    textAlign: 'center',
+  },
+
+  // header 731:3338 — px20 / py16 with a border/default hairline below
+  header: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border.default,
+  },
+  // 731:3340 — Manrope *Regular* 18/24, with "Story" in brand green
+  headerTitle: {
+    fontFamily: 'Manrope_400Regular',
+    fontSize: 18,
+    lineHeight: 24,
+    color: theme.text.primary,
+  },
+  headerTitleBrand: { color: theme.text.brand },
 
   // Year filter
   filterWrap: {
     paddingHorizontal: theme.spacing.xl,
     paddingVertical: theme.spacing.m,
   },
+  // Filter 731:3421 — bare 36-tall row of pills, no tinted track
   filterBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     height: 36,
-    backgroundColor: palette.primary[50],
-    borderRadius: theme.radius.full,
-    padding: 4,
+    paddingVertical: theme.spacing.xs,
     gap: theme.spacing.s,
   },
   yearPill: {
-    paddingHorizontal: theme.spacing.l,
+    paddingHorizontal: theme.spacing.l, // 16 — wider than the Home month pills
     paddingVertical: 6,
     borderRadius: theme.radius.full,
     borderWidth: 1,
@@ -610,13 +744,15 @@ const styles = StyleSheet.create({
     gap: theme.spacing.l,
   },
 
-  // Current/Collecting card — border 1.5px, p-16, gap-12
+  // StoryCard Property=Collecting (744:4019) — brand-subtle fill behind a
+  // 1.5px brand edge, px16 / py12
   cardCollecting: {
-    backgroundColor: theme.surface.card,
+    backgroundColor: theme.surface.brandSubtle,
     borderWidth: 1.5,
-    borderColor: theme.border.default,
+    borderColor: theme.border.brand,
     borderRadius: theme.radius.l,
-    padding: theme.spacing.l,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.m,
     gap: theme.spacing.m,
   },
   collectingInner: {
@@ -703,7 +839,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   genAreaTitle: {
-    ...theme.typography.buttonLabelM,
+    ...theme.typography.body, // Inter Regular 16/20, not a button label
     color: theme.text.brand,
   },
   genBody: {
@@ -711,11 +847,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  // Locked card — surface.muted, border 1px, p-16, gap-12
+  // StoryCard Property=Locked (44:28) — amber quota banner
   cardLocked: {
-    backgroundColor: theme.surface.muted,
+    backgroundColor: theme.surface.warningSubtle,
     borderWidth: 1,
-    borderColor: theme.border.default,
+    borderColor: theme.border.warning,
     borderRadius: theme.radius.l,
     padding: theme.spacing.l,
     gap: 12,
@@ -776,7 +912,16 @@ const styles = StyleSheet.create({
     gap: theme.spacing.s,
   },
   cardTitle: {
-    ...theme.typography.h3,
+    ...theme.typography.h3, // Manrope SemiBold 16/22 — month headings
+    color: theme.text.primary,
+  },
+  // 44:39 — a generated Story's own title is Heading2, not Heading3
+  storyTitle: {
+    ...theme.typography.h2,
+    color: theme.text.primary,
+  },
+  storyExcerpt: {
+    ...theme.typography.body,
     color: theme.text.primary,
   },
   cardFooter: {
@@ -794,17 +939,18 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.l,
     overflow: 'hidden',
   },
+  // nsImgArea 744:4029 — surface/disabled band, 140 tall, gap 8
   nsImgArea: {
-    height: 100,
-    backgroundColor: theme.surface.muted,
+    height: 140,
+    backgroundColor: theme.surface.disabled,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: theme.spacing.xs,
+    gap: theme.spacing.s,
     paddingHorizontal: theme.spacing.l,
   },
   nsImgCaption: {
-    ...theme.typography.caption,
-    color: theme.text.hint,
+    ...theme.typography.body, // Inter Regular 16/20
+    color: theme.text.secondary,
     textAlign: 'center',
   },
   nsBody: {
@@ -825,89 +971,61 @@ const styles = StyleSheet.create({
     color: theme.text.secondary,
   },
 
-  // Regenerate strip (DS AllowRegenerate — blue band)
+  // Notify strip inside AllowRegenerate / -2 (762:3547) — info-subtle fill with
+  // a border/info edge and its own radius/s, not a bare full-bleed band
   regenStrip: {
     backgroundColor: theme.surface.infoSubtle,
+    borderWidth: 1,
+    borderColor: theme.border.info,
+    borderRadius: theme.radius.s, // 6
     paddingVertical: theme.spacing.s,
     paddingHorizontal: theme.spacing.l,
+    marginHorizontal: theme.spacing.l,
+    marginTop: theme.spacing.l,
   },
   regenStripLabel: {
     ...theme.typography.caption,
     color: theme.text.info,
   },
 
-  // Premium-ended renew button
-  renewWrap: {
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    alignSelf: 'flex-start',
-  },
-  renewBtn: {
-    height: 44,
-    paddingHorizontal: theme.spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  renewLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.premium,
-  },
+  // Premium-ended renew button (DS Premium, sized to the card)
+  renewBtn: { height: 44 },
 
-  // Regenerate confirm sheet
+  // S-Regeneration confirm popup (761:2717) — DS Bottom Sheet geometry
   regenScrim: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   regenSheet: {
     backgroundColor: theme.surface.card,
     borderTopLeftRadius: theme.radius.l,
     borderTopRightRadius: theme.radius.l,
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.safeBtm + theme.spacing.l,
-    gap: theme.spacing.m,
+    paddingTop: theme.spacing.l,
+    paddingBottom: theme.spacing.safeBtm,
+    gap: theme.spacing.l,
   },
   regenHandle: {
-    width: 40,
+    width: 36,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.border.strong,
+    borderRadius: 3,
+    backgroundColor: theme.border.default,
     alignSelf: 'center',
     marginBottom: theme.spacing.s,
   },
   regenTitle: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 24,
-    lineHeight: 32,
+    ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.primary,
   },
   regenBody: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
-    lineHeight: 22,
+    ...theme.typography.body, // Inter Regular 16/20, text/primary
+    color: theme.text.primary,
   },
-  regenConfirmWrap: {
-    width: '100%',
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    marginTop: theme.spacing.s,
-  },
-  regenConfirmBtn: {
-    height: 52,
+  // cta 810:3045 — py8, buttons 16 apart
+  regenCta: {
+    paddingVertical: theme.spacing.s,
+    gap: theme.spacing.l,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  regenConfirmLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
-  regenCancelBtn: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  regenCancelLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.secondary,
-  },
+  regenCancelBtn: { height: 44 },
 });

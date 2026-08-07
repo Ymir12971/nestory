@@ -15,8 +15,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import type { Child, Moment } from '@nestory/types';
-import { BottomSheet } from '@/shared/components/BottomSheet';
+import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { Button } from '@/shared/components/Button';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
 import { formatAge } from '@/shared/lib/formatAge';
@@ -401,67 +402,76 @@ export function HomeScreen() {
         </View>
       </BottomSheet>
 
-      {/* Profile Switcher — H-Sheet · Profile Switcher · Free / Premium */}
+      {/* Profile Switcher — Free 770:2914 / Premium 770:2943 */}
       <BottomSheet visible={switcherVisible} onRequestClose={() => setSwitcherVisible(false)}>
-        <View style={styles.sheetPad}>
-          <Text style={styles.sheetTitle}>Switch Profile</Text>
-          {!isPremium && (
-            <Text style={styles.sheetSubtitle}>
-              Free plan supports one active profile. Upgrade to switch between them.
-            </Text>
-          )}
-          {profiles.map((profile: Child) => {
+        <View style={sheetSection.title}>
+          <View style={styles.switcherTitleBlock}>
+            <Text style={styles.sheetTitle}>Switch Profile</Text>
+            {!isPremium && (
+              <Text style={styles.sheetSubtitle}>
+                Free plan supports one active profile. Upgrade to switch between them.
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={sheetSection.body}>
+          {profiles.map((profile: Child, i) => {
             const isActive = profile.isActive;
-            // Free: non-active rows are dimmed and NOT tappable (annotation —
-            // the only actions are the Upgrade CTA or dismissing the sheet).
+            // Free: non-active rows aren't tappable — the subtitle explains why,
+            // and the only actions are the Upgrade CTA or dismissing the sheet
+            // (annotation). The design doesn't dim them.
             const isLocked = !isActive && !isPremium;
             return (
-              <Pressable
-                key={profile.id}
-                style={[styles.profileRow, isLocked && styles.profileRowDimmed]}
-                onPress={() => handleSwitch(profile.id)}
-                disabled={isActive || isLocked}
-              >
-                {profile.avatarUrl ? (
-                  <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} />
-                ) : (
-                  <View style={styles.profileAvatar} />
-                )}
-                <View style={styles.profileTextCol}>
-                  <Text style={styles.profileName}>{profile.name}</Text>
-                  <Text style={styles.profileSub}>{profileSubtitle(profile)}</Text>
-                </View>
-                {isActive && (
-                  <View style={styles.currentBadge}>
-                    {/* 决策7: Free variant says "Active", Premium says "Current" (per Figma) */}
-                    <Text style={styles.currentBadgeLabel}>{isPremium ? 'Current' : 'Active'}</Text>
+              <View key={profile.id}>
+                {i > 0 && <View style={styles.profileDivider} />}
+                <Pressable
+                  style={styles.profileRow}
+                  onPress={() => handleSwitch(profile.id)}
+                  disabled={isActive || isLocked}
+                >
+                  {profile.avatarUrl ? (
+                    <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} />
+                  ) : (
+                    <View style={styles.profileAvatar} />
+                  )}
+                  <View style={styles.profileTextCol}>
+                    <Text style={styles.profileName}>{profile.name}</Text>
+                    <Text style={styles.profileSub}>{profileSubtitle(profile)}</Text>
                   </View>
-                )}
-              </Pressable>
+                  {isActive && (
+                    <StatusBadge
+                      type="active"
+                      // 决策7: Free says "Active", Premium says "Current" (per Figma)
+                      label={isPremium ? 'Current' : 'Active'}
+                    />
+                  )}
+                </Pressable>
+              </View>
             );
           })}
-
-          {!isPremium && (
-            <View style={styles.switcherCta}>
-              <Button
-                label="Upgrade to Premium"
-                type="premium"
-                onPress={() => {
-                  setSwitcherVisible(false);
-                  setPaywallVisible(true);
-                }}
-              />
-              <Button
-                label="View Premium benefits"
-                type="text"
-                onPress={() => {
-                  setSwitcherVisible(false);
-                  setPaywallVisible(true);
-                }}
-              />
-            </View>
-          )}
         </View>
+
+        {!isPremium && (
+          <View style={styles.switcherCta}>
+            <Button
+              label="Upgrade to Premium"
+              type="premium"
+              onPress={() => {
+                setSwitcherVisible(false);
+                setPaywallVisible(true);
+              }}
+            />
+            <Button
+              label="View Premium benefits"
+              type="text"
+              onPress={() => {
+                setSwitcherVisible(false);
+                setPaywallVisible(true);
+              }}
+            />
+          </View>
+        )}
       </BottomSheet>
 
       <PaywallModal
@@ -733,8 +743,10 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.s,
     gap: theme.spacing.s,
   },
-  sheetTitle: { ...theme.typography.h2, color: theme.text.primary },
-  sheetSubtitle: { ...theme.typography.body, color: theme.text.secondary },
+  // 770:2918 — H1 title over a Caption subtitle, 8 apart
+  switcherTitleBlock: { gap: theme.spacing.s },
+  sheetTitle: { ...theme.typography.h1, color: theme.text.primary },
+  sheetSubtitle: { ...theme.typography.caption, color: theme.text.secondary },
 
   yearRow: {
     flexDirection: 'row',
@@ -750,12 +762,11 @@ const styles = StyleSheet.create({
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.m,
-    paddingVertical: theme.spacing.m,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border.default,
+    gap: theme.spacing.m, // 12
+    paddingVertical: theme.spacing.m, // 12
   },
-  profileRowDimmed: { opacity: 0.5 },
+  // 775:1920 — a translucent hairline between rows only, not border/default
+  profileDivider: { height: 1, backgroundColor: 'rgba(0,0,0,0.06)' },
   profileAvatar: {
     width: 40,
     height: 40,
@@ -765,12 +776,11 @@ const styles = StyleSheet.create({
   profileTextCol: { flex: 1, gap: 2 },
   profileName: { ...theme.typography.h3, color: theme.text.primary },
   profileSub: { ...theme.typography.caption, color: theme.text.secondary },
-  currentBadge: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.successSubtle,
+  // cta 775:1959 — px20 / pt12, buttons 4 apart
+  switcherCta: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: 12,
+    gap: theme.spacing.xs,
+    alignItems: 'center',
   },
-  currentBadgeLabel: { ...theme.typography.tagBadge, color: theme.text.success },
-  switcherCta: { gap: theme.spacing.s, paddingTop: theme.spacing.s },
 });

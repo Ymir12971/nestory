@@ -8,6 +8,10 @@ import type { Subscription } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { useSubscription, queryClient, queryKeys } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
+import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
+import { NavBar } from '@/shared/components/NavBar';
 import { purchasePlan, openManageSubscriptions, isPurchasesAvailable } from '@/features/billing/purchases';
 import { track } from '@/shared/lib/analytics';
 import { showToast } from '@/features/ui/toast';
@@ -33,17 +37,15 @@ function freeSubtitle(sub: Subscription): string {
 
 // ---------- Shared NavBar ----------
 
-function NavBar({ onBack }: { onBack: () => void }) {
-  return (
-    <View style={styles.navBar}>
-      <Pressable hitSlop={8} onPress={onBack}>
-        <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-      </Pressable>
-      <Text style={styles.navTitle}>Subscription</Text>
-      <View style={styles.navSpacer} />
-    </View>
-  );
-}
+// 764:3775 / 764:3844 — both variants title the page "Current Plan"
+const FREE_INCLUDES = ['One child profile', 'Two Stories', 'Watermarked Sharing'];
+const PREMIUM_BENEFITS = [
+  'Unlimited child profiles',
+  'Unlimited monthly Stories',
+  'Watermark-Free Sharing',
+  'Access to regenerate past Stories',
+  'Annual Recap and more features',
+];
 
 // ---------- ST-02A Free Plan ----------
 
@@ -80,113 +82,96 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
         contentContainerStyle={styles.bodyFree}
         showsVerticalScrollIndicator={false}
       >
-        {/* Current plan card */}
+        {/* currentPlanCard 764:3779 — plan name + what Free includes */}
         <View style={styles.currentPlanCard}>
-          <View style={styles.currentPlanPill}>
-            <Text style={styles.currentPlanPillLabel}>CURRENT PLAN</Text>
-          </View>
           <Text style={styles.currentPlanName}>Free Plan</Text>
-          <Text style={styles.currentPlanSubtitle}>{freeSubtitle(sub)}</Text>
-        </View>
-
-        {/* Compare table */}
-        <View style={styles.compareTable}>
-          {/* Header */}
-          <View style={[styles.compareRow, styles.compareHeader]}>
-            <View style={styles.colFeature}><Text style={styles.compareHeaderText}>Feature</Text></View>
-            <View style={styles.colPlan}><Text style={styles.compareHeaderText}>Free</Text></View>
-            <View style={styles.colPlan}><Text style={[styles.compareHeaderText, { color: theme.text.premium }]}>Premium</Text></View>
+          <View style={styles.benefitList}>
+            {FREE_INCLUDES.map((text) => (
+              <View key={text} style={styles.benefitRow}>
+                <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.secondary} />
+                <Text style={styles.benefitText}>{text}</Text>
+              </View>
+            ))}
           </View>
-          {/* Rows */}
-          {[
-            { feature: 'AI Stories',             free: '2',  premium: 'Unlimited', premiumType: 'text' },
-            { feature: 'Watermark-Free Sharing', free: null, premium: null,         premiumType: 'check' },
-            { feature: 'Highlights',             free: '10', premium: 'Unlimited', premiumType: 'text' },
-            { feature: 'Child Profiles',         free: '1',  premium: 'Unlimited', premiumType: 'text' },
-          ].map((item, i) => (
-            <View key={i} style={styles.compareRow}>
-              <View style={styles.colFeature}>
-                <Text style={styles.compareFeatureText}>{item.feature}</Text>
-              </View>
-              <View style={styles.colPlan}>
-                {item.free !== null ? (
-                  <Text style={styles.compareValueTextSecondary}>{item.free}</Text>
-                ) : (
-                  <RemixIcon name="close-line" size={20} color={theme.text.secondary} />
-                )}
-              </View>
-              <View style={styles.colPlan}>
-                {item.premiumType === 'text' ? (
-                  <Text style={styles.compareValueTextPremium}>{item.premium}</Text>
-                ) : (
-                  <RemixIcon name="check-line" size={20} color={theme.text.brand} />
-                )}
-              </View>
-            </View>
-          ))}
         </View>
 
-        {/* Plan selector */}
-        <View style={styles.planSelectorRow}>
-          {/* Yearly — flex:1 per Figma */}
-          <Pressable
-            style={[styles.planCard, styles.planCardYearly, cycle === 'yearly' ? styles.planCardSelected : styles.planCardUnselected]}
-            onPress={() => setCycle('yearly')}
-          >
-            <View style={styles.planCardHeader}>
-              <Text style={styles.planCardTitle}>Yearly</Text>
-              <RemixIcon
-                name={cycle === 'yearly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
-                size={24}
-                color={cycle === 'yearly' ? palette.accent[500] : theme.text.secondary}
-              />
+        {/* pmBenefits 764:4008 — the design has no Free-vs-Premium compare table */}
+        <View style={styles.pmBenefits}>
+          <Text style={styles.pmHeading}>Enjoy more benefits with Premium:</Text>
+          <View style={styles.premiumCard}>
+            <View style={styles.premiumCardHead}>
+              <RemixIcon name="vip-crown-2-line" size={24} color={theme.text.premium} />
+              <Text style={styles.premiumCardTitle}>Premium</Text>
             </View>
-            <View style={styles.planCardPriceRow}>
-              <Text style={styles.planCardPrice}>$99.99/year</Text>
-              <View style={styles.savingsBadge}>
-                <Text style={styles.savingsBadgeLabel}>$20 Off</Text>
-              </View>
+            <View style={styles.benefitList}>
+              {PREMIUM_BENEFITS.map((text) => (
+                <View key={text} style={styles.benefitRow}>
+                  <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+                  <Text style={styles.benefitText}>{text}</Text>
+                </View>
+              ))}
             </View>
-            <Text style={styles.planCardPromo}>First month free</Text>
-          </Pressable>
 
-          {/* Monthly — fixed w-156 per Figma */}
-          <Pressable
-            style={[styles.planCard, styles.planCardMonthly, cycle === 'monthly' ? styles.planCardSelected : styles.planCardUnselected]}
-            onPress={() => setCycle('monthly')}
-          >
-            <View style={styles.planCardHeader}>
-              <Text style={styles.planCardTitle}>Monthly</Text>
-              <RemixIcon
-                name={cycle === 'monthly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
-                size={24}
-                color={cycle === 'monthly' ? palette.accent[500] : theme.text.secondary}
-              />
+            <View style={styles.planSelectorRow}>
+              <Pressable
+                style={[styles.planCard, cycle === 'yearly' ? styles.planCardSelected : styles.planCardUnselected]}
+                onPress={() => setCycle('yearly')}
+              >
+                <View style={styles.planCardHeader}>
+                  <Text style={styles.planCardPrice}>$100</Text>
+                  <RemixIcon
+                    name={cycle === 'yearly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
+                    size={20}
+                    color={cycle === 'yearly' ? theme.border.premium : theme.border.strong}
+                  />
+                </View>
+                <View style={styles.planCardMeta}>
+                  <Text style={styles.planCardCaption}>Billed annually</Text>
+                  <Text style={styles.planCardBadge}>~17% Off</Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.planCard,
+                  styles.planCardMonthly,
+                  cycle === 'monthly' ? styles.planCardSelected : styles.planCardUnselected,
+                ]}
+                onPress={() => setCycle('monthly')}
+              >
+                <View style={styles.planCardHeader}>
+                  <Text style={styles.planCardPrice}>$10</Text>
+                  <RemixIcon
+                    name={cycle === 'monthly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
+                    size={20}
+                    color={cycle === 'monthly' ? theme.border.premium : theme.border.strong}
+                  />
+                </View>
+                <Text style={styles.planCardCaption}>Billed monthly</Text>
+              </Pressable>
             </View>
-            <Text style={styles.planCardPriceSecondary}>$9.99/month</Text>
-          </Pressable>
+          </View>
         </View>
       </ScrollView>
 
-      {/* CTA */}
+      {/* cta 765:4051 — no trial copy: the product has no free-trial period */}
       <View style={styles.cta}>
-        <Pressable
-          style={({ pressed }) => [styles.premiumBtnWrap, (pressed || purchasing) && { opacity: 0.85 }]}
-          onPress={handleUpgrade}
+        <Button
+          label={purchasing ? 'Processing…' : 'Upgrade to Premium'}
+          type="premium"
           disabled={purchasing}
-        >
-          <LinearGradient
-            colors={[palette.accent[500], palette.accent[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.premiumBtn}
-          >
-            <Text style={styles.premiumBtnLabel}>
-              {purchasing ? 'Processing…' : 'Try Premium Free for 1 Month'}
-            </Text>
-          </LinearGradient>
-        </Pressable>
-        <Text style={styles.ctaCaption}>Cancel anytime. Manage in Settings.</Text>
+          onPress={handleUpgrade}
+        />
+        <Text style={styles.ctaCaption}>
+          Auto-renews until canceled. Manage in Settings.{'\n'}
+          <Text style={styles.ctaLink} onPress={() => router.push('/onboarding/terms')}>
+            Terms of Service
+          </Text>
+          <Text style={styles.ctaLinkPlain}>{' · '}</Text>
+          <Text style={styles.ctaLink} onPress={() => router.push('/onboarding/privacy')}>
+            Privacy Policy
+          </Text>
+        </Text>
       </View>
     </>
   );
@@ -199,8 +184,10 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
   const renewsLabel = sub.expiresAt
     ? `Renews ${formatExpiry(sub.expiresAt)}`
     : 'Renewal date pending';
+  // 764:3857 — Plan / Price / Next billing
   const billingRows: { key: string; value: string }[] = [
     { key: 'Plan', value: cycleLabel },
+    { key: 'Price', value: sub.billingCycle === 'monthly' ? '$10 / month' : '$100 / year' },
     ...(sub.expiresAt
       ? [{ key: 'Next billing', value: formatExpiry(sub.expiresAt) }]
       : []),
@@ -244,97 +231,90 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
         contentContainerStyle={styles.bodyPremium}
         showsVerticalScrollIndicator={false}
       >
-        {/* Current plan card — amber gradient */}
+        {/* currentPlanCard 764:3848 — 160.79° accent/400 → accent/500 with the
+            same three amber blobs as global-Welcome to premium */}
         <LinearGradient
           colors={[palette.accent[400], palette.accent[500]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0.7, y: 1 }}
+          locations={[0, 0.7071]}
+          start={{ x: 0.336, y: 0.028 }}
+          end={{ x: 0.664, y: 0.972 }}
           style={styles.premiumCurrentCard}
         >
-          <RemixIcon name="vip-crown-fill" size={28} color={theme.text.onColor} />
-          <View style={styles.premiumCurrentPill}>
-            <Text style={styles.premiumCurrentPillLabel}>CURRENT PLAN</Text>
-          </View>
+          <View style={[styles.blob, styles.blobTopLeft]} />
+          <View style={[styles.blob, styles.blobRight]} />
+          <View style={[styles.blob, styles.blobTopRight]} />
+          <RemixIcon name="vip-crown-fill" size={41} color={theme.text.onColor} />
           <Text style={styles.premiumCurrentName}>Premium Plan</Text>
-          <Text style={styles.premiumCurrentSubtitle}>
-            {cycleLabel} · {renewsLabel}
-          </Text>
         </LinearGradient>
 
-        {/* Billing detail card */}
+        {/* billingDetailCard 764:3857 — plain rows (no dividers) + a centred note */}
         <View style={styles.billingCard}>
           {billingRows.map((row, i) => (
-            <View key={i}>
-              {i > 0 && <View style={styles.divider} />}
-              <View style={styles.billingRow}>
-                <Text style={styles.billingKey}>{row.key}</Text>
-                <Text style={styles.billingValue}>{row.value}</Text>
-              </View>
+            <View key={i} style={styles.billingRow}>
+              <Text style={styles.billingKey}>{row.key}</Text>
+              <Text style={styles.billingValue}>{row.value}</Text>
             </View>
           ))}
+          <Text style={styles.billingNote}>Auto-renews until canceled. Manage in Settings.</Text>
         </View>
 
-        {/* What's included */}
+        {/* includedCard 764:3867 */}
         <View style={styles.includedCard}>
           <Text style={styles.includedTitle}>{"What's included"}</Text>
           {benefits.map((benefit, i) => (
             <View key={i} style={styles.benefitRow}>
-              <RemixIcon name="check-line" size={20} color={theme.text.brand} />
+              <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
               <Text style={styles.benefitText}>{benefit}</Text>
             </View>
           ))}
         </View>
       </ScrollView>
 
-      {/* CTA */}
+      {/* cta 764:3890 — DS Destructive, full width */}
       <View style={styles.ctaPremium}>
-        <Pressable style={styles.cancelBtn} onPress={() => setCancelStep(1)}>
-          <Text style={styles.cancelBtnLabel}>Cancel Subscription</Text>
-        </Pressable>
+        <Button
+          label="Cancel Subscription"
+          type="destructive"
+          style={styles.cancelBtn}
+          onPress={() => setCancelStep(1)}
+        />
       </View>
 
       {/* ST-02 / Sheet · Cancel Step 1 — loss list */}
-      <Modal
-        visible={cancelStep === 1}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setCancelStep(0)}
-      >
-        <Pressable style={styles.sheetScrim} onPress={() => setCancelStep(0)} />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
+      <BottomSheet visible={cancelStep === 1} onRequestClose={() => setCancelStep(0)}>
+        <View style={sheetSection.title}>
           <Text style={styles.sheetTitle}>Your little one's story isn't finished yet</Text>
           <Text style={styles.sheetBody}>Cancel now and you'll lose:</Text>
+        </View>
+        <View style={sheetSection.body}>
           <View style={styles.lossList}>
-            {benefits.map(b => (
+            {benefits.map((b) => (
               <View key={b} style={styles.lossRow}>
                 <Text style={styles.lossX}>✕</Text>
                 <Text style={styles.lossText}>{b}</Text>
               </View>
             ))}
           </View>
-          <Pressable style={styles.keepBtn} onPress={() => setCancelStep(0)}>
-            <Text style={styles.keepBtnLabel}>Keep my plan</Text>
-          </Pressable>
-          <Pressable style={styles.continueCancelBtn} onPress={() => setCancelStep(2)}>
-            <Text style={styles.continueCancelLabel}>Continue to cancel</Text>
-          </Pressable>
         </View>
-      </Modal>
+        <View style={sheetSection.cta}>
+          <Button label="Keep my plan" onPress={() => setCancelStep(0)} />
+          <Button
+            label="Continue to cancel"
+            type="destructive"
+            style={styles.cancelTextBtn}
+            onPress={() => setCancelStep(2)}
+          />
+        </View>
+      </BottomSheet>
 
       {/* ST-02 / Sheet · Cancel Step 2 — reason survey (optional) */}
-      <Modal
-        visible={cancelStep === 2}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setCancelStep(0)}
-      >
-        <Pressable style={styles.sheetScrim} onPress={() => setCancelStep(0)} />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
+      <BottomSheet visible={cancelStep === 2} onRequestClose={() => setCancelStep(0)}>
+        <View style={sheetSection.title}>
           <Text style={styles.sheetTitle}>We'd love to know why you're leaving</Text>
           <Text style={styles.sheetBody}>Optional — your feedback helps us improve.</Text>
-          {CANCEL_REASONS.map(r => (
+        </View>
+        <View style={sheetSection.body}>
+          {CANCEL_REASONS.map((r) => (
             <Pressable key={r} style={styles.reasonRow} onPress={() => setReason(r)}>
               <View style={reason === r ? styles.radioOn : styles.radioOff}>
                 {reason === r && <View style={styles.radioDot} />}
@@ -344,22 +324,25 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
           ))}
           {reason === 'Other' && (
             <>
-              <TextInput
-                style={styles.otherInput}
-                value={otherText}
-                onChangeText={t => setOtherText(t.slice(0, 200))}
-                placeholder="Tell us more (optional)"
-                placeholderTextColor={theme.text.hint}
+              <Input
                 multiline
+                value={otherText}
+                onChangeText={(t) => setOtherText(t.slice(0, 200))}
+                placeholder="Tell us more (optional)"
               />
               <Text style={styles.otherCount}>{otherText.length} / 200</Text>
             </>
           )}
-          <Pressable style={styles.confirmCancelBtn} onPress={() => void confirmCancel()}>
-            <Text style={styles.confirmCancelLabel}>Confirm to Cancel</Text>
-          </Pressable>
         </View>
-      </Modal>
+        <View style={sheetSection.cta}>
+          <Button
+            label="Confirm to Cancel"
+            type="destructive"
+            style={styles.cancelTextBtn}
+            onPress={() => void confirmCancel()}
+          />
+        </View>
+      </BottomSheet>
     </>
   );
 }
@@ -385,7 +368,7 @@ export function SubscriptionScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <NavBar onBack={goBack} />
+      <NavBar title="Current Plan" onBack={goBack} />
       {subQ.isLoading || !subQ.data ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.text.brand} />
@@ -445,27 +428,19 @@ const styles = StyleSheet.create({
     gap: theme.spacing.l,
   },
 
-  // currentPlanCard — muted bg, items-center, py-20, px-16, gap-4
+  // currentPlanCard 764:3779 — white with a border/strong edge, px16 / py12
   currentPlanCard: {
-    backgroundColor: theme.surface.muted,
+    backgroundColor: theme.surface.card,
+    borderWidth: 1,
+    borderColor: theme.border.strong,
     borderRadius: theme.radius.l,
     paddingHorizontal: theme.spacing.l,
-    paddingVertical: 20,
-    gap: 4,
+    paddingVertical: theme.spacing.m,
+    gap: theme.spacing.l,
     alignItems: 'center',
   },
-  currentPlanPill: {
-    backgroundColor: palette.neutral[200],
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.radius.full,
-  },
-  currentPlanPillLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.secondary,
-  },
   currentPlanName: {
-    ...theme.typography.h1,
+    ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.primary,
     textAlign: 'center',
   },
@@ -475,127 +450,99 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Compare table — border, radius.m
-  compareTable: {
-    borderWidth: 1,
-    borderColor: theme.border.default,
-    borderRadius: theme.radius.m,
-    overflow: 'hidden',
-    backgroundColor: theme.surface.default,
-  },
-  compareRow: {
+  // Benefit lists (shared by the Free summary and the Premium card)
+  benefitList: { alignSelf: 'stretch', gap: theme.spacing.s },
+  benefitRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: theme.spacing.m,
-    backgroundColor: theme.surface.default,
+    alignItems: 'flex-start',
+    gap: theme.spacing.xs, // 4
   },
-  compareHeader: { backgroundColor: theme.surface.muted },
-  colFeature: { flex: 2 },
-  colPlan:    { flex: 1 },
-  compareHeaderText: {
-    ...theme.typography.h4,
-    color: theme.text.secondary,
-  },
-  compareFeatureText: {
+  benefitText: {
+    flex: 1,
     ...theme.typography.body,
     color: theme.text.primary,
   },
-  compareValueTextSecondary: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
-    textAlign: 'center',
+
+  // pmBenefits 764:4008
+  pmBenefits: { gap: 12 },
+  pmHeading: {
+    ...theme.typography.h2,
+    color: theme.text.primary,
   },
-  compareValueTextPremium: {
-    fontFamily: 'Manrope_600SemiBold',
-    fontSize: 16,
-    lineHeight: 20,
+  premiumCard: {
+    backgroundColor: theme.surface.premiumSubtle,
+    borderWidth: 1,
+    borderColor: theme.border.strong,
+    borderRadius: theme.radius.m,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.m,
+    gap: 12,
+  },
+  premiumCardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  premiumCardTitle: {
+    ...theme.typography.h2,
     color: theme.text.premium,
-    textAlign: 'right',
   },
 
-  // Plan selector
+  // Plan selector 764:4035 — same two cards as O-Choose plan
   planSelectorRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: theme.spacing.s,
   },
   planCard: {
-    backgroundColor: theme.surface.premiumSubtle,
+    flex: 1,
+    backgroundColor: theme.surface.card,
     borderRadius: theme.radius.m,
     paddingHorizontal: theme.spacing.l,
     paddingVertical: 14,
     gap: theme.spacing.s,
   },
-  planCardYearly:   { flex: 1 },
-  planCardMonthly:  { width: 156, alignSelf: 'stretch' },
-  planCardSelected: { borderWidth: 2, borderColor: theme.border.premium  },
-  planCardUnselected: { borderWidth: 1, borderColor: theme.border.default },
+  planCardMonthly: { height: 94 },
+  planCardSelected: { borderWidth: 2, borderColor: theme.border.premium },
+  planCardUnselected: { borderWidth: 1, borderColor: theme.border.strong },
   planCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  planCardTitle: {
-    ...theme.typography.h3,
-    color: theme.text.primary,
-  },
-  planCardPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 4,
-  },
   planCardPrice: {
-    ...theme.typography.caption,
+    ...theme.typography.h3, // Manrope SemiBold 16/22
     color: theme.text.primary,
   },
-  planCardPriceSecondary: {
+  planCardMeta: { gap: theme.spacing.xs },
+  planCardCaption: {
     ...theme.typography.caption,
     color: theme.text.secondary,
   },
-  planCardPromo: {
-    ...theme.typography.caption,
+  planCardBadge: {
+    ...theme.typography.h4,
     color: theme.text.premium,
-  },
-  savingsBadge: {
-    backgroundColor: palette.accent[500],
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 2,
-    borderRadius: theme.radius.full,
-  },
-  savingsBadgeLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.onColor,
   },
 
   // CTA — Free
+  // cta 765:4051 — px20 / pt8, DS Premium button over the legal line
   cta: {
-    paddingTop: theme.spacing.m,
+    paddingTop: theme.spacing.s,
     paddingBottom: theme.spacing.safeBtm,
     paddingHorizontal: theme.spacing.xl,
-    gap: theme.spacing.s,
+    gap: 12,
     alignItems: 'center',
-  },
-  premiumBtnWrap: {
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: palette.accent[50],
-    width: '100%',
-  },
-  premiumBtn: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  premiumBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.premium,
   },
   ctaCaption: {
     ...theme.typography.caption,
     color: theme.text.secondary,
     textAlign: 'center',
   },
+  ctaLink: {
+    color: theme.text.brand,
+    textDecorationLine: 'underline',
+  },
+  ctaLinkPlain: { color: theme.text.brand },
 
   // ── Premium plan body ─────────────────────────────────────
   bodyPremium: {
@@ -613,24 +560,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  premiumCurrentPill: {
-    backgroundColor: theme.surface.default,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.radius.full,
-  },
-  premiumCurrentPillLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.premium,
-  },
   premiumCurrentName: {
     ...theme.typography.h1,
     color: theme.text.onColor,
     textAlign: 'center',
   },
-  premiumCurrentSubtitle: {
+  // 764:3854-3856 — the same amber blobs as global-Welcome to premium
+  blob: { position: 'absolute', borderRadius: theme.radius.full },
+  blobTopLeft: { left: -42, top: -49, width: 140, height: 140, backgroundColor: '#f8aa14' },
+  blobRight: { left: 285, top: 82, width: 63, height: 63, backgroundColor: '#f9b21a' },
+  blobTopRight: { left: 255, top: -11, width: 36, height: 36, backgroundColor: '#f9b21a' },
+  billingNote: {
     ...theme.typography.caption,
-    color: theme.text.onColor,
+    color: theme.text.secondary,
     textAlign: 'center',
   },
 
@@ -661,18 +603,6 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   includedTitle: { ...theme.typography.h3, color: theme.text.primary },
-  benefitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.m,
-  },
-  benefitText: {
-    ...theme.typography.caption,
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.text.primary,
-    flex: 1,
-  },
 
   // CTA — Premium
   ctaPremium: {
@@ -680,6 +610,8 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.safeBtm,
     paddingHorizontal: theme.spacing.xl,
   },
+  // Destructive text buttons in the cancel sheets sit at 44 like the DS instances
+  cancelTextBtn: { height: 44 },
   cancelBtn: {
     height: 44,
     alignItems: 'center',

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
-import { theme, palette } from '@/shared/theme';
+import { Button } from '@/shared/components/Button';
+import { theme } from '@/shared/theme';
 import { track } from '@/shared/lib/analytics';
 
 // global-Paywall (Figma 775:1819) — the single paywall for the whole app.
@@ -48,59 +48,54 @@ export function PaywallModal({ visible, onSubscribe, onDismiss, source }: Paywal
             <View style={styles.handleBar} />
           </View>
 
-          <Text style={styles.headline}>Upgrade to enjoy more!</Text>
+          {/* header 775:1822 */}
+          <View style={styles.header}>
+            <Text style={styles.headline}>Upgrade to enjoy more!</Text>
+          </View>
 
-          {/* Premium card: benefits + plan picker */}
-          <View style={styles.premiumCard}>
-            <View style={styles.premiumHeader}>
-              <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
-              <Text style={styles.premiumTitle}>Premium</Text>
-            </View>
+          {/* body 775:1990 — Premium card carries benefits + plan picker */}
+          <View style={styles.body}>
+            <View style={styles.premiumCard}>
+              <View style={styles.premiumHeader}>
+                <RemixIcon name="vip-crown-2-line" size={24} color={theme.text.premium} />
+                <Text style={styles.premiumTitle}>Premium</Text>
+              </View>
 
-            <View style={styles.benefits}>
-              {BENEFITS.map(text => (
-                <View key={text} style={styles.benefit}>
-                  <Text style={styles.benefitBullet}>•</Text>
-                  <Text style={styles.benefitText}>{text}</Text>
-                </View>
-              ))}
-            </View>
+              <View style={styles.benefits}>
+                {BENEFITS.map((text) => (
+                  <View key={text} style={styles.benefit}>
+                    <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+                    <Text style={styles.benefitText}>{text}</Text>
+                  </View>
+                ))}
+              </View>
 
-            <View style={styles.planRow}>
-              <PlanOption
-                selected={cycle === 'year'}
-                price="$100"
-                caption="Billed annually"
-                badge="~17% Off"
-                onPress={() => setCycle('year')}
-              />
-              <PlanOption
-                selected={cycle === 'month'}
-                price="$10"
-                caption="Billed monthly"
-                onPress={() => setCycle('month')}
-              />
+              <View style={styles.planRow}>
+                <PlanOption
+                  selected={cycle === 'year'}
+                  price="$100"
+                  caption="Billed annually"
+                  badge="~17% Off"
+                  onPress={() => setCycle('year')}
+                />
+                <PlanOption
+                  selected={cycle === 'month'}
+                  price="$10"
+                  caption="Billed monthly"
+                  onPress={() => setCycle('month')}
+                />
+              </View>
             </View>
           </View>
 
-          {/* CTA */}
+          {/* cta 775:1856 */}
           <View style={styles.cta}>
-            <Pressable
-              style={({ pressed }) => [styles.ctaBtnWrap, pressed && { opacity: 0.88 }]}
+            <Button
+              label="Upgrade to Premium"
+              type="premium"
               onPress={() => onSubscribe(cycle)}
-            >
-              <LinearGradient
-                colors={[palette.accent[500], palette.accent[400]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.ctaBtn}
-              >
-                <Text style={styles.ctaBtnLabel}>Upgrade to Premium</Text>
-              </LinearGradient>
-            </Pressable>
-            <Pressable style={styles.dismissBtn} onPress={onDismiss}>
-              <Text style={styles.dismissBtnLabel}>Back</Text>
-            </Pressable>
+            />
+            <Button label="Back" type="text" style={styles.dismissBtn} onPress={onDismiss} />
           </View>
         </View>
       </View>
@@ -128,16 +123,16 @@ function PlanOption({
     >
       <View style={styles.planTop}>
         <Text style={styles.planPrice}>{price}</Text>
-        {selected ? (
-          <View style={styles.radioChecked}>
-            <RemixIcon name="check-line" size={12} color={theme.text.onColor} />
-          </View>
-        ) : (
-          <View style={styles.radioUnchecked} />
-        )}
+        <RemixIcon
+          name={selected ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
+          size={20}
+          color={selected ? theme.border.premium : theme.border.strong}
+        />
       </View>
-      <Text style={styles.planCaption}>{caption}</Text>
-      {badge ? <Text style={styles.planBadge}>{badge}</Text> : null}
+      <View style={styles.planMeta}>
+        <Text style={styles.planCaption}>{caption}</Text>
+        {badge ? <Text style={styles.planBadge}>{badge}</Text> : null}
+      </View>
     </Pressable>
   );
 }
@@ -175,48 +170,45 @@ const styles = StyleSheet.create({
     backgroundColor: theme.border.default,
   },
 
+  header: {
+    paddingHorizontal: theme.spacing.xl, // 20
+    paddingVertical: theme.spacing.l, // 16
+    alignSelf: 'stretch',
+  },
   headline: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 28,
-    lineHeight: 38,
+    ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.primary,
-    paddingTop: 12,
-    paddingBottom: 16,
-    paddingHorizontal: theme.spacing.l,
   },
 
-  // Premium card
+  body: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
+  },
+
+  // Premium card 775:2071 — radius/m, px16 py12, 1px border/premium
   premiumCard: {
-    marginHorizontal: theme.spacing.l,
     borderWidth: 1,
-    borderColor: theme.text.premium,
-    borderRadius: theme.radius.l,
-    backgroundColor: palette.accent[50],
-    padding: theme.spacing.l,
+    borderColor: theme.border.premium,
+    borderRadius: theme.radius.m,
+    backgroundColor: theme.surface.premiumSubtle,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.m,
     gap: 12,
   },
   premiumHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing.xs, // 4
   },
   premiumTitle: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 18,
-    lineHeight: 24,
+    ...theme.typography.h2,
     color: theme.text.premium,
   },
-  benefits: {
-    gap: 8,
-  },
+  benefits: { gap: theme.spacing.s },
   benefit: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-  },
-  benefitBullet: {
-    ...theme.typography.body,
-    color: theme.text.primary,
+    gap: theme.spacing.xs, // 4
   },
   benefitText: {
     flex: 1,
@@ -224,25 +216,27 @@ const styles = StyleSheet.create({
     color: theme.text.primary,
   },
 
-  // Plan picker
+  // Plan picker 775:2097 — same two cards as O-Choose plan
   planRow: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'flex-start',
+    gap: theme.spacing.s, // 8
   },
   planCard: {
     flex: 1,
     borderRadius: theme.radius.m,
     backgroundColor: theme.surface.card,
-    padding: theme.spacing.m,
-    gap: 2,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: 14,
+    gap: theme.spacing.s,
   },
   planCardSelected: {
     borderWidth: 2,
-    borderColor: theme.text.premium,
+    borderColor: theme.border.premium,
   },
   planCardUnselected: {
     borderWidth: 1,
-    borderColor: theme.border.default,
+    borderColor: theme.border.strong,
   },
   planTop: {
     flexDirection: 'row',
@@ -250,66 +244,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   planPrice: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 22,
-    lineHeight: 30,
+    ...theme.typography.h3, // Manrope SemiBold 16/22
     color: theme.text.primary,
   },
-  radioChecked: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: theme.text.premium,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioUnchecked: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: theme.border.strong,
-  },
+  planMeta: { gap: theme.spacing.xs },
   planCaption: {
     ...theme.typography.caption,
     color: theme.text.secondary,
   },
   planBadge: {
-    ...theme.typography.caption,
+    ...theme.typography.h4, // Manrope SemiBold 14/20
     color: theme.text.premium,
   },
 
-  // CTA
+  // cta 775:1856 — px16 / pt16, buttons 12 apart
   cta: {
-    paddingTop: 20,
+    paddingTop: theme.spacing.l,
     paddingBottom: theme.spacing.safeBtm,
-    paddingHorizontal: theme.spacing.l,
+    paddingHorizontal: theme.spacing.l, // 16
     gap: 12,
     alignItems: 'center',
+    alignSelf: 'stretch',
   },
-  ctaBtnWrap: {
-    width: '100%',
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-  },
-  ctaBtn: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.premium,
-  },
-  dismissBtn: {
-    height: 44,
-    minWidth: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.full,
-  },
-  dismissBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.brand,
-  },
+  dismissBtn: { height: 44 },
 });

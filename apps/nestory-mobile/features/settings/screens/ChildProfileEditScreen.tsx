@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Child, ChildGender, ChildPatch } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
+import { Button } from '@/shared/components/Button';
+import { NavBar } from '@/shared/components/NavBar';
 import { useChild, useSubscription, useUpdateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { useGoBack } from '@/shared/hooks/useGoBack';
@@ -75,21 +76,18 @@ export function ChildProfileEditScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>Edit Profile</Text>
-        <View style={styles.navSpacer} />
-      </View>
+      <NavBar title="Edit Profile" onBack={goBack} />
 
-      {/* ST-Child Profile Edit (free): persistent one-active-profile notice */}
+      {/* ST-Child Profile Edit(free) 770:2557 — persistent warning Notify */}
       {!isPremium && subQ.data && (
-        <View style={styles.freeNotice}>
-          <RemixIcon name="information-line" size={16} color={theme.text.info} />
-          <Text style={styles.freeNoticeText}>
-            Free plan supports one active profile. Upgrade to switch between them.
-          </Text>
+        <View style={styles.freeNoticeWrap}>
+          <View style={styles.freeNotice}>
+            <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
+            <Text style={styles.freeNoticeText}>
+              Free plan supports one active profile.{'\n'}
+              You can add and edit, but switching requires Premium.
+            </Text>
+          </View>
         </View>
       )}
 
@@ -271,24 +269,14 @@ function EditForm({ child }: { child: Child }) {
         </View>
       </ScrollView>
 
-      {/* CTA */}
+      {/* cta 769:2522 — px20 / pt12, DS Primary */}
       <View style={styles.cta}>
         {saveError && <Text style={styles.errorInline}>{saveError}</Text>}
-        <Pressable
-          style={({ pressed }) => [styles.saveBtnWrap, pressed && { opacity: 0.85 }]}
+        <Button
+          label={updateChild.isPending ? 'Saving…' : 'Save Changes'}
+          disabled={updateChild.isPending}
           onPress={handleSave}
-        >
-          <LinearGradient
-            colors={[palette.primary[500], palette.primary[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.saveBtn}
-          >
-            <Text style={styles.saveBtnLabel}>
-              {updateChild.isPending ? 'Saving…' : 'Save Changes'}
-            </Text>
-          </LinearGradient>
-        </Pressable>
+        />
       </View>
     </>
   );
@@ -298,23 +286,16 @@ function EditForm({ child }: { child: Child }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
-  navBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xxl,
-  },
-  navTitle:  { ...theme.typography.h2, color: theme.text.primary },
-  navSpacer: { width: 24 },
-
+  // Notify 770:2557 — warning colours (not info), 1px border/warning, h64
+  freeNoticeWrap: { paddingHorizontal: theme.spacing.xl },
   freeNotice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: theme.spacing.xs,
-    marginHorizontal: theme.spacing.xl,
-    marginBottom: theme.spacing.s,
-    backgroundColor: theme.surface.infoSubtle,
+    height: 64,
+    backgroundColor: theme.surface.warningSubtle,
+    borderWidth: 1,
+    borderColor: theme.border.warning,
     borderRadius: theme.radius.s,
     paddingHorizontal: theme.spacing.l,
     paddingVertical: theme.spacing.s,
@@ -322,7 +303,7 @@ const styles = StyleSheet.create({
   freeNoticeText: {
     flex: 1,
     ...theme.typography.caption,
-    color: theme.text.info,
+    color: theme.text.warning,
   },
 
   center: {

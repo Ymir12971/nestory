@@ -1,14 +1,27 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
-import type { SubscriptionStatus } from '@nestory/types';
-import { theme } from '@/shared/theme';
+import type { Child, SubscriptionStatus } from '@nestory/types';
+import { palette, theme } from '@/shared/theme';
+import { Button } from '@/shared/components/Button';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Toggle } from '@/shared/components/Toggle';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { useMe, useSubscription, useChildren, useUpdateMe } from '@/api';
-import { useGoBack } from '@/shared/hooks/useGoBack';
+import { formatAge } from '@/shared/lib/formatAge';
+
+const GENDER_LABEL: Record<string, string> = { girl: 'Girl', boy: 'Boy' };
+
+/** "2y 4mo old, Girl" — gender omitted for prefer_not_to_say. */
+function childSubtitle(child: Child): string {
+  const age = formatAge(child.birthDate);
+  const gender = child.gender ? GENDER_LABEL[child.gender] : undefined;
+  return gender ? `${age}, ${gender}` : age;
+}
 
 // ---------- Subscription entry derivation ----------
 
@@ -94,23 +107,14 @@ function ToggleRow({
   onValueChange: (v: boolean) => void;
 }) {
   return (
-    <View style={styles.row}>
+    // Toggle rows are top-aligned in the design (768:4638), and the DS Toggle
+    // carries no On/Off caption
+    <View style={[styles.row, styles.rowTop]}>
       <View style={styles.rowCol}>
         <Text style={styles.rowLabel}>{label}</Text>
         <Text style={styles.rowSubtitle}>{subtitle}</Text>
       </View>
-      <View style={styles.toggleWrap}>
-        <Switch
-          value={value}
-          onValueChange={onValueChange}
-          trackColor={{ false: theme.border.default, true: theme.surface.brand }}
-          thumbColor={theme.surface.card}
-          ios_backgroundColor={theme.border.default}
-        />
-        <Text style={[styles.toggleLabel, value ? styles.toggleLabelOn : styles.toggleLabelOff]}>
-          {value ? 'On' : 'Off'}
-        </Text>
-      </View>
+      <Toggle value={value} onValueChange={onValueChange} />
     </View>
   );
 }
@@ -119,7 +123,6 @@ function ToggleRow({
 
 export function SettingsScreen() {
   const router = useRouter();
-  const goBack = useGoBack();
   const meQ        = useMe();
   const subQ       = useSubscription();
   const childrenQ  = useChildren();
@@ -188,13 +191,9 @@ export function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* NavBar */}
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>Settings</Text>
-        <View style={styles.navSpacer} />
+      {/* header 768:4583 — tab root, so no back arrow; hairline underneath */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
       <ScrollView
@@ -202,69 +201,81 @@ export function SettingsScreen() {
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
-        {/* Promo banner — 10% off feedback program (annotation: 后续可能会调整) */}
+        {/* Promo card 768:4588 — blue gradient with a coin tile, no section label */}
         <Pressable
-          style={({ pressed }) => [styles.promoBanner, pressed && { opacity: 0.9 }]}
+          style={({ pressed }) => pressed && { opacity: 0.9 }}
           onPress={() => router.push('/settings/feedback')}
         >
-          <RemixIcon name="lightbulb-flash-line" size={22} color={theme.text.premium} />
-          <View style={styles.promoText}>
-            <Text style={styles.promoTitle}>Share an idea, earn 10% off</Text>
-            <Text style={styles.promoBody}>If we ship your idea, your next Premium bill is 10% off.</Text>
-          </View>
-          <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+          <LinearGradient
+            colors={['#6790ff', '#2660e7']}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={styles.promoCard}
+          >
+            <View style={styles.promoIconTile}>
+              <RemixIcon name="money-dollar-circle-fill" size={32} color="#2660e7" />
+            </View>
+            <Text style={styles.promoTitle}>
+              Share feedback, Earn <Text style={styles.promoAccent}>10% off</Text>.
+            </Text>
+          </LinearGradient>
         </Pressable>
 
-        {/* ACCOUNT */}
+        {/* Child Profile 768:4598 — every child, with "+Add child" on the label row */}
         <View style={styles.group}>
-          <SectionLabel label="ACCOUNT" />
-          <Card>
-            <NavRow
-              label={me.name}
-              subtitle={me.email}
-              onPress={() => router.push('/settings/account')}
-            />
-          </Card>
-        </View>
-
-        {/* CHILD PROFILE */}
-        {activeChild && (
-          <View style={styles.group}>
-            <SectionLabel label="CHILD PROFILE" />
-            <Card>
-              <Pressable style={styles.row} onPress={() => router.push('/settings/profiles')}>
-                <View style={[styles.avatar, { backgroundColor: theme.surface.brand }]} />
-                <View style={styles.rowCol}>
-                  <Text style={styles.rowLabel}>{activeChild.name}</Text>
-                </View>
-                <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
-              </Pressable>
-            </Card>
+          <View style={styles.sectionLabelWrap}>
+            <Text style={styles.sectionLabel}>Child Profile</Text>
+            <Pressable hitSlop={8} onPress={() => router.push('/onboarding/profile?another=1')}>
+              <Text style={styles.sectionAction}>+Add child</Text>
+            </Pressable>
           </View>
-        )}
-
-        {/* SUBSCRIPTION — 3 states: Upgrade / Active / Renew */}
-        <View style={styles.group}>
-          <SectionLabel label="SUBSCRIPTION" />
           <Card>
-            <NavRow
-              label={subEntry.label}
-              subtitle={subEntry.subtitle}
-              onPress={handleSubEntryPress}
-              right={
-                <View style={subEntry.badgeVariant === 'active' ? styles.activeBadge : styles.upgradeBadge}>
-                  <Text style={subEntry.badgeVariant === 'active' ? styles.activeBadgeLabel : styles.upgradeBadgeLabel}>
-                    {subEntry.badge}
-                  </Text>
-                </View>
-              }
-            />
+            {(childrenList ?? []).map((child, i) => (
+              <View key={child.id}>
+                {i > 0 && <Divider />}
+                <Pressable
+                  style={styles.row}
+                  onPress={() => router.push(`/settings/profiles/${child.id}`)}
+                >
+                  {child.avatarUrl ? (
+                    <Image source={{ uri: child.avatarUrl }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatar} />
+                  )}
+                  <View style={styles.rowCol}>
+                    <Text style={styles.childName}>{child.name}</Text>
+                    <Text style={styles.rowSubtitle}>{childSubtitle(child)}</Text>
+                  </View>
+                  {child.isActive && <StatusBadge type="active" label="Active" />}
+                  <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+                </Pressable>
+              </View>
+            ))}
           </Card>
         </View>
 
-        {/* NOTIFICATIONS */}
+        {/* Current Plan 768:4625 — plan + quota, with a DS Small action button */}
         <View style={styles.group}>
-          <SectionLabel label="NOTIFICATIONS" />
+          <SectionLabel label="Current Plan" />
+          <Card>
+            <View style={styles.row}>
+              <View style={styles.rowCol}>
+                <Text style={styles.rowLabel}>{subEntry.label}</Text>
+                <Text style={styles.rowSubtitle}>{subEntry.subtitle}</Text>
+              </View>
+              <Button
+                label={subEntry.badge}
+                type="small"
+                style={styles.planAction}
+                onPress={handleSubEntryPress}
+              />
+            </View>
+          </Card>
+        </View>
+
+        {/* Notifications 768:4634 */}
+        <View style={styles.group}>
+          <SectionLabel label="Notifications" />
           <Card>
             <ToggleRow
               label="Story Notifications"
@@ -282,13 +293,13 @@ export function SettingsScreen() {
           </Card>
         </View>
 
-        {/* STORIES */}
+        {/* Story 768:4649 */}
         <View style={styles.group}>
-          <SectionLabel label="STORIES" />
+          <SectionLabel label="Story" />
           <Card>
             {/* TODO(justin): when On + iOS authorized, persist optional `location` field via backend */}
             <ToggleRow
-              label="Stories · Location"
+              label="Story · Location"
               subtitle="For enriching monthly Stories."
               value={location}
               onValueChange={setLocation}
@@ -296,15 +307,15 @@ export function SettingsScreen() {
           </Card>
         </View>
 
-        {/* MORE */}
+        {/* More 768:4658 — Account lives here; the promo card is the Feedback entry */}
         <View style={styles.group}>
-          <SectionLabel label="MORE" />
+          <SectionLabel label="More" />
           <Card>
+            <NavRow label="Account" onPress={() => router.push('/settings/account')} />
+            <Divider />
             <NavRow label="Data & Privacy" onPress={() => router.push('/settings/privacy')} />
             <Divider />
-            <NavRow label="Feedback" onPress={() => router.push('/settings/feedback')} />
-            <Divider />
-            <NavRow label="About" onPress={() => router.push('/settings/about')} />
+            <NavRow label="About Nestory" onPress={() => router.push('/settings/about')} />
           </Card>
         </View>
       </ScrollView>
@@ -338,45 +349,51 @@ const styles = StyleSheet.create({
     ...theme.typography.buttonLabelM,
     color: theme.text.brand,
   },
-  navBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xxl,
+  // header 768:4583 — px20 / py16 + border/default hairline, H2, no back arrow
+  header: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.l,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border.default,
   },
-  navTitle: {
-    ...theme.typography.h2,
+  headerTitle: {
+    ...theme.typography.h2, // Manrope Bold 18/24
     color: theme.text.primary,
   },
-  navSpacer: { width: 24 },
 
   scroll: { flex: 1 },
   body: {
     paddingTop: theme.spacing.l,
     paddingHorizontal: theme.spacing.xl,
     paddingBottom: theme.spacing.safeBtm,
-    gap: theme.spacing.xxl,
+    gap: theme.spacing.xxl, // 24 between groups
   },
 
-  group: { gap: theme.spacing.s },
+  // group 768:4587 — label and card sit 4 apart
+  group: { gap: theme.spacing.xs },
 
   sectionLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingBottom: 4,
     paddingLeft: 4,
   },
   sectionLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    lineHeight: 16,
+    ...theme.typography.tagBadge, // Inter Medium 14/16
     color: theme.text.secondary,
+  },
+  // 816:3362 — "+Add child" on the Child Profile label row
+  sectionAction: {
+    ...theme.typography.buttonLabelM,
+    color: theme.text.brand,
   },
 
   card: {
     backgroundColor: theme.surface.card,
     borderWidth: 1,
     borderColor: theme.border.default,
-    borderRadius: theme.radius.l,
+    borderRadius: theme.radius.m, // 10
     overflow: 'hidden',
   },
 
@@ -388,15 +405,21 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.l,
-    gap: theme.spacing.m,
+    padding: theme.spacing.l, // 16
+    gap: theme.spacing.m, // 12
   },
+  rowTop: { alignItems: 'flex-start' },
   rowCol: {
     flex: 1,
     gap: 2,
   },
   rowLabel: {
-    ...theme.typography.h4,
+    ...theme.typography.h4, // Manrope SemiBold 14/20
+    color: theme.text.primary,
+  },
+  // 768:4608 — a child's name is Heading3, larger than a settings row label
+  childName: {
+    ...theme.typography.h3,
     color: theme.text.primary,
   },
   rowSubtitle: {
@@ -407,61 +430,38 @@ const styles = StyleSheet.create({
   avatar: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-  },
-
-  // Subscription badges
-  upgradeBadge: {
-    backgroundColor: theme.surface.premiumSubtle,
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.xs,
     borderRadius: theme.radius.full,
-  },
-  upgradeBadgeLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.premium,
-  },
-  activeBadge: {
-    backgroundColor: theme.surface.successSubtle,
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.full,
-  },
-  activeBadgeLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.success,
+    backgroundColor: theme.surface.brand,
+    borderWidth: 1,
+    borderColor: theme.border.strong,
   },
 
-  // Toggle
-  toggleWrap: {
-    alignItems: 'center',
-    gap: theme.spacing.s,
-  },
-  toggleLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  toggleLabelOn:  { color: theme.text.success },
-  toggleLabelOff: { color: theme.text.secondary },
+  // Current Plan action — DS Small button
+  planAction: { alignSelf: 'center' },
 
-  promoBanner: {
+  // Promo card 768:4588 — blue gradient, 2px #c6d7ff edge, radius/m
+  promoCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.m,
-    backgroundColor: theme.surface.premiumSubtle,
-    borderWidth: 1,
-    borderColor: theme.border.premium,
-    borderRadius: theme.radius.l,
+    borderWidth: 2,
+    borderColor: '#c6d7ff',
+    borderRadius: theme.radius.m,
     padding: theme.spacing.l,
+    overflow: 'hidden',
   },
-  promoText: { flex: 1, gap: 2 },
+  promoIconTile: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.m,
+    backgroundColor: '#e0e9ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   promoTitle: {
-    ...theme.typography.h4,
-    color: theme.text.primary,
+    ...theme.typography.h2, // Manrope Bold 18/24
+    color: theme.text.onColor,
+    flex: 1,
   },
-  promoBody: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
-  },
+  promoAccent: { color: palette.accent[400] }, // #fbbf24
 });

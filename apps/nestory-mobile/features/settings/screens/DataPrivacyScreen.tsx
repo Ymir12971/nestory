@@ -1,7 +1,7 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
+import { NavBar } from '@/shared/components/NavBar';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
@@ -12,18 +12,11 @@ const DATA_POINTS = [
 ];
 
 export function DataPrivacyScreen() {
-  const router = useRouter();
   const goBack = useGoBack();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>Data & Privacy</Text>
-        <View style={styles.navSpacer} />
-      </View>
+      <NavBar title="Data & Privacy" onBack={goBack} />
 
       <ScrollView
         style={styles.scroll}
@@ -51,16 +44,6 @@ export function DataPrivacyScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
-  navBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xxl,
-  },
-  navTitle:  { ...theme.typography.h2, color: theme.text.primary },
-  navSpacer: { width: 24 },
-
   scroll: { flex: 1 },
   body: {
     paddingTop: theme.spacing.l,

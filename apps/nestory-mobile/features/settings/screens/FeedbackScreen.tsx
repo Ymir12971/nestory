@@ -4,6 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { FEEDBACK_CONSTRAINTS } from '@nestory/types';
+import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
+import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
+import { NavBar } from '@/shared/components/NavBar';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { useMe, useSubmitFeedback, uploadPhoto } from '@/api';
@@ -93,12 +97,11 @@ export function FeedbackScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>Feedback</Text>
-        <View style={styles.navSpacer} />
+      {/* NavBar 769:2308 — back arrow only, the H1 below carries the title */}
+      <NavBar onBack={goBack} />
+
+      <View style={styles.titleBlock}>
+        <Text style={styles.pageTitle}>Share feedback, Earn 10% off.</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -111,126 +114,120 @@ export function FeedbackScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.section}>
-            <View style={styles.titleGroup}>
-              <Text style={styles.sectionTitle}>Share an idea, earn 10% off</Text>
-              <Text style={styles.sectionSubtitle}>
-                Tell us what would make Nestory better. If we ship it, your next Premium bill is 10% off.
-              </Text>
-              <Pressable onPress={() => setHowItWorksVisible(true)}>
-                <Text style={styles.howLink}>How does the 10% off work?</Text>
-              </Pressable>
-            </View>
+          <View style={styles.introGroup}>
+            <Text style={styles.introText}>
+              Tell us what would make this feel more like home. If we build it, your next Premium
+              bill is 10% lighter.
+            </Text>
+            <Pressable style={styles.howLinkBtn} onPress={() => setHowItWorksVisible(true)}>
+              <Text style={styles.howLink}>How does the 10% off work? →</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Let us know what's on your mind:</Text>
             <TextInput
-              style={styles.textarea}
+              style={[styles.textarea, feedbackText.length > 0 && styles.textareaFilled]}
               value={feedbackText}
               onChangeText={onChangeText}
-              placeholder={"Tell us what you think, or let us know if something isn't working right…"}
+              placeholder={"e.g. I'd love it if Nestory could..."}
               placeholderTextColor={theme.text.hint}
               multiline
               textAlignVertical="top"
             />
           </View>
 
-          {/* Photos — same flow as Add Moment, ≤ 9 */}
-          <View style={styles.section}>
-            <Text style={styles.photoLabel}>Add photos (optional)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoStrip}>
+          {/* Photos — same 3-up grid as Add Moment, ≤ 9 */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Any pictures you'd like to share?</Text>
+            <View style={styles.photoGrid}>
               {photos.map((p, i) => (
-                <View key={`${p.uri}-${i}`} style={styles.photoThumbWrap}>
-                  <Image source={{ uri: p.uri }} style={styles.photoThumbImg} />
+                <View key={`${p.uri}-${i}`} style={styles.photoCell}>
+                  <Image source={{ uri: p.uri }} style={styles.photoCellImg} />
                   <Pressable
                     style={styles.deleteBadge}
                     hitSlop={6}
                     onPress={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
                   >
-                    <RemixIcon name="close-line" size={12} color={theme.text.onColor} />
+                    <RemixIcon name="close-line" size={24} color={theme.text.onColor} />
                   </Pressable>
                 </View>
               ))}
               {photos.length < FEEDBACK_CONSTRAINTS.maxPhotos && (
                 <Pressable style={styles.photoAdd} onPress={() => setPhotoSourceVisible(true)}>
-                  <RemixIcon name="add-large-line" size={28} color={theme.text.hint} />
+                  <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
                 </Pressable>
               )}
-            </ScrollView>
+            </View>
           </View>
         </ScrollView>
 
-        {/* CTA */}
+        {/* cta 768:4465 */}
         <View style={styles.cta}>
-          {canSend ? (
-            <Pressable
-              style={({ pressed }) => [styles.submitBtnWrap, pressed && { opacity: 0.85 }]}
-              onPress={() => setThanksVisible(true)}
-            >
-              <LinearGradient
-                colors={[palette.primary[500], palette.primary[400]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.submitBtn}
-              >
-                <Text style={styles.submitBtnLabel}>Send Feedback</Text>
-              </LinearGradient>
-            </Pressable>
-          ) : (
-            <View style={[styles.submitBtn, styles.submitBtnDisabled]}>
-              <Text style={styles.submitBtnLabelDisabled}>Send Feedback</Text>
-            </View>
-          )}
+          <Button
+            label="Send feedback"
+            disabled={!canSend}
+            onPress={() => setThanksVisible(true)}
+          />
         </View>
       </KeyboardAvoidingView>
 
-      {/* How the 10% off works */}
-      <Modal visible={howItWorksVisible} transparent animationType="slide" onRequestClose={() => setHowItWorksVisible(false)}>
-        <Pressable style={styles.scrim} onPress={() => setHowItWorksVisible(false)} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+      {/* Bottom Sheet · How the 10% off works (ST-feedback annotation) */}
+      <BottomSheet visible={howItWorksVisible} onRequestClose={() => setHowItWorksVisible(false)}>
+        <View style={sheetSection.title}>
           <Text style={styles.sheetTitle}>How the 10% off works</Text>
-          {HOW_IT_WORKS.map(line => (
-            <View key={line.slice(0, 24)} style={styles.benefitRow}>
-              <RemixIcon name="vip-crown-2-line" size={18} color={theme.text.premium} />
-              <Text style={styles.benefitText}>{line}</Text>
-            </View>
-          ))}
-          <Pressable style={styles.sheetPrimaryBtn} onPress={() => setHowItWorksVisible(false)}>
-            <Text style={styles.sheetPrimaryLabel}>Got it</Text>
-          </Pressable>
         </View>
-      </Modal>
-
-      {/* Thanks — email confirm; All Done submits and returns to Settings */}
-      <Modal visible={thanksVisible} transparent animationType="slide" onRequestClose={() => setThanksVisible(false)}>
-        <Pressable style={styles.scrim} onPress={() => setThanksVisible(false)} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          <Text style={styles.sheetTitle}>Thanks for your feedback!</Text>
-          <View style={styles.benefitRow}>
-            <RemixIcon name="mail-send-line" size={18} color={theme.text.brand} />
-            <Text style={styles.benefitText}>
-              We'll get back to you soon and let you know if you earn 10% off your Premium bill.
-            </Text>
+        <View style={sheetSection.body}>
+          <View style={styles.sheetList}>
+            {HOW_IT_WORKS.map((line) => (
+              <View key={line.slice(0, 24)} style={styles.benefitRow}>
+                <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+                <Text style={styles.benefitText}>{line}</Text>
+              </View>
+            ))}
           </View>
-          <Text style={styles.emailHint}>
-            This is the email we'll contact you with. Please change if it's not correct.
-          </Text>
-          <TextInput
-            style={styles.emailInput}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            returnKeyType="done"
-          />
-          <Pressable
-            style={[styles.sheetPrimaryBtn, sending && { opacity: 0.7 }]}
-            onPress={() => void handleAllDone()}
-            disabled={sending}
-          >
-            <Text style={styles.sheetPrimaryLabel}>{sending ? 'Sending…' : 'All Done'}</Text>
-          </Pressable>
         </View>
-      </Modal>
+        <View style={sheetSection.cta}>
+          <Button label="Got it" onPress={() => setHowItWorksVisible(false)} />
+        </View>
+      </BottomSheet>
+
+      {/* Bottom Sheet · Thanks — All Done submits and returns to Settings */}
+      <BottomSheet visible={thanksVisible} onRequestClose={() => setThanksVisible(false)}>
+        <View style={sheetSection.title}>
+          <Text style={styles.sheetTitle}>Thanks for your feedback!</Text>
+        </View>
+        <View style={sheetSection.body}>
+          <View style={styles.sheetList}>
+            <View style={styles.benefitRow}>
+              <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+              <Text style={styles.benefitText}>
+                We'll get back to you soon and let you know if you earn 10% off your Premium bill.
+              </Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+              <Text style={styles.benefitText}>
+                This is the email we'll connect you with. Please change if it's not correct.
+              </Text>
+            </View>
+            <Input
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              returnKeyType="done"
+            />
+          </View>
+        </View>
+        <View style={sheetSection.cta}>
+          <Button
+            label={sending ? 'Sending…' : 'All Done'}
+            disabled={sending}
+            onPress={() => void handleAllDone()}
+          />
+        </View>
+      </BottomSheet>
 
       <PhotoSourceSheet
         visible={photoSourceVisible}
@@ -245,20 +242,17 @@ export function FeedbackScreen() {
   );
 }
 
-const THUMB = 72;
+const PHOTO_CELL = 107;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
   flex: { flex: 1 },
-  navBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xxl,
+  // title 768:4420 — the page headline lives under the bar, not in it
+  titleBlock: {
+    paddingHorizontal: 20,
+    paddingVertical: theme.spacing.l,
   },
-  navTitle:  { ...theme.typography.h2, color: theme.text.primary },
-  navSpacer: { width: 24 },
+  pageTitle: { ...theme.typography.h1, color: theme.text.primary },
 
   scroll: { flex: 1 },
   body: {
@@ -268,156 +262,87 @@ const styles = StyleSheet.create({
     gap: theme.spacing.l,
   },
 
-  section: { gap: theme.spacing.m },
-
-  titleGroup: { gap: 6 },
-  sectionTitle:    { ...theme.typography.h2, color: theme.text.primary },
-  sectionSubtitle: { ...theme.typography.body, color: theme.text.secondary },
+  introGroup: { gap: theme.spacing.s },
+  introText: { ...theme.typography.body, color: theme.text.primary },
+  howLinkBtn: { height: 40, justifyContent: 'center' },
   howLink: {
     ...theme.typography.buttonLabelM,
     color: theme.text.brand,
-    paddingTop: 2,
   },
+
+  fieldGroup: { gap: theme.spacing.s },
+  fieldLabel: { ...theme.typography.h4, color: theme.text.primary },
 
   textarea: {
     backgroundColor: theme.surface.card,
     borderWidth: 1,
     borderColor: theme.border.default,
     borderRadius: theme.radius.s,
-    height: 220,
+    height: 200, // 768:4446
     paddingHorizontal: theme.spacing.l,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.m,
+    paddingVertical: theme.spacing.m,
     ...theme.typography.body,
     color: theme.text.primary,
   },
+  textareaFilled: { borderColor: theme.border.strong },
 
-  photoLabel: { ...theme.typography.h4, color: theme.text.primary },
-  photoStrip: { gap: theme.spacing.s },
-  photoThumbWrap: {
-    width: THUMB,
-    height: THUMB,
-    borderRadius: theme.radius.m,
-    overflow: 'visible',
+  // Photo grid 768:4454 — same 3-up 107 grid as Add Moment
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.l,
   },
-  photoThumbImg: {
-    width: THUMB,
-    height: THUMB,
+  photoCell: {
+    width: PHOTO_CELL,
+    height: PHOTO_CELL,
     borderRadius: theme.radius.m,
-    backgroundColor: theme.border.strong,
+    backgroundColor: palette.neutral[200],
+    overflow: 'hidden',
   },
+  photoCellImg: { width: PHOTO_CELL, height: PHOTO_CELL },
   deleteBadge: {
     position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: theme.text.primary,
+    top: 4,
+    left: 79,
+    width: 24,
+    height: 24,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.overlay.scrim,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   photoAdd: {
-    width: THUMB,
-    height: THUMB,
+    width: PHOTO_CELL,
+    height: PHOTO_CELL,
     borderRadius: theme.radius.m,
-    borderWidth: 1,
-    borderColor: theme.border.strong,
-    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderColor: theme.border.default,
+    backgroundColor: theme.surface.card,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  emailHint: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
-  },
-  emailInput: {
-    backgroundColor: theme.surface.card,
-    borderWidth: 1,
-    borderColor: theme.border.strong,
-    borderRadius: theme.radius.s,
-    height: 48,
-    paddingHorizontal: theme.spacing.l,
-    ...theme.typography.body,
-    color: theme.text.primary,
   },
 
   cta: {
-    paddingTop: theme.spacing.m,
+    paddingTop: theme.spacing.l, // 16
     paddingBottom: theme.spacing.safeBtm,
-    paddingHorizontal: theme.spacing.xl,
-  },
-  submitBtnWrap: {
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: palette.primary[50],
-  },
-  submitBtn: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.full,
-  },
-  submitBtnDisabled: {
-    backgroundColor: theme.surface.disabled,
-  },
-  submitBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
-  submitBtnLabelDisabled: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.disabled,
+    paddingHorizontal: 20,
   },
 
-  // Sheets
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: {
-    backgroundColor: theme.surface.card,
-    borderTopLeftRadius: theme.radius.l,
-    borderTopRightRadius: theme.radius.l,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.safeBtm + theme.spacing.l,
-    gap: theme.spacing.m,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.border.strong,
-    alignSelf: 'center',
-    marginBottom: theme.spacing.s,
-  },
+  // Sheet content (shell comes from shared/components/BottomSheet)
   sheetTitle: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 24,
-    lineHeight: 32,
+    ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.primary,
   },
+  sheetList: { gap: theme.spacing.s },
   benefitRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: theme.spacing.s,
+    gap: theme.spacing.xs, // 4
   },
   benefitText: {
     flex: 1,
     ...theme.typography.body,
     color: theme.text.primary,
-    lineHeight: 22,
-  },
-  sheetPrimaryBtn: {
-    height: 52,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.s,
-  },
-  sheetPrimaryLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
   },
 });

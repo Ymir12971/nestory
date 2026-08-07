@@ -1,11 +1,16 @@
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import type { LinkedProvider } from '@nestory/types';
 import { theme } from '@/shared/theme';
+import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
+import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
+import { NavBar } from '@/shared/components/NavBar';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { useMe, useDeleteMe, useSubscription } from '@/api';
 import { setDevSession } from '@/features/auth/hooks/useSession';
@@ -68,19 +73,10 @@ export function AccountScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>Account</Text>
-        <View style={styles.navSpacer} />
-      </View>
+      <NavBar title="Account" onBack={goBack} />
 
+      {/* body 770:2607 — two cards, 16 apart; the design has no section label */}
       <View style={styles.body}>
-        <View style={styles.sectionLabelWrap}>
-          <Text style={styles.sectionLabel}>LINKED ACCOUNTS</Text>
-        </View>
-
         {meQ.isLoading ? (
           <View style={styles.card}>
             <View style={styles.row}><ActivityIndicator color={theme.text.brand} /></View>
@@ -118,11 +114,7 @@ export function AccountScreen() {
                           : 'Not connected'}
                       </Text>
                     </View>
-                    {linked && (
-                      <View style={styles.connectedBadge}>
-                        <Text style={styles.connectedBadgeLabel}>Connected</Text>
-                      </View>
-                    )}
+                    {linked && <StatusBadge type="active" label="Connected" />}
                   </View>
                 </View>
               );
@@ -151,30 +143,29 @@ export function AccountScreen() {
       </View>
 
       {/* ST-07 / Sheet · Logout Confirm */}
-      <Modal visible={logoutVisible} transparent animationType="slide" onRequestClose={() => setLogoutVisible(false)}>
-        <Pressable style={styles.scrim} onPress={() => setLogoutVisible(false)} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+      <BottomSheet visible={logoutVisible} onRequestClose={() => setLogoutVisible(false)}>
+        <View style={sheetSection.title}>
           <Text style={styles.sheetTitle}>Log out of Nestory?</Text>
-          <Text style={styles.sheetBody}>You can always sign back in with the same account.</Text>
-          <Pressable style={styles.primaryBtn} onPress={() => void handleLogOut()}>
-            <Text style={styles.primaryBtnLabel}>Log Out</Text>
-          </Pressable>
-          <Pressable style={styles.textBtn} onPress={() => setLogoutVisible(false)}>
-            <Text style={styles.textBtnLabel}>Cancel</Text>
-          </Pressable>
         </View>
-      </Modal>
+        <View style={sheetSection.body}>
+          <Text style={styles.sheetBody}>You can always sign back in with the same account.</Text>
+        </View>
+        <View style={sheetSection.cta}>
+          <Button label="Log Out" onPress={() => void handleLogOut()} />
+          <Button label="Cancel" type="text" onPress={() => setLogoutVisible(false)} />
+        </View>
+      </BottomSheet>
 
       {/* ST-07 / Sheet · Delete Account Confirm (Premium adds the subscription
           notice — v2 per annotation; older popup without it is 作废) */}
-      <Modal visible={deleteVisible} transparent animationType="slide" onRequestClose={() => setDeleteVisible(false)}>
-        <Pressable style={styles.scrim} onPress={() => setDeleteVisible(false)} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+      <BottomSheet visible={deleteVisible} onRequestClose={() => setDeleteVisible(false)}>
+        <View style={sheetSection.title}>
           <Text style={styles.sheetTitle}>Delete your account?</Text>
+        </View>
+        <View style={sheetSection.body}>
           <Text style={styles.sheetBody}>
-            All your data — Stories, Moments, Profiles — will be permanently removed. This can't be undone.
+            All your data — Stories, Moments, Profiles — will be permanently removed. This can't be
+            undone.
           </Text>
 
           {isPremium && (
@@ -183,36 +174,35 @@ export function AccountScreen() {
               <View style={styles.subNoticeText}>
                 <Text style={styles.subNoticeTitle}>Your subscription won't cancel automatically</Text>
                 <Text style={styles.subNoticeBody}>
-                  Deleting your account doesn't cancel your Premium subscription. Please cancel it in your App Store or Google Play settings to avoid future charges.
+                  Deleting your account doesn't cancel your Premium subscription. Please cancel it in
+                  your App Store or Google Play settings to avoid future charges.
                 </Text>
               </View>
             </View>
           )}
 
           <Text style={styles.confirmHint}>Type "DELETE" to confirm</Text>
-          <TextInput
-            style={styles.confirmInput}
+          <Input
             value={deleteInput}
             onChangeText={setDeleteInput}
             autoCapitalize="characters"
             autoCorrect={false}
             placeholder="DELETE"
-            placeholderTextColor={theme.text.hint}
           />
-          <Pressable
-            style={[styles.deleteBtn, !deleteArmed && styles.deleteBtnDisabled]}
-            onPress={() => { setDeleteVisible(false); void confirmDelete(); }}
-            disabled={!deleteArmed || deleteMe.isPending}
-          >
-            <Text style={[styles.deleteBtnLabel, !deleteArmed && styles.deleteBtnLabelDisabled]}>
-              {deleteMe.isPending ? 'Deleting…' : 'Delete Account'}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.textBtn} onPress={() => setDeleteVisible(false)}>
-            <Text style={styles.textBtnLabel}>Cancel</Text>
-          </Pressable>
         </View>
-      </Modal>
+        <View style={sheetSection.cta}>
+          <Button
+            label={deleteMe.isPending ? 'Deleting…' : 'Delete Account'}
+            type="destructive"
+            disabled={!deleteArmed || deleteMe.isPending}
+            onPress={() => {
+              setDeleteVisible(false);
+              void confirmDelete();
+            }}
+          />
+          <Button label="Cancel" type="text" onPress={() => setDeleteVisible(false)} />
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -298,16 +288,14 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: theme.spacing.s,
   },
+  // Sheet titles across the redesign are Heading1 on text/primary bodies
   sheetTitle: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 24,
-    lineHeight: 32,
+    ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.primary,
   },
   sheetBody: {
-    ...theme.typography.body,
-    color: theme.text.secondary,
-    lineHeight: 22,
+    ...theme.typography.body, // Inter Regular 16/20
+    color: theme.text.primary,
   },
   primaryBtn: {
     height: 52,

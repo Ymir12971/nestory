@@ -3,10 +3,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import * as Application from 'expo-application';
+import { NavBar } from '@/shared/components/NavBar';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
 const REMIX_URL = 'https://remixicon.com/';
+const SUPPORT_EMAIL = 'support@nestory.love';
 // Read the real version + build code from the installed package. Falls back to
 // the source string when expo-application can't resolve it (web, etc.).
 const APP_VERSION =
@@ -20,27 +22,20 @@ export function AboutScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle}>About</Text>
-        <View style={styles.navSpacer} />
-      </View>
+      <NavBar title="About" onBack={goBack} />
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
-        {/* Brand column */}
+        {/* brandCol 770:2587 — the logo lockup, not an app icon over a wordmark */}
         <View style={styles.brandCol}>
           <Image
-            source={require('@/assets/images/icon.png')}
-            style={styles.appIcon}
+            source={require('@/assets/images/nestory-logo.png')}
+            style={styles.logoLockup}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>Nestory</Text>
           <Text style={styles.tagline}>Every little moment becomes a story</Text>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
@@ -49,12 +44,12 @@ export function AboutScreen() {
         <View style={styles.card}>
           <Pressable style={styles.row} onPress={() => router.push('/onboarding/terms')}>
             <Text style={styles.rowLabel}>Terms of Service</Text>
-            <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+            <RemixIcon name="external-link-line" size={20} color={theme.text.secondary} />
           </Pressable>
           <View style={styles.divider} />
           <Pressable style={styles.row} onPress={() => router.push('/onboarding/privacy')}>
             <Text style={styles.rowLabel}>Privacy Policy</Text>
-            <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.secondary} />
+            <RemixIcon name="external-link-line" size={20} color={theme.text.secondary} />
           </Pressable>
         </View>
 
@@ -66,6 +61,18 @@ export function AboutScreen() {
           </Text>
           {'.'}
         </Text>
+
+        {/* 770:2603 — support address in brand green */}
+        <Text style={styles.attribution}>
+          {'Contact us via '}
+          <Text
+            style={styles.supportLink}
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          >
+            {SUPPORT_EMAIL}
+          </Text>
+        </Text>
+
         <Text style={styles.copyright}>© 2026 Nestory. All rights reserved.</Text>
       </ScrollView>
     </SafeAreaView>
@@ -74,16 +81,6 @@ export function AboutScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
-  navBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xxl,
-  },
-  navTitle:  { ...theme.typography.h2, color: theme.text.primary },
-  navSpacer: { width: 24 },
-
   scroll: { flex: 1 },
   body: {
     paddingTop: theme.spacing.xxl,
@@ -100,16 +97,8 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.l,
     paddingBottom: theme.spacing.s,
   },
-  appIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 20,
-    marginBottom: theme.spacing.s,
-  },
-  appName: {
-    ...theme.typography.h1,
-    color: theme.text.primary,
-  },
+  // 770:2588 — 160×53 logo lockup
+  logoLockup: { width: 160, height: 53 },
   tagline: { ...theme.typography.caption, color: theme.text.secondary },
   version: { ...theme.typography.caption, color: theme.text.secondary },
 
@@ -143,6 +132,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: theme.text.secondary,
   },
+  supportLink: { color: theme.text.brand },
   copyright: {
     ...theme.typography.caption,
     color: theme.text.secondary,

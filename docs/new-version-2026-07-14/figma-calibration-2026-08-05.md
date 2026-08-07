@@ -3,6 +3,38 @@
 **在线文件：** `wS1hJeZhXMkUnn8YwLtFcv` → 页面 `Nestory-new version` (`731:1269`)
 **方法：** 每屏 `get_design_context` 取权威规格（几何 / token / 文案 / 排版）+ `get_screenshot` 目视核对 → 逐项对齐代码。
 **范围：** 只校准已实现的屏；刻意偏离（Justin 拍板项）保留并在此登记。
+**完成度：** 55 屏中除 `O-Launch Page` 外全部校准完毕（Launch 见待决策 #1）。全程 `pnpm typecheck` 通过；**未跑真机/模拟器**。
+
+---
+
+## ⚠️ 待 Justin 决策（6 项）
+
+> 这 6 项在各自章节里都有上下文，这里汇总一份便于一次性过。**#1 / #2 会影响后续实现或后端排期，其余是文案与取舍。**
+
+| # | 事项 | 现状 | 我的建议 | 详见 |
+|---|---|---|---|---|
+| **1** | **启动页两套规范冲突** —— [`docs/delivery/启动页.md`](../delivery/启动页.md)（自称 hifi 完整规范，含 2.5s 呼吸动效 + live preview）与 Figma `O-Launch Page 739:1985` 对不上：logo 90 vs 120、字标 Manrope 800/36 vs Bold/40、slogan 灰色两行 vs 纯黑单行、光晕 440@46% 带呼吸 vs 248@53% 静态 | **未动**。现有 `SplashScreen.tsx` 严格按 `启动页.md` 实现 | **以 `启动页.md` 为准**，把 Figma 那帧当过时稿（它画不出动效，尺寸也更粗）。若反过来，`739:2032` 与 `H-Launch 810:2993` 要一并改 | §5 |
+| **2** | **Generated StoryCard 的摘要行缺后端字段** —— 稿中每张已生成 Story 卡有一行摘要正文（Body 16/20，例「Emma had the most eventful month yet — from her first steps to her first word…」），但 `StoryListItem` 没有 excerpt/subtitle 字段（story 文档里有 `subtitle`，`/stories` 列表接口没暴露） | 前端按缺字段处理，**暂不渲染** | 后端在 `/stories` 列表项里带出摘要（可直接复用 story 文档的 `subtitle`），前端一行即可接上 | §7 |
+| **3** | **Stats 卡删除后身高体重的入口** —— 方案 A 把 Home 改成时间轴，稿中 header 只有头像 + 名字，原来的三格 Stats 卡（年龄/身高/体重，点击跳 ST-03 Edit）已删 | 已删。身高体重现在**只在 Settings → Child Profile Edit 可见** | 若接受就不用动；若想保留快捷入口，需要在稿外另找位置 | §6 |
+| **4** | **空态标题措辞** —— 稿是「Turn every moment into a **Memory**」/「Start with Emma's first **Memory**」，按 Memory→Moment 全局改名后变成「…into a **Moment**」，moment 与 Moment 同词，读着绕。这是新用户第一眼看到的句子 | 按字面改名实现 | 给个新说法即可，我替换 | §6 |
+| **5** | **Add / View / Edit 页的 Tags 行** —— 稿的 detailsList **只有 "Memory Date" 一行，没有 Tags 行**（空态/有照片/编辑三个变体都没有）；但 annotation 明确写了 Tags 的「首个 +X」显示规则，且 TagPickerSheet / `moment/tags.tsx` 是已上线功能、WorkPlan §3 写「Tag 保留」 | **保留 Tags 行**，按 annotation 规则显示 | 若稿才是最新意图，说一声即可摘掉 | §6 |
+| **6** | **Collecting StoryCard 上的两个按钮** —— 稿中该卡是整卡可点 + chevron，**没有** "Add Moment" / "Generate Now" 按钮；但 Generate Now 是 main 分支已上线的功能（`e3487a3`） | **保留两个按钮** | 二选一：按稿去掉（Generate Now 另找入口），或承认为稿外功能 | §7 |
+
+### 另外三点已知妥协（不需决策，但记录在案）
+
+1. **未跑真机** —— 全程只做了 `pnpm typecheck`。本次含多处结构性改动（Home 合并成时间轴、Save 移进 NavBar、Toast 改屏幕正中），建议起一次 app 走主流程。
+2. **Settings 优惠卡的 6 个装饰图形** —— 稿中蓝色渐变卡里有 6 个绝对定位的圆形/矢量装饰（出血裁切），需要导出 SVG 资源才能 1:1；当前只实现了渐变 + 描边 + 图标砖 + 文案。
+3. **`global-off-line` 图标缺失** —— 加载失败态稿用 `global-off-line`，当前 `react-native-remix-icon` 版本类型里没有，改用语义等价的 `wifi-off-line`；要精确一致需升级 icon 包或内联该 SVG。
+
+### 已在实现中修正的设计稿笔误 / 内容问题
+
+| 位置 | 稿中原文 / 原实现 | 处理 |
+|---|---|---|
+| ST-feedback | 「How does the 10% off **works**? →」 | 改为 "work" |
+| ST-feedback | 「Let us know what's **in you** mind:」 | 改为 "what's **on your** mind" |
+| ST-Current plan(Free) | 原实现 CTA "Try Premium Free for 1 Month" + 套餐卡 "First month free" | **删除** —— 改版明确无平台免费试用（WorkPlan §1-3、Handoff §3.1） |
+| ST-Current plan(Free) | 原实现对比表含已删除的 **Highlights** 行 | 随对比表整体移除（稿中无对比表） |
+| H-Edit Memory | 原实现点 Delete **直接删除**，无二次确认 | 按 annotation 补上删除确认 sheet |
 
 ---
 
@@ -440,6 +472,202 @@ Tags 行同 Add 页：稿中未画、annotation 有，**保留**。点照片进�
 | 文案 | Manrope Medium 14/20 | **Body Inter 16/20 居中** | ✅ |
 
 `info` 态稿中没有（DS 只有 Success/Warning/Error），沿用同一配方 + `info-*` token（与 Notify 的 Info 型一致）。这条改动同时修正了 Add Memory 成功提示、500 字超限警告、支付失败、登录失败等所有 toast 调用点。
+
+---
+
+## 7. Stories 模块
+
+### DS StoryCard 8 变体 `48:680` — 规格 + 已修
+
+一次取到全部 8 个变体。外壳统一：w353、radius/l 16、col、items-start。
+
+| 变体 | 规格 | 代码原状 → 已修 |
+|---|---|---|
+| **Collecting** `744:4019` | `brand-subtle` 底 + **1.5px `border/brand`**、**px16 py12**、gap8：标题 `h3` `text/success`「{名字}'s {月} Story in N days …」→ ProgressBar（h6、轨 `primary/100`、填充 `surface/brand`、radius 6）→ cgFooter：`Caption` `text/secondary`「{月} {年}  \|  N memories」+ **24px chevron** | 底色/描边错（白底 + `border/default`）→ 已改；标题文案缺名字与月份 → 已补；**footer 原本是一句 "N moments so far — your story is starting to take shape."，稿里是「月份 \| 计数」+ chevron** → 已改 |
+| **Locked** `44:28` | **`warning-subtle` 底 + 1px `border/warning`**、p16 gap12：24px `lock-line` → Body `text/primary` → Text 按钮（44 高、**Manrope Medium 16**、`text/premium`）"Upgrade to Premium →" | 底色/描边错（`surface/muted` + `border/default`）→ 已改；图标色 `text/hint` → `text/warning`；文案原来带孩子名，**稿里是通用句** "Upgrade to keep recording every month." → 已改 |
+| **Generating** `744:4027` | 白底 1px `border/default` 裁切：genArea（`success-subtle`、**h140**、gap8、48px `loader-2-line`、**Body** `text/brand`）+ genBody（p16 gap10：`h3` 月份 + 两行 `Caption` `text/secondary`） | genArea 标题用了 `buttonLabelM` → 改 **Body**；正文文案原为 "Your Story is on its way — sit tight!"，稿是**两行** "Turning this month's moments into a Story. / It'll be worth the wait!" → 已改 |
+| **Generated** `44:34` | 白底裁切：storyImg（`brand-subtle`、**h198**、monthBadge @(12,12) `overlay-65` px12 py5 radius-full、`Tag&Badge` 白字）+ storyBody（p16 gap12：文本组 gap8 = **标题 `h2` Manrope Bold 18/24** + **Body 摘要行** ；cgFooter = `Caption` "N memories" + 24px chevron） | 标题原用 `h3` → 改 **`h2`**；**摘要行缺失**（见下方后端项） |
+| **AllowRegenerate** `761:2549` | = Generated + storyImg 与 storyBody 之间插一条 Notify：**`info-subtle` 底 + 1px `border/info` + radius/s 6**、px16 py8、`Caption` `text/info` | 原实现是**无描边、无圆角的通栏色带** → 已改为带边框圆角的条 |
+| **NoMemories** `744:4046` | 白底：nsImgArea（**`surface/disabled`** 底、**h140**、gap8、48px `link-unlink-m`、**Body** `text/secondary`「No memories were added for this month.」）+ nsBody（p16 gap12：`h3` 月份 + Inter 14/20 `text/secondary` 说明） | nsImgArea 高 100→**140**、底色 `surface/muted`→**`surface/disabled`**、caption `Caption`/`text/hint`→**Body**/`text/secondary` → 已改 |
+| **AllowRegenerate-2** `762:3537` | = NoMemories + 同一条 Notify | ✅ 结构已对 |
+| **NoPremium** `744:4890` | 白底：nsImgArea 同上，文案「Story paused (Trial ended)」（决策 6 确认故意）+ nsBody（p16、**无 gap**）月份区间 `h3` | 图标原为 `lock-line` **40** → **`link-unlink-m` 48** → 已改 |
+
+### S-Regeneration confirm popup `761:2717` — ✅
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| 标题 | "Regenerate this Story?"、Manrope Bold **24/32** | **"You have to know"**、`h1` **28/38** | ✅ |
+| 正文 | 一长段 "We'll create a new Story from this month's updated moments…"、`text/secondary` | **两段**「The existing Story will be covered by the new one.」/ 空行 /「Please confirm if you want to continue.」、**`text/primary`** | ✅ |
+| 遮罩 / handle | 0.45 / 40×4 `border/strong` | **0.35 / 36×4 `border/default` radius 3** | ✅ |
+| CTA | 手写渐变 + Cancel（`text/secondary`） | DS Primary + DS Text（44 高、**`text/brand`**）、py8 gap16 | ✅ |
+
+### S-Over one year `731:3336` + S-Story Empty `821:1534` — ✅ 两套 header
+
+Stories 页有**两种 header**，原实现只有一种（`h1` "Stories" + 副标题 "Your little one's growth, told by AI"，两者稿中都不存在）：
+
+| 态 | Figma |
+|---|---|
+| **有历史 Story** `731:3338` | px20 py16 + **1px `border/default` 下边线**；单行 **Manrope Regular 18/24**：「{名字}'s monthly **Story**」，"Story" 用 `text/brand` 绿 —— **没有头像**（与 Home 不同） |
+| **首次进入（无历史）** `821:1536` | px20 py16、**无边线**；**Manrope Bold 32**：「{名字}'s growth, one **Story** a month」，"Story" 绿 |
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| header | 单一 `h1` "Stories" + 副标题 | 上表两套，按有无历史切换 | ✅ |
+| 年份筛选器容器 | `primary/50` 底 + padding4 的胶囊轨道 | **无容器底色**，裸胶囊行 h36 py4 gap8 | ✅ |
+| 年份胶囊内距 | px16 | px16 ✓（注意与 Home 月份胶囊的 px12 不同） | ✅ 无需改 |
+| 首次进入的说明区 | **整块缺失** | `821:1540`：128 砖（`brand-subtle` + **72px `book-open-line`**）+ `h3`「How {名字}'s Story works」→ 两行步骤（Body 16/20 primary，gap12）→ `Caption` `text/secondary` 脚注 | ✅ 补上 |
+| 首次进入时年份筛选器 | 显示 | 稿中无 | ✅ 隐藏 |
+| couldn't load 态 | 40px 图标 + 两行文字 | DS Abnormal · Type=WebIssue（同 Home） | ✅ |
+
+### Stories 待办与后端项
+
+- **后端项**：Generated 卡在稿里有一行**摘要正文**（Body 16/20，例「Emma had the most eventful month yet — from her first steps to her first word…」），但 `StoryListItem` 没有 excerpt/subtitle 字段（story 文档里有 `subtitle`，列表接口没暴露）。需要后端在 `/stories` 列表项里带出摘要，前端才能渲染。已按缺字段处理，暂不显示。
+- **保留的刻意偏离**：Collecting 卡里的 "Add Moment" / "Generate Now" 两个按钮稿中没有（稿是整卡可点 + chevron）。Generate Now 是 main 分支上线的功能（`e3487a3`），保留待你定。
+- [ ] 逐屏：S-Story Empty `821:1534`、First Story Generating `731:1547`、No Memory to generate `731:3280`、Normal Generation `731:1515` / 2 `731:1569`、Free quota used/Premium Ended `731:3218`、Premium recovered `731:3426` / Past months folded `731:3602`、Over one year `731:3336`、Regeneration allowed `761:2628`、couldn't load `774:3769`
+- [ ] Stories 顶部年份筛选器（对 DS `Filter Type=Year` `38:4`）
+
+---
+
+## 8. Settings 模块
+
+### ST-Settings(free plan) `768:4581` — ✅ 结构性改动
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| **header** | NavBar：**带返回箭头** + 居中 "Settings" | tab 根页，**无返回箭头**；px20 py16 + **1px `border/default` 下边线**，`h2` **左对齐** | ✅ |
+| **顶部优惠位** | 淡琥珀底行（`premium-subtle` + 1px `border/premium`）+ 22px 灯泡图标 + 两行文字 + chevron | **蓝色渐变卡**：`78.47deg #6790ff → #2660e7`、**2px `#c6d7ff`** 描边、radius/m；内含 **40×40 `#e0e9ff` 砖 + 32px `money-dollar-circle-fill`** + 单行 **`h2` 白字**「Share feedback, Earn **10% off**.」，"10% off" 用 **`#fbbf24`** | ✅ |
+| **分组标题** | **全大写**（ACCOUNT / CHILD PROFILE / SUBSCRIPTION / NOTIFICATIONS / STORIES / MORE）、Inter Medium **12**/16 | **Title Case**（Child Profile / Current Plan / Notifications / Story / More）、**Tag&Badge 14/16** | ✅ |
+| **分组构成** | 有独立 ACCOUNT 组（显示邮箱）；MORE 组里有 Feedback，没有 Account | **没有 ACCOUNT 组** —— Account 是 **More 组的一行**；More = Account / Data & Privacy / **About Nestory**（Feedback 入口就是顶部优惠卡） | ✅ |
+| **Child Profile 组** | 只显示**当前激活的一个**孩子，只有名字 | **列出所有孩子**：40 头像（`surface/brand` 底 + **1px `border/strong`**）+ 名字 **`h3`** + 「年龄, 性别」`Caption` + 激活项带 **StatusBadge "Active"** + 20px chevron；标题行右侧有 **"+Add child"**（ButtonLabel-M `text/brand`） | ✅ |
+| **Current Plan 组** | 名为 SUBSCRIPTION，右侧是自绘徽标 | 名为 **Current Plan**；行内右侧是 **DS Small 按钮**（"Upgrade"） | ✅ |
+| 卡片圆角 | radius/l 16 | **radius/m 10** | ✅ |
+| 分组内间距（标题↔卡片） | 8 | **4** | ✅ |
+| 开关 | RN `Switch` + "On/Off" 文字标签 | **DS Toggle**，无文字标签；开关行**顶对齐** | ✅ |
+| Story 组标题 / 行标题 | "STORIES" / "Stories · Location" | **"Story"** / **"Story · Location"** | ✅ |
+| 行标题字号 | `h4` ✓ | `h4`（Manrope SemiBold 14/20） | ✅ 无需改 |
+
+**注**：稿中优惠卡里还有 6 个装饰性圆形/矢量图形（绝对定位、出血裁切），我只实现了渐变 + 描边 + 图标砖 + 文案；那些装饰形状需要导出 SVG 资源才能 1:1，暂缺。
+
+### ST-Account `770:2604` — ✅
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| NavBar | 自绘、px24、space-between（标题被挤到居中） | 共享 NavBar `Back&Title`（px20 gap16 左对齐） | ✅ |
+| "LINKED ACCOUNTS" 分组标题 | 有 | **稿中没有**，只有两张卡 | ✅ 去掉 |
+| Connected 徽标 | 自绘 | DS StatusBadge（active 配色） | ✅ |
+| 两个 sheet 外壳 | 自绘 Modal（0.45 遮罩、40×4 handle） | DS BottomSheet + title/body/cta 分区 | ✅ |
+| sheet 标题 | Manrope Bold **24/32** | **`h1` 28/38** | ✅ |
+| sheet 正文 | `text/secondary`、lineHeight 22 | **`text/primary`** 16/20 | ✅ |
+| 删号 sheet 的输入框 | 裸 `TextInput` | **DS Input**（含"有内容→`border/strong`"态） | ✅ |
+| 删号主按钮 / Cancel | 自绘红底 + 灰字 Cancel | **DS Destructive + DS Text**（`text/brand`） | ✅ |
+| 卡片 radius/l 16、行 p16 gap12、Apple/Google 行结构、Premium 版订阅不自动取消提示 | — | 一致 | ✅ 无需改 |
+
+> 注意：Settings 主页的卡片是 **radius/m 10**，而 Account 页的卡片是 **radius/l 16** —— 稿中两处确实不同，按各自 frame 实现。
+
+### ST-Current plan(Free) `764:3775` — ✅ 重写，含**两处内容级问题**
+
+⚠️ **这屏原实现有两个不只是视觉的问题：**
+
+1. **仍在卖「首月免费」试用** —— CTA 文案是 **"Try Premium Free for 1 Month"**，套餐卡上还有 **"First month free"** 标签。但改版明确**没有平台免费试用**（WorkPlan §1 第 3 条、Handoff §3.1），稿中 CTA 是 **"Upgrade to Premium"**，脚注是 "Auto-renews until canceled."。**已按稿改掉。**
+2. **对比表里仍有 Highlights** —— Highlight 功能在 P0 已整体删除，但 Free/Premium 对比表还列着「Highlights 10 / Unlimited」。稿中**根本没有对比表**，已随表一起移除。
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| NavBar 标题 | "Subscription" | **"Current Plan"** | ✅ |
+| currentPlanCard | `surface/muted` 底、"CURRENT PLAN" 胶囊 + 名称 + 配额副标题 | **白底 + 1px `border/strong`**、px16 py12 gap16；**"Free Plan" `h1` 居中** + **三条 Free 权益**（20px 皇冠 + Body） | ✅ |
+| Free vs Premium 对比表 | 有（且含已删除的 Highlights） | **无** —— 换成「Enjoy more benefits with Premium:」`h2` + Premium 卡（`premium-subtle` 底、1px `border/strong`、radius/m、5 条权益） | ✅ |
+| 套餐卡 | "Yearly / $99.99/year / $20 Off / First month free"、"Monthly / $9.99/month"、`premium-subtle` 底、24px 单选 | **"$100 / Billed annually / ~17% Off"**、**"$10 / Billed monthly"**（定高 94）、**白底**、**20px** 单选、未选中描边 **`border/strong`** | ✅ |
+| CTA | 手写 accent/500→400 渐变 + "Cancel anytime. Manage in Settings." | **DS Premium 按钮** + 换行式法律行（"Auto-renews…" + 带下划线的 ToS · Privacy） | ✅ |
+| CTA 区间距 | pt12 gap8 | **pt8 gap12** | ✅ |
+
+### ST-Current plan(Premium) `764:3844` — ✅
+
+与 `global-Welcome to premium` 同构（渐变皇冠卡 + 账单明细卡 + What's included 卡），差异已对齐：
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| 渐变卡 | accent/400→500，start(0,0)→end(0.7,1)；皇冠 **28**；含 "CURRENT PLAN" 胶囊 + 「周期 · 续费日」副标题 | **160.79°**（0% → 70.71%）；皇冠 **41**；**只有 "Premium Plan" `h1` 白字**，无胶囊无副标题；**三个琥珀色装饰圆斑** | ✅ |
+| 账单明细 | 行之间有分隔线；只有 Plan / Next billing | **无分隔线**；**Plan / Price / Next billing 三行** + 底部居中 `Caption`「Auto-renews until canceled. Manage in Settings.」 | ✅（Price 行按周期显示 $100 / year 或 $10 / month） |
+| What's included 图标 | `check-line`、`text/brand` 绿 | **`vip-crown-2-line`**、`text/premium` | ✅ |
+| Cancel Subscription | 自绘按钮 | **DS Destructive**、44 高、通栏；区块 px20 **pt12** pb34 | ✅ |
+
+> 两步取消流的两个 sheet（损失清单 / 原因问卷）本轮未改，仍用自绘 Modal，待办。
+
+### ST-Child Profile Edit(free) `769:2487` / (premium) `769:2306` — ✅
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| NavBar | 自绘 px24 space-between | 共享 NavBar `Back&Title` | ✅ |
+| Free 常驻提示条 | **info 色系**（`info-subtle` 底、`information-line` 图标、`text/info` 字）、无描边 | **warning 色系**（`warning-subtle` 底、**1px `border/warning`**、`error-warning-line` 图标、`text/warning` 字）、定高 **64**、radius/s | ✅ |
+| 提示文案 | "Free plan supports one active profile. Upgrade to switch between them." | **两行**：「Free plan supports one active profile.」/「You can add and edit, but switching requires Premium.」 | ✅ |
+| Save Changes | 手写渐变按钮 | DS Primary | ✅ |
+| 128 头像 + "Tap to change" 文字按钮、生日只读禁用态、性别加大号 tag、身高体重 Unit 行 | — | 一致 | ✅ 无需改 |
+
+### ST-Plan cancelled `771:3205` — ✅ 重写
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| 整体版式 | **居中成功页**：80px 圆形 check 徽标 + 居中标题 + 居中一段说明 | **左对齐**：title 区（px20 py16、`h1`）+ body（p20 gap16）**两段正文** + **权益卡** | ✅ |
+| 正文 | "Your Premium benefits stay active until the end of the current billing period. All your Stories, Moments and Profiles are safe — nothing gets deleted." | 「We are sorry to see you go.」/ 空行 /「You won't be charged again. Your plan stays Premium through the end of this billing cycle: **{日期}**.」（日期取自 `subscription.expiresAt`） | ✅ |
+| "STILL YOURS UNTIL THEN" 权益卡 | **整块缺失** | `premium-subtle` 底、1px `neutral/200`、radius/l、px16 py20、gap14：`h2` 标题 + 5 条权益（20px 皇冠 + Body） | ✅ 补上 |
+| 按钮 | 纯色 `surface/brand` | DS Primary；区块 px20 **pt4** pb34 | ✅ |
+
+### ST-About `770:2583` — ✅
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| 品牌区 | **96 应用图标 + "Nestory" `h1` 文字** | **160×53 logo 组合图**（图标+字标一体），下接 tagline 与版本号 | ✅ |
+| 法务行图标 | `arrow-right-s-line`（右箭头） | **`external-link-line`**（外链图标） | ✅ |
+| 联系邮箱行 | **缺失** | 「Contact us via **support@nestory.love**」，邮箱用 `text/brand` 绿、可点发邮件 | ✅ 补上 |
+| NavBar | 自绘 px24 | 共享 NavBar | ✅ |
+
+### ST-Data & Privacy `770:2563` — ✅
+版式本就与稿一致（`h1` 标题 + Body 副段 + 3 条 20px 图标要点，gap12），只把自绘 NavBar 换成共享组件。
+
+### ST-feedback `768:4295` — ✅（页面主体）
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| NavBar | 带标题 "Feedback" | **只有返回箭头**，标题由页内 `h1` 承担 | ✅ |
+| 页面标题 | `h2`「Share an idea, earn 10% off」 | **`h1` 28/38**「Share feedback, Earn 10% off.」，独立 title 区（px20 py16） | ✅ |
+| 引导文案 | 「Tell us what would make Nestory better. If we ship it, your next Premium bill is 10% off.」`text/secondary` | 「Tell us what would make this feel more like home. If we build it, your next Premium bill is 10% lighter.」**`text/primary`** | ✅ |
+| "How does…" 链接 | 纯文字 | DS Text 按钮（40 高）+ **末尾 "→"** | ✅ |
+| 文本框 | 高 220、无字段标签 | 高 **200**、上方有字段标签；空态 `border/default` / 有内容 `border/strong` | ✅ |
+| 文本框 placeholder | "Tell us what you think, or let us know if something isn't working right…" | **"e.g. I'd love it if Nestory could..."** | ✅ |
+| 照片区 | 横向 72 缩略图条、标签 "Add photos (optional)"、加号 28、删除角标 20 挂在外侧 | **3 列 107 网格**（同 Add Moment）、标签 **"Any pictures you'd like to share?"**、加号 **36**、删除角标 **24 在格内 (79,4)** | ✅ |
+| Send 按钮 | 手写渐变/禁用双写法 | DS Primary（禁用态自动） | ✅ |
+| 按钮文案 | "Send Feedback" | **"Send feedback"** | ✅ |
+
+**修掉了稿中的两处笔误**（照抄会上线到用户界面）：
+- 「How does the 10% off **works**? →」→ "How does the 10% off **work**? →"
+- 「Let us know what's in **you** mind:」→ "Let us know what's **on your** mind:"
+
+### 四个 sheet 统一到 DS BottomSheet — ✅
+
+ST-feedback 的 **How-it-works / Thanks**、两步取消流的 **Cancel Step 1 / Step 2**，原本都是自绘 Modal（0.45 遮罩、40×4 `border/strong` handle、标题 24/32、手写按钮）。全部换成 DS BottomSheet + `sheetSection` 分区 + DS 按钮：
+
+- 遮罩 0.45 → **0.35**、handle 40×4 `border/strong` → **36×4 `border/default` radius 3**、面板底色统一 `surface/card`
+- sheet 标题 Manrope Bold 24/32 → **`h1` 28/38**
+- Thanks sheet 的邮箱输入框换 **DS Input**；两条说明按 annotation 改为**两行带图标的条目**（原来第二条是纯 caption）
+- Cancel Step 1 的「Keep my plan」→ **DS Primary**，「Continue to cancel」→ **DS Destructive**；Step 2 的「Confirm to Cancel」→ **DS Destructive**；Other 的补充输入框换 DS Input（multiline）
+
+---
+
+## 9. Global
+
+### global-Paywall `775:1819` — ✅
+
+| 项 | 原实现 | Figma | |
+|---|---|---|---|
+| 标题区 | 标题直接带内距，pt12 pb16 px16 | 独立 header 区 **px20 py16**，`h1` 28/38 | ✅ |
+| Premium 卡 | radius/**l 16**、padding 16、描边 `text/premium`、底色 `accent[50]` | radius/**m 10**、**px16 py12**、描边 **`border/premium`**、底色 `surface/premium-subtle` | ✅ |
+| 卡头图标 | 20 | **24** | ✅ |
+| 权益条目 | "•" 文字符号 + gap8 | **20px `vip-crown-2-line`** + gap **4** | ✅ |
+| 套餐卡 | padding12、gap2、价格 Manrope Bold **22/30**、自绘单选圆点、未选描边 `border/default` | px16 **py14**、gap8、价格 **`h3` 16/22**、**20px `checkbox-circle-fill` / `checkbox-blank-circle-line`**、未选描边 **`border/strong`**、月付卡定高 94 | ✅ |
+| "~17% Off" | Caption | **`h4`** | ✅ |
+| CTA | 手写 accent/500→400 渐变 + 自绘 Back | **DS Premium + DS Text**（44 高）；区块 **px16 pt16** gap12 | ✅ |
+
+### global-Welcome to premium `771:3311` — ✅（见 §1 Onboarding 段，与 O-Welcome to premium 同组件）
 
 ### Home 模块余下待做
 - [ ] `H-First Memory 731:1304`（首条 Moment 态，与 Normal list 同构，需确认是否有差异）
