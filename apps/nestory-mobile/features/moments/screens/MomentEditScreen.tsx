@@ -234,26 +234,9 @@ function EditForm({ moment }: { moment: Moment }) {
           )}
         </View>
 
-        {/* detailsList 774:3685 — the frame only draws Memory Date; the Tags row
-            is kept because Tags ship as a feature. */}
+        {/* detailsList 774:3685 — Memory Date only, matching the frame. Tags
+            were removed from the product (Justin 2026-08-09). */}
         <View style={styles.detailsList}>
-          <Pressable
-            style={styles.detailRow}
-            onPress={() => router.push(`/moment/tags?momentId=${moment.id}`)}
-          >
-            <Text style={styles.detailLabel}>Tags</Text>
-            <View style={styles.detailRight}>
-              <Text style={styles.detailValue}>
-                {moment.tags.length > 0
-                  ? `${moment.tags[0]}${moment.tags.length > 1 ? ` +${moment.tags.length - 1}` : ''}`
-                  : 'None'}
-              </Text>
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.hint} />
-            </View>
-          </Pressable>
-
-          <View style={styles.rowDivider} />
-
           {/* Memory Date — read-only here; capture date is fixed at create */}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Memory Date</Text>
@@ -281,24 +264,29 @@ function EditForm({ moment }: { moment: Moment }) {
         onRequestClose={() => setDeleteConfirmVisible(false)}
       >
         <View style={sheetSection.title}>
-          <Text style={styles.sheetTitle}>Delete this memory?</Text>
+          <View style={styles.sheetTitleStack}>
+            <Text style={styles.sheetTitle}>Delete this memory?</Text>
+            <Text style={styles.sheetSubtitle}>
+              This can't be undone. All photos and notes in this memory will be permanently removed.
+            </Text>
+          </View>
         </View>
-        <View style={sheetSection.body}>
-          <Text style={styles.sheetBody}>
-            This can't be undone. All photos and notes in this memory will be permanently removed.
-          </Text>
-        </View>
+        {/* Same grammar as the two spec'd confirm sheets (770:3145 / 770:3155):
+            keeping is the primary, deleting is the quiet 44-tall text button.
+            The "Keep This Memory" label is inferred — the design's copy for
+            this sheet only covers the title and body. */}
         <View style={sheetSection.cta}>
+          <Button label="Keep This Memory" onPress={() => setDeleteConfirmVisible(false)} />
           <Button
             label={deleting ? 'Deleting…' : 'Delete Memory'}
             type="destructive"
+            style={styles.sheetTextBtn}
             disabled={deleting}
             onPress={() => {
               setDeleteConfirmVisible(false);
               void handleDelete();
             }}
           />
-          <Button label="Cancel" type="text" onPress={() => setDeleteConfirmVisible(false)} />
         </View>
       </BottomSheet>
 
@@ -415,7 +403,10 @@ const styles = StyleSheet.create({
   },
 
   sheetTitle: { ...theme.typography.h1, color: theme.text.primary },
-  sheetBody: { ...theme.typography.body, color: theme.text.primary },
+  /** headline + subtitle share the title block, 12 apart, subtitle secondary */
+  sheetTitleStack: { gap: theme.spacing.m },
+  sheetSubtitle: { ...theme.typography.body, color: theme.text.secondary },
+  sheetTextBtn: { height: 44 },
   detailLabel: {
     ...theme.typography.body,
     color: theme.text.primary,

@@ -24,6 +24,14 @@ export class ApiError extends Error {
 export const Errors = {
   unauthorized: (msg = 'Unauthorized') =>
     new ApiError('UNAUTHORIZED', msg, 401),
+  /** `purgeAt` lets the client name the deadline in the restore prompt. */
+  accountDeleted: (purgeAt: Date) =>
+    new ApiError(
+      'ACCOUNT_DELETED',
+      'This account was deleted and is scheduled for permanent removal.',
+      401,
+      { purgeAt: purgeAt.toISOString() },
+    ),
   notFound: (resource: string, id?: string) =>
     new ApiError('NOT_FOUND', id ? `${resource} ${id} not found` : `${resource} not found`, 404),
   validation: (msg: string, details?: Record<string, unknown>) =>

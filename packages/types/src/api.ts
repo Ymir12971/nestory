@@ -27,6 +27,9 @@ export type ApiErrorCode =
   | 'VALIDATION_ERROR'
   | 'EMPTY_MOMENT'
   | 'UNAUTHORIZED'
+  // 账号已注销、尚在清理窗口内：provider 侧仍能登录成功，但本服务拒绝。
+  // 客户端要据此给出明确说明，否则表现为登录后被静默弹回登录页。
+  | 'ACCOUNT_DELETED'
   | 'HIGHLIGHT_LIMIT_REACHED'
   | 'PROFILE_SWITCH_RESTRICTED'
   | 'MOMENT_EDIT_RESTRICTED'

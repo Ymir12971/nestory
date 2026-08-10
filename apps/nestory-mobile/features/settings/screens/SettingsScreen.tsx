@@ -225,7 +225,10 @@ export function SettingsScreen() {
         <View style={styles.group}>
           <View style={styles.sectionLabelWrap}>
             <Text style={styles.sectionLabel}>Child Profile</Text>
-            <Pressable hitSlop={8} onPress={() => router.push('/onboarding/profile?another=1')}>
+            <Pressable
+              hitSlop={8}
+              onPress={() => router.push('/onboarding/profile?another=1&from=settings')}
+            >
               <Text style={styles.sectionAction}>+Add child</Text>
             </Pressable>
           </View>

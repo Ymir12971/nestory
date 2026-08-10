@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { config } from '@/shared/config';
 
 let _client: SupabaseClient | null = null;
@@ -26,6 +26,20 @@ export function getSupabaseClient(): SupabaseClient | null {
       detectSessionInUrl: Platform.OS === 'web',
     },
   });
+
+  // `autoRefreshToken` alone is not enough on native: the refresh timer does
+  // not survive the app being backgrounded, so a session can lapse while
+  // suspended and come back expired. Supabase's documented RN setup is to
+  // drive the timer off AppState. Web keeps its own timer.
+  if (Platform.OS !== 'web') {
+    const client = _client;
+    AppState.addEventListener('change', (state) => {
+      if (state === 'active') void client.auth.startAutoRefresh();
+      else void client.auth.stopAutoRefresh();
+    });
+    if (AppState.currentState === 'active') void _client.auth.startAutoRefresh();
+  }
+
   return _client;
 }
 

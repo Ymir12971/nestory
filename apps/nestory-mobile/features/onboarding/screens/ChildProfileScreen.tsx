@@ -139,8 +139,12 @@ export function ChildProfileScreen() {
   const createChild = useCreateChild();
   // ?another=1 → adding an additional child from the children list:
   // relationship step is skipped (defaults to the first child's answer).
-  const { another } = useLocalSearchParams<{ another?: string }>();
+  // `from=settings` marks the Settings entry points (Settings page "+Add child"
+  // and the Child Profile list CTA) so we return there instead of continuing
+  // the onboarding chain.
+  const { another, from } = useLocalSearchParams<{ another?: string; from?: string }>();
   const isAnother = another === '1';
+  const fromSettings = from === 'settings';
   const [step, setStep] = useState<Step>(0);
 
   const [name, setName] = useState('');
@@ -218,7 +222,10 @@ export function ChildProfileScreen() {
         ? (await uploadPhoto(avatarPhoto, 'avatars')).fileUrl
         : undefined;
       await createChild.mutateAsync(buildBody(avatarUrl));
-      router.replace('/onboarding/children');
+      // Entered from Settings → go back there. Without this the user lands on
+      // the onboarding children list and gets walked through permissions and
+      // plan again, with no way back to Settings.
+      router.replace(fromSettings ? '/settings/profiles' : '/onboarding/children');
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to save profile. Please try again.');
     }

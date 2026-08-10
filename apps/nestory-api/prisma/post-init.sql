@@ -2,8 +2,7 @@
 -- 在 `prisma migrate deploy` 之后手动执行（或并入 CI deploy 脚本）
 -- 包含 Prisma DSL 不支持的：
 --   1. 部分索引（partial indexes，含 WHERE 子句）
---   2. GIN 索引（tags TEXT[] 全文/数组查询）
---   3. Supabase Realtime publication
+--   2. Supabase Realtime publication
 --
 -- 幂等：所有 CREATE 都用 IF NOT EXISTS / OR REPLACE
 
@@ -42,15 +41,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_shares_story_active
   WHERE revoked_at IS NULL;
 
 -- ============================================================================
--- 2. GIN 索引（tags TEXT[] 数组查询）
--- ============================================================================
-
--- 按 Tag 筛选 Memory（WHERE 'Outdoor' = ANY(tags) 之类）
-CREATE INDEX IF NOT EXISTS idx_assets_tags_gin
-  ON raw_assets USING GIN (tags);
-
--- ============================================================================
--- 3. Supabase Realtime publication
+-- 2. Supabase Realtime publication
 -- ============================================================================
 
 -- stories 表开启 Realtime，前端订阅 status 变化（pending → generating → generated）
@@ -64,15 +55,3 @@ EXCEPTION WHEN duplicate_object THEN
   NULL;
 END
 $$;
-
--- ============================================================================
--- 4. user_tag_library UNIQUE 约束基于 normalize 后的 name
--- ============================================================================
--- Prisma 的 @@unique([userId, name]) 是字面相等；文档 §5 要求按 LOWER(TRIM(name))
--- 改建 functional unique index 后删除原 unique 约束
--- 应用层写入前必须 normalize（否则会拿到 unique violation）
-
-DROP INDEX IF EXISTS user_tag_library_user_id_name_key;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_tag_library_user_normalized_name
-  ON user_tag_library (user_id, LOWER(TRIM(name)));

@@ -76,15 +76,20 @@ function labelColor(type: ButtonType, disabled: boolean): string {
 export function Button({ label, type = 'primary', icon, style, labelStyle, ...rest }: Props) {
   const disabled = rest.disabled ?? false;
 
+  // Sizing belongs on the Pressable, because the Pressable — not the gradient
+  // inside it — is the flex item the parent lays out. With the height and
+  // `alignSelf: stretch` on the inner view instead, any parent that centres its
+  // children (every `sheetSection.cta`) shrank the Pressable to the label's
+  // width, and the design's 353-wide bar rendered as a pill hugging its text.
+  // It also put caller `style` overrides on the wrong node.
   return (
-    <Pressable accessibilityRole="button" {...rest}>
+    <Pressable accessibilityRole="button" {...rest} style={[s[type], style]}>
       {({ pressed }) => {
         const gradient = disabled ? null : gradientFor(type, pressed);
-        const shell = [
-          s.base,
-          s[type],
+        const fill = [
+          s.fill,
+          s[`${type}Padding` as const],
           disabled ? s[`${type}Disabled` as const] : pressed ? s[`${type}Pressed` as const] : s[`${type}Default` as const],
-          style,
         ];
         const content = (
           <>
@@ -94,11 +99,11 @@ export function Button({ label, type = 'primary', icon, style, labelStyle, ...re
         );
 
         return gradient ? (
-          <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={shell}>
+          <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={fill}>
             {content}
           </LinearGradient>
         ) : (
-          <View style={shell}>{content}</View>
+          <View style={fill}>{content}</View>
         );
       }}
     </Pressable>
@@ -106,7 +111,10 @@ export function Button({ label, type = 'primary', icon, style, labelStyle, ...re
 }
 
 const s = StyleSheet.create({
-  base: {
+  /** Inner layer: fills the Pressable and carries every visual. */
+  fill: {
+    flex: 1,
+    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -118,15 +126,23 @@ const s = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── sizes ──────────────────────────────────────────────────────────────────
+  // ── sizes (on the Pressable) ───────────────────────────────────────────────
   // 52h full-width types: the design draws them 353 wide, i.e. 393 − 20px page
   // padding on both sides, so stretching inside a 20px-padded page matches.
   primary: { height: 52, alignSelf: 'stretch' },
   secondary: { height: 52, alignSelf: 'stretch' },
   premium: { height: 52, alignSelf: 'stretch' },
-  small: { height: 36, minWidth: 72, paddingHorizontal: theme.spacing.l },
-  text: { height: 40, paddingHorizontal: theme.spacing.s },
-  destructive: { height: 40, paddingHorizontal: theme.spacing.s },
+  small: { height: 36, minWidth: 72 },
+  text: { height: 40 },
+  destructive: { height: 40 },
+
+  // ── horizontal padding (on the fill, so gradients cover it) ────────────────
+  primaryPadding: {},
+  secondaryPadding: {},
+  premiumPadding: {},
+  smallPadding: { paddingHorizontal: theme.spacing.l },
+  textPadding: { paddingHorizontal: theme.spacing.s },
+  destructivePadding: { paddingHorizontal: theme.spacing.s },
 
   // ── primary ────────────────────────────────────────────────────────────────
   primaryDefault: { borderWidth: 2, borderColor: palette.primary[50] },

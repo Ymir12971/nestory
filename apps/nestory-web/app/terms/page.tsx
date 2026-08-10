@@ -30,14 +30,14 @@ export default function TermsPage() {
       <h2 style={h2Style}>2. Your content</h2>
       <p>
         You retain all rights to the photos, notes, and child profile
-        information you put into Nestory ("Your Content"). You grant us a
+        information you put into Nestory (&ldquo;Your Content&rdquo;). You grant us a
         limited licence to store, process, and display Your Content solely to
         provide the app to you, including transmitting necessary inputs to our
         AI provider to generate stories you request.
       </p>
       <p>
-        You agree not to upload content that is unlawful, infringes others'
-        rights, or that you don't have permission to share.
+        You agree not to upload content that is unlawful, infringes others&rsquo;
+        rights, or that you don&rsquo;t have permission to share.
       </p>
 
       <h2 style={h2Style}>3. Subscriptions and payment</h2>
@@ -56,19 +56,19 @@ export default function TermsPage() {
         AI Stories are produced by a third-party model based on the moments
         and metadata you supply. The output may contain inaccuracies; it is
         intended as a keepsake, not a factual record. You are free to delete
-        any generated story you don't want to keep.
+        any generated story you don&rsquo;t want to keep.
       </p>
 
       <h2 style={h2Style}>5. Service availability</h2>
       <p>
-        We do our best to keep Nestory available, but we don't guarantee
+        We do our best to keep Nestory available, but we don&rsquo;t guarantee
         uninterrupted service. We may modify, suspend, or discontinue features
         at any time.
       </p>
 
       <h2 style={h2Style}>6. Disclaimers and liability</h2>
       <p>
-        Nestory is provided <strong>"as is"</strong>, without warranties of any
+        Nestory is provided <strong>&ldquo;as is&rdquo;</strong>, without warranties of any
         kind. To the maximum extent permitted by law, our liability is limited
         to the amount you paid us in the 12 months before the event giving
         rise to the claim.

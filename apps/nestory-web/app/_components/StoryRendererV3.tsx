@@ -172,7 +172,6 @@ function Img({ photo }: { photo: StoryPhoto }) {
   return (
     <picture>
       {photo.srcsetWebp && <source type="image/webp" srcSet={photo.srcsetWebp} sizes={SIZES} />}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className={cls}
         style={style}

@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import * as Sentry from '@sentry/react-native';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/api';
+import { setUnauthorizedHandler } from '@/api/queryClient';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { forceSignOut } from '@/features/auth/signOut';
 import { initPurchases, identifyPurchaseUser } from '@/features/billing/purchases';
 import { ToastHost } from '@/features/ui/ToastHost';
+import { showToast } from '@/features/ui/toast';
 import { SplashScreen as BrandSplash } from '@/features/splash/SplashScreen';
 import {
   useFonts,
@@ -100,6 +103,30 @@ export default function RootLayout() {
   // Configure RevenueCat once at startup (no-op on web / when key absent).
   useEffect(() => {
     initPurchases();
+  }, []);
+
+  // Any 401 from the API means this session is finished — token revoked or
+  // expired past refresh, or the account was deleted (possibly on another
+  // device). Tear down and send them to sign-in instead of leaving every
+  // screen on a retry button that can't work.
+  useEffect(() => {
+    setUnauthorizedHandler((error) => {
+      // A deleted account still authenticates with Google/Apple — the provider
+      // account outlives ours until the purge — so signing in "succeeds" and
+      // then every request 401s. Send them somewhere that explains it and
+      // offers the account back, instead of bouncing them to sign-in silently.
+      if (error.code === 'ACCOUNT_DELETED') {
+        const purgeAt = error.details?.purgeAt;
+        router.replace({
+          pathname: '/onboarding/account-deleted',
+          params: typeof purgeAt === 'string' ? { purgeAt } : {},
+        });
+        return;
+      }
+      showToast({ type: 'info', message: 'Your session expired. Please sign in again.' });
+      void forceSignOut();
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   // Alias the RC customer to our user id whenever a session is present — covers

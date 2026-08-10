@@ -7,9 +7,9 @@
 
 ---
 
-## ⚠️ 待 Justin 决策（6 项）
+## ⚠️ 待 Justin 决策（5 项）
 
-> 这 6 项在各自章节里都有上下文，这里汇总一份便于一次性过。**#1 / #2 会影响后续实现或后端排期，其余是文案与取舍。**
+> 这 5 项在各自章节里都有上下文，这里汇总一份便于一次性过。**#1 / #2 会影响后续实现或后端排期，其余是文案与取舍。**
 
 | # | 事项 | 现状 | 我的建议 | 详见 |
 |---|---|---|---|---|
@@ -17,7 +17,6 @@
 | **2** | **Generated StoryCard 的摘要行缺后端字段** —— 稿中每张已生成 Story 卡有一行摘要正文（Body 16/20，例「Emma had the most eventful month yet — from her first steps to her first word…」），但 `StoryListItem` 没有 excerpt/subtitle 字段（story 文档里有 `subtitle`，`/stories` 列表接口没暴露） | 前端按缺字段处理，**暂不渲染** | 后端在 `/stories` 列表项里带出摘要（可直接复用 story 文档的 `subtitle`），前端一行即可接上 | §7 |
 | **3** | **Stats 卡删除后身高体重的入口** —— 方案 A 把 Home 改成时间轴，稿中 header 只有头像 + 名字，原来的三格 Stats 卡（年龄/身高/体重，点击跳 ST-03 Edit）已删 | 已删。身高体重现在**只在 Settings → Child Profile Edit 可见** | 若接受就不用动；若想保留快捷入口，需要在稿外另找位置 | §6 |
 | **4** | **空态标题措辞** —— 稿是「Turn every moment into a **Memory**」/「Start with Emma's first **Memory**」，按 Memory→Moment 全局改名后变成「…into a **Moment**」，moment 与 Moment 同词，读着绕。这是新用户第一眼看到的句子 | 按字面改名实现 | 给个新说法即可，我替换 | §6 |
-| **5** | **Add / View / Edit 页的 Tags 行** —— 稿的 detailsList **只有 "Memory Date" 一行，没有 Tags 行**（空态/有照片/编辑三个变体都没有）；但 annotation 明确写了 Tags 的「首个 +X」显示规则，且 TagPickerSheet / `moment/tags.tsx` 是已上线功能、WorkPlan §3 写「Tag 保留」 | **保留 Tags 行**，按 annotation 规则显示 | 若稿才是最新意图，说一声即可摘掉 | §6 |
 | **6** | **Collecting StoryCard 上的两个按钮** —— 稿中该卡是整卡可点 + chevron，**没有** "Add Moment" / "Generate Now" 按钮；但 Generate Now 是 main 分支已上线的功能（`e3487a3`） | **保留两个按钮** | 二选一：按稿去掉（Generate Now 另找入口），或承认为稿外功能 | §7 |
 
 ### 另外三点已知妥协（不需决策，但记录在案）
@@ -35,6 +34,77 @@
 | ST-Current plan(Free) | 原实现 CTA "Try Premium Free for 1 Month" + 套餐卡 "First month free" | **删除** —— 改版明确无平台免费试用（WorkPlan §1-3、Handoff §3.1） |
 | ST-Current plan(Free) | 原实现对比表含已删除的 **Highlights** 行 | 随对比表整体移除（稿中无对比表） |
 | H-Edit Memory | 原实现点 Delete **直接删除**，无二次确认 | 按 annotation 补上删除确认 sheet |
+
+---
+
+## 🐞 2026-08-09 bug 扫查
+
+Justin 报了 Delete Account 的问题后做的一轮排查，结果如下。
+
+**已修**
+
+| # | 问题 | 位置 | 严重度 |
+|---|---|---|---|
+| 1 | 确认弹窗按钮层级倒置（危险动作占主按钮位） | `AccountScreen` × 2、`MomentEditScreen` × 1 | 高（不可逆操作） |
+| 2 | 注销后 `deleted_at` 无人检查 —— token 继续可用、重新登录即复活账号 | `lib/auth.ts` | 高（安全 / 合规） |
+| 3 | 只软删、无清理任务，数据永久留库却宣称已永久删除 | 新增 `lib/accountPurge.ts` | 高（合规） |
+| 4 | Moment 硬删只删库、不删对象存储 —— 照片永久残留并持续计费 | `routes/assets.ts` | 中（隐私 / 成本） |
+| 5 | Child Profile 列表的 "Add Child" 跳 `/settings/profiles/new`，落到 `[id]` 编辑路由，`GET /children/new` 过不了 uuid 校验 → 死在 "Failed to load profile"（重试永远失败） | `ChildProfileListScreen` | 中（功能不可用） |
+| 6 | 从 Settings 添加孩子，存完后 `router.replace('/onboarding/children')` 把用户扔进 onboarding 链路（permissions → plan），回不到 Settings。两个 Settings 入口都中招 | `ChildProfileScreen` + 两个入口传 `from=settings` | 中 |
+| 7 | **mobile 实际加载的依赖版本和锁文件对不上** —— `apps/nestory-mobile/node_modules` 里的 pnpm 软链是陈旧的，指向 `.pnpm` 里的旧版本：RN 0.76.6（锁文件 0.76.9）、async-storage 3.0.2（锁文件 1.23.1）、auth-session 55.0.15（锁文件 6.0.3）、crypto/web-browser 55.0.14（锁文件 14.0.2）。根目录 node_modules 一直是对的，但 app 层会遮蔽它 | 删掉 `apps/nestory-mobile/node_modules` 后重装 | 高（真机） |
+| 8 | **401 之后 app 变砖** —— `apiFetch` 和 queryClient 都没有 401 处理。token 被吊销/过期到无法刷新、或账号在另一台设备上被注销，会让每一屏各自显示 "Failed to load" + 一个永远点不通的重试按钮；唯一出路是在同样加载失败的 Settings 页里找到 Log Out | 新增 `features/auth/signOut.ts` + queryClient 的 QueryCache/MutationCache onError 钩子 | 高 |
+| 9 | **Supabase token 自动刷新在原生端没接 AppState** —— `autoRefreshToken: true` 单独不够，刷新定时器不随 app 进后台/回前台重启，会话可能在挂起期间过期。这是 Supabase RN 文档明确要求的接线 | `supabaseClient.ts` | 中 |
+| 10 | **DS Button 的尺寸挂错了节点** —— 高度和 `alignSelf: stretch` 全写在里层的 View/LinearGradient 上，`Pressable` 一条样式都没有。但参与父容器布局的是 Pressable：任何 `alignItems: 'center'` 的父容器（每一个 `sheetSection.cta`）都会把它缩成内容宽度，稿里 353 通栏的绿条渲染成贴着文字的小药丸。调用方传的 `style` 覆盖也落在里层 | `shared/components/Button.tsx` | 高（全局可见） |
+| 11 | **所有不带 body 的写请求返回 400** —— `apiFetch` 无条件设 `Content-Type: application/json`，Fastify 对「声明了 JSON 却没有 body」直接拒绝（`FST_ERR_CTP_EMPTY_JSON_BODY`）。中招的有 7 个：注销账号、删 Moment、恢复 Moment、删孩子、恢复孩子、撤销分享链接、删标签 | `api/client.ts`：有 body 才设 content type | 高（功能全废） |
+| 12 | **注销后无法用同一个 Google/Apple 账号重新进入，且毫无提示** —— provider 侧的账号活到清理任务执行为止，所以 OAuth 会成功，接着每个请求 401，全局处理立刻把人弹回登录页，一个字的解释都没有 | 后端 `ACCOUNT_DELETED` 错误码（带 `purgeAt`）+ `POST /users/me/restore`；前端新增 `/onboarding/account-deleted` 说明页 | 高 |
+
+> 第 7 条的排查要点记一下：Expo 启动时那串 "expected version" 告警**说的是真的**，不是噪音。`pnpm install` 会报 "Lockfile is up to date" 然后什么都不做 —— 它不检查 app 层软链是否陈旧；带 `--filter` 的安装只修被 filter 的那个包。唯一可靠的办法是删掉那个 app 的 `node_modules` 再 `pnpm install`。修完 Expo 的告警从 5 条变 0 条。async-storage 和 auth-session 正好是登录链路，模拟器上不一定炸、真机上会。
+
+> 第 8 条顺带消掉了一处重复：登出的拆卸逻辑（Supabase signOut、RevenueCat 登出、dev session 清空、analytics reset、query cache 清空、跳转登录页）原先在 `AccountScreen` 的 handleLogOut 和 confirmDelete 里各写了一遍。现在统一走 `forceSignOut()`，并带一个 in-flight 去重 —— 否则 token 一失效，所有在途请求会各触发一次拆卸和跳转。漏掉其中任何一步都会把上一个用户泄漏给下一个：RevenueCat 留着旧权益、PostHog 继续按旧身份归因、query cache 把上个用户的 Moment 交给新用户。
+
+> 第 10 条顺带修好了两处一直没生效的覆盖：`SettingsScreen` 的 `planAction: {alignSelf:'center'}` 和 `WelcomeScreen` 的 `{width, alignSelf:'auto'}` —— 它们之前都落在里层，对 Pressable 的定位毫无作用。检查过全部 11 处 Button 的 `style` 覆盖，都是纯几何（height/width/alignSelf），没有一处传背景色/边框之类的视觉属性，所以把 `style` 移到外层是安全的。
+
+> 第 11 条是 Justin 实际点「Delete Account」时报出来的 —— 前面所有静态检查都发现不了，因为代码本身完全合理。教训：这类 header 层面的问题只有真跑请求才会暴露。修完逐个实测：删 Moment / 删标签 / 删孩子 / 恢复孩子 / 注销账号，全部 200。
+
+> 第 12 条把删除语义从方案 (a) 调成 **方案 B（Justin 2026-08-09 决定）**：30 天窗口内重新登录会看到说明页，可以一键恢复账号。理由是那个窗口的全部价值就在挽回误操作 —— 原先的做法是有窗口但用户够不着，只能找客服。
+>
+> 实现上有个必须注意的点：**恢复接口本身必须能被已软删的账号调用**，否则用户永远够不着它。`lib/auth.ts` 为 `POST /users/me/restore` 单独放行（仍然完整校验身份），其余路由一律拒绝。恢复时要补建 subscription 行 —— 注销期间 `ensureUser` 会跳过它，而有五条路由把「没有 subscription」当硬错误。
+>
+> 端到端实测：注销 200 → 普通接口 401 `ACCOUNT_DELETED`（`purgeAt` 正确落在 30 天后）→ 恢复 200 → 普通接口恢复 200 → subscription 补回 200 → 重复恢复幂等返回 `restored:false` → 审计留痕。
+>
+> 删除确认弹窗文案随之改成「You'll be signed out right away. Your Stories, Moments and Profiles are permanently deleted after 30 days — until then you can change your mind by signing back in.」稿里的「permanently removed / can't be undone」两句都不成立。说明页 `/onboarding/account-deleted` 是稿外新增（Figma 没有这个状态的 frame），用 DS 原子按 app 语言搭的。
+
+**查过没问题**：所有路由的越权访问（每个写操作都先做 `{id, userId}` 作用域查询；share 撤销校验 story 归属；tag 删除走 `user_id` 过滤 raw SQL）、TanStack 各 mutation 的缓存失效、订阅取消（正确地跳转商店管理页并说明）、主要接口冒烟（`/users/me`、`/children`、`/subscriptions/me`、`/assets`、`/highlights`、`/tags/user` 全 200）。
+
+**已知但没动**
+
+- **lint 覆盖面**（2026-08-09 处理了一半）—— `pnpm lint` 原先直接失败：`nestory-web` 声明了 `next lint` 但 ESLint 根本没装、也没有配置文件，`next lint` 进交互式提问后退出，turbo 整条中断。已给 web 装上 ESLint 9 + `eslint-config-next`，用 flat config 走 ESLint CLI（绕开 Next 16 会删掉的 `next lint`），并修掉它报出的 13 个 `react/no-unescaped-entities`（隐私/条款页的裸引号）和一条失效的 eslint-disable。现在 `pnpm lint` 是真跑且通过的。
+  **但覆盖面只有 web**：`nestory-mobile` 和 `nestory-api` 至今没有 lint script，从未被 lint 过。Justin 2026-08-09 决定发布后再补 —— 现在补会一次性冒出大量告警，而这轮 6 个 bug ESLint 一个都抓不到，时间花在跑真机主流程上收益更高。
+- `stories` 桶已创建但没有写入方；purge 目前只扫 `memories` / `avatars`。等 §7.2 图片变体落地后要把它加进 `USER_BUCKETS`。
+
+---
+
+## 🗑 Tag 体系整体下线（Justin 2026-08-09 决定）
+
+原待决策 #5 的结论：**不是留 Tags 行，而是整个 Tag 体系移除**。
+
+需要说明的是，仓库里所有文档都指向相反方向 —— `Handoff:127` 把 Moment 定义成「照片 + 文字 + Tag + 日期」，`Handoff:53` 免费档权益列了 Tag，最新的 `WorkPlan:121`（2026-08-05）明写「Tag 保留，仅预设集合」，annotation 里 Add 页和 View 页都写了 Tag 显示规则。唯一支持移除的信号是 Figma 三帧 detailsList 都没画 Tags 行。**这些文档现在都过期了**，后续读到时以本节为准。
+
+删除范围：
+
+| 层 | 内容 |
+|---|---|
+| types | 删 `tag.ts`；`Moment.tags`、`MomentCreate/Patch.tagValues`、`HighlightAsset.tags` |
+| API | 删 `routes/tags.ts` 及注册；`assets.ts` 的 `normalizeTags` / `upsertCustomTags` / 读写；`highlights.ts` 的 tags 字段 |
+| storyGen | **v2 `storyAi` 和 v3 `storyGen/prompt1` 两条链路的 prompt 输入**；system prompt 里「tags drive the story」和「Tags are SUPPORTING signals」两段规则一并删除 |
+| Mobile | 删 `TagPickerSheet` / `MomentTagsScreen` / `app/moment/tags.tsx` / `api/tags.ts`；queryKeys 的 `presetTags`/`userTags`；Moment 三屏的 Tags 行与录入入口 |
+| DB | 迁移 `20260809220000_remove_tags`：drop `raw_assets.tags`、drop `user_tag_library` 表、drop GIN 索引 `idx_assets_tags_gin`；`post-init.sql` 的第 2、4 节一并摘除（否则新环境重跑会报错） |
+
+**代价**：Tag 曾是 storyGen 的输入信号之一（`storyAi.ts` 原文「The captions and tags drive the story」）。移除后每条 moment 只剩文字和照片数量两个信号，AI 生成质量可能下降 —— 这一点在决策时已经说明。
+
+**不可逆**：`raw_assets.tags` 的字符串快照没有别处备份。执行时 dev 库只有 1 条 moment 带 tag、6 行 library，无真实数据损失。
+
+实测：`/tags` 与 `/tags/user` 双双 404；`/users/me`、`/children`、`/subscriptions/me`、`/assets`、`/highlights` 全部 200 且响应里不再出现 `tags` 字段；POST/PATCH/DELETE `/assets` 全部 200；旧客户端如果仍传 `tagValues`，zod 会静默忽略而不是报错（不会因为版本不同步炸掉）。typecheck 四包绿、lint 绿、Metro 打包成功。
 
 ---
 
@@ -429,7 +499,9 @@ Tags 行同 Add 页：稿中未画、annotation 有，**保留**。点照片进�
 | 元素顺序 / 照片网格 / 文本框 / 明细卡 | 同 Add 页的旧写法 | 同 Add 页新规格（note → 107 三列网格 → 明细，py14、Caption 取值、radius/m） | ✅ |
 | 日期行文案 | "Date" | **"Memory Date"** | ✅ |
 
-**待你确认**：删除确认弹窗的 CTA 在稿里是 annotation 内嵌实例，我没拿到它的按钮规格，暂按「DS Destructive "Delete Memory" + DS Text "Cancel"」实现。若那个 sheet 里其实是通栏红底主按钮，说一声我改。
+**删除确认弹窗的 CTA**：稿里这个 sheet 是 annotation 内嵌实例，拿不到按钮规格。第一版按「DS Destructive "Delete Memory" + DS Text "Cancel"」实现；后来查 ST-07 的两个确认 sheet（`770:3145` / `770:3155`）才发现它们**都是"安全动作当绿色主按钮、危险动作当下方 44 高文字按钮"**，于是这里也改成同一语法：**Primary "Keep This Memory" + Destructive 文字按钮 "Delete Memory"**，副标题也并进 title 区（gap 12、`text/secondary`）。
+
+> "Keep This Memory" 这句是我照 "Keep My Account" / "Stay Signed In" 的构词推的 —— 稿里这个 sheet 只给了标题和正文，没给按钮文案。要换措辞说一声。
 
 ### H-full picture `774:4717` — ✅
 
@@ -557,12 +629,44 @@ Stories 页有**两种 header**，原实现只有一种（`h1` "Stories" + 副�
 | Connected 徽标 | 自绘 | DS StatusBadge（active 配色） | ✅ |
 | 两个 sheet 外壳 | 自绘 Modal（0.45 遮罩、40×4 handle） | DS BottomSheet + title/body/cta 分区 | ✅ |
 | sheet 标题 | Manrope Bold **24/32** | **`h1` 28/38** | ✅ |
-| sheet 正文 | `text/secondary`、lineHeight 22 | **`text/primary`** 16/20 | ✅ |
 | 删号 sheet 的输入框 | 裸 `TextInput` | **DS Input**（含"有内容→`border/strong`"态） | ✅ |
-| 删号主按钮 / Cancel | 自绘红底 + 灰字 Cancel | **DS Destructive + DS Text**（`text/brand`） | ✅ |
 | 卡片 radius/l 16、行 p16 gap12、Apple/Google 行结构、Premium 版订阅不自动取消提示 | — | 一致 | ✅ 无需改 |
 
 > 注意：Settings 主页的卡片是 **radius/m 10**，而 Account 页的卡片是 **radius/l 16** —— 稿中两处确实不同，按各自 frame 实现。
+
+#### ST-07 两个确认 sheet：`770:3145` Logout / `770:3155` Delete Account — ⚠️ 第一版做反了，已修
+
+这两帧当时没单独拉，我按"危险操作当主按钮"的常规写法实现，取到规格后发现**稿的按钮层级正好相反**：
+
+| | 稿（主按钮 = DS Primary 绿渐变 353×52） | 稿（次按钮 = 44 高文字按钮） | 我原来的实现 |
+|---|---|---|---|
+| Logout `770:3145` | **"Stay Signed In"** | "Log Out"（`text/error`） | Destructive "Log Out" 在上 + Text "Cancel" 在下 ❌ |
+| Delete `770:3155` | **"Keep My Account"** | "Delete Account"（未激活时 `text/disabled`） | Destructive "Delete Account" 在上 + Text "Cancel" 在下 ❌ |
+
+**这不只是排版差异**：不可逆操作把危险动作放在最显眼的主按钮位，安全性倒置。已按稿改回——安全动作是绿色主按钮，删除/登出降级为下方安静的文字按钮；删号那颗仍保持"输入 DELETE 才解禁"，未解禁时正好是稿里画的 `text/disabled` 灰态。
+
+同批修掉的结构差异：
+
+| 项 | 我原来的实现 | Figma |
+|---|---|---|
+| 副标题归属 | 独立 body 区（与标题相隔 py16+py16 = 32） | **和标题同在 title 区，gap 12**（`770:3149` / `770:3157`） |
+| 副标题颜色 | `text/primary` | **`text/secondary`** |
+| "Type "DELETE" to confirm" | `h4` | **Body 16/20 `text/primary`**（`770:3163`） |
+| 删号 body 区 | 无 gap | **gap 8** |
+| 危险文字按钮高度 | DS destructive 的 40 | **44**（两帧都是，用 `style` 覆盖） |
+
+**未跟稿的一处**：稿把删号输入框画成 **h52**，DS Input 原子（`34:18`）是 h48。判为设计稿漂移，保持 DS 的 48。
+
+**顺带修的后端 bug（比 UI 更严重）**：`DELETE /users/me` 写了 `users.deleted_at`，但 `lib/auth.ts` **从不检查它** —— 全仓库只有 `lib/push.ts` 和 story cron 认这个字段。后果是注销形同虚设：手上的 token 继续畅通无阻，重新登录时 `ensureUser` 的 upsert（`update: {}`）直接把账号原样复活，Stories / Moments / Profiles 全在。已在 auth 的两条路径（dev token 与 Supabase JWT）都加上 `deletedAt` 拦截，返回 401；命中时也不再重建 subscription / linkedProvider 行。
+
+**删除语义（Justin 2026-08-09 定：软删 + 30 天清理）** —— 原先只有软删、没有任何清理任务，数据永久留库，与「permanently removed」文案不符。已落地：
+
+- 新增 `src/lib/accountPurge.ts`：每日扫 `deleted_at <= now-30d`，逐个清 Storage（`memories` / `avatars` 桶的 `<userId>/` 前缀）→ `user.delete()` 级联清库 → 删 Supabase Auth 用户 → 写 `purge_account` 审计。单账号失败不影响其余，次日重试；单次上限 200 个账号。
+- 挂在既有 BullMQ 调度器上（`storyQueue.ts`，`account-purge-daily`，03:15 UTC），避开 02:30 的 story dispatcher。
+- sheet 文案改为「You'll lose access right away. All your data … is permanently deleted 30 days later. This can't be undone.」—— 说的是后端真实行为。
+- 实测：40 天前注销的账号连同 child / moment / assetFile / subscription 全部清除、审计留痕，5 天前注销的账号保留。
+
+> 这个 30 天窗口没有恢复入口（auth 立即拒绝），它的用途是误操作申诉和事故回滚，不是产品功能。
 
 ### ST-Current plan(Free) `764:3775` — ✅ 重写，含**两处内容级问题**
 

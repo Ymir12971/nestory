@@ -97,7 +97,11 @@ export async function usersRoutes(app: FastifyInstance) {
     return { data: { removed: true } };
   });
 
-  // DELETE /users/me — 软删（注销账号，30 天恢复窗）
+  // DELETE /users/me — 注销账号。这里只打 deleted_at：auth 插件立刻拒绝该账号
+  // 的一切请求，真正的删除由 lib/accountPurge.ts 的每日任务在 PURGE_AFTER_DAYS
+  // 天后执行（级联删库 + 清 Storage + 删 Supabase Auth 用户）。
+  // 窗口期内重新登录会拿到 401 ACCOUNT_DELETED（带 purgeAt），客户端据此给出
+  // 恢复入口 —— 见下面的 POST /me/restore（Justin 2026-08-09 选方案 B）。
   app.delete('/me', async (req) => {
     const deletedAt = new Date();
     await prisma.user.update({
@@ -127,5 +131,37 @@ export async function usersRoutes(app: FastifyInstance) {
       }
     }
     return { data: { deletedAt: deletedAt.toISOString() } };
+  });
+
+  // POST /users/me/restore — 撤销注销。auth 插件专门为这条路径放行软删账号
+  // （见 lib/auth.ts 的 RESTORE_PATH），否则用户永远够不着这个入口。
+  app.post('/me/restore', async (req) => {
+    const existing = await prisma.user.findUnique({
+      where:  { id: req.userId },
+      select: { deletedAt: true },
+    });
+    // 清理任务跑过之后这行就没了；此时重新登录本来就会开一个全新账号。
+    if (!existing) throw Errors.notFound('User', req.userId);
+    if (!existing.deletedAt) return { data: { restored: false } }; // 幂等：本来就是活的
+
+    await prisma.user.update({ where: { id: req.userId }, data: { deletedAt: null } });
+    // 注销期间 ensureUser 会跳过这行的创建，恢复时补上 —— /subscriptions/me 等
+    // 五条路由把「没有 subscription」当硬错误处理。
+    await prisma.subscription.upsert({
+      where:  { userId: req.userId },
+      update: {},
+      create: { userId: req.userId },
+    });
+
+    audit({
+      userId:     req.userId,
+      actorType:  'user',
+      action:     'restore_account',
+      resource:   'user',
+      resourceId: req.userId,
+      metadata:   { deletedAt: existing.deletedAt.toISOString() },
+      req,
+    });
+    return { data: { restored: true } };
   });
 }

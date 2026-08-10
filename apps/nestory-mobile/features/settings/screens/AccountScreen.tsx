@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQueryClient } from '@tanstack/react-query';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
 import type { LinkedProvider } from '@nestory/types';
 import { theme } from '@/shared/theme';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
@@ -12,12 +10,9 @@ import { Input } from '@/shared/components/Input';
 import { NavBar } from '@/shared/components/NavBar';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { forceSignOut } from '@/features/auth/signOut';
 import { useMe, useDeleteMe, useSubscription } from '@/api';
-import { setDevSession } from '@/features/auth/hooks/useSession';
-import { getSupabaseClient } from '@/features/auth/supabaseClient';
-import { logOutPurchaseUser } from '@/features/billing/purchases';
 import { showToast } from '@/features/ui/toast';
-import { resetAnalytics } from '@/shared/lib/analytics';
 
 const PROVIDERS: { key: 'apple' | 'google'; label: string }[] = [
   { key: 'apple',  label: 'Apple'  },
@@ -26,12 +21,10 @@ const PROVIDERS: { key: 'apple' | 'google'; label: string }[] = [
 const PROVIDER_ICON = { apple: 'apple-fill', google: 'google-fill' } as const;
 
 export function AccountScreen() {
-  const router = useRouter();
   const goBack = useGoBack();
   const meQ = useMe();
   const subQ = useSubscription();
   const deleteMe = useDeleteMe();
-  const qc = useQueryClient();
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
@@ -44,27 +37,15 @@ export function AccountScreen() {
 
   const handleLogOut = async () => {
     setLogoutVisible(false);
-    const sb = getSupabaseClient();
-    if (sb) await sb.auth.signOut();
-    await logOutPurchaseUser();
-    setDevSession(null);
-    resetAnalytics();
-    qc.clear();
-    router.replace('/onboarding/auth');
+    await forceSignOut();
   };
 
   const confirmDelete = async () => {
     if (!deleteArmed || deleteMe.isPending) return;
     try {
       await deleteMe.mutateAsync();
-      const sb = getSupabaseClient();
-      if (sb) await sb.auth.signOut();
-      await logOutPurchaseUser();
-      setDevSession(null);
-      resetAnalytics();
-      qc.clear();
       showToast({ type: 'success', message: 'Account deleted.' });
-      router.replace('/onboarding/auth');
+      await forceSignOut();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Please try again.';
       showToast({ type: 'error', message: `Couldn't delete account: ${msg}` });
@@ -142,17 +123,25 @@ export function AccountScreen() {
         </View>
       </View>
 
-      {/* ST-07 / Sheet · Logout Confirm */}
+      {/* ST-07 / Sheet · Logout Confirm (770:3145) — headline and its line of
+          reassurance share one title block, 12 apart; there is no body block. */}
       <BottomSheet visible={logoutVisible} onRequestClose={() => setLogoutVisible(false)}>
         <View style={sheetSection.title}>
-          <Text style={styles.sheetTitle}>Log out of Nestory?</Text>
+          <View style={styles.sheetTitleStack}>
+            <Text style={styles.sheetTitle}>Log out of Nestory?</Text>
+            <Text style={styles.sheetSubtitle}>You can always sign back in with the same account.</Text>
+          </View>
         </View>
-        <View style={sheetSection.body}>
-          <Text style={styles.sheetBody}>You can always sign back in with the same account.</Text>
-        </View>
+        {/* cta 775:2586 — the safe action is the primary; logging out is the
+            quiet destructive text button underneath. */}
         <View style={sheetSection.cta}>
-          <Button label="Log Out" onPress={() => void handleLogOut()} />
-          <Button label="Cancel" type="text" onPress={() => setLogoutVisible(false)} />
+          <Button label="Stay Signed In" onPress={() => setLogoutVisible(false)} />
+          <Button
+            label="Log Out"
+            type="destructive"
+            style={styles.sheetTextBtn}
+            onPress={() => void handleLogOut()}
+          />
         </View>
       </BottomSheet>
 
@@ -160,14 +149,19 @@ export function AccountScreen() {
           notice — v2 per annotation; older popup without it is 作废) */}
       <BottomSheet visible={deleteVisible} onRequestClose={() => setDeleteVisible(false)}>
         <View style={sheetSection.title}>
-          <Text style={styles.sheetTitle}>Delete your account?</Text>
+          <View style={styles.sheetTitleStack}>
+            <Text style={styles.sheetTitle}>Delete your account?</Text>
+            {/* Copy tracks what the backend actually does: lock out now, purge
+                on day 30 (accountPurge.ts), restorable by signing back in until
+                then (方案 B). The design's "permanently removed / can't be
+                undone" wording described neither half of that. */}
+            <Text style={styles.sheetSubtitle}>
+              You'll be signed out right away. Your Stories, Moments and Profiles are permanently
+              deleted after 30 days — until then you can change your mind by signing back in.
+            </Text>
+          </View>
         </View>
-        <View style={sheetSection.body}>
-          <Text style={styles.sheetBody}>
-            All your data — Stories, Moments, Profiles — will be permanently removed. This can't be
-            undone.
-          </Text>
-
+        <View style={[sheetSection.body, styles.deleteBody]}>
           {isPremium && (
             <View style={styles.subNotice}>
               <RemixIcon name="error-warning-line" size={20} color={theme.text.warning} />
@@ -190,17 +184,20 @@ export function AccountScreen() {
             placeholder="DELETE"
           />
         </View>
+        {/* cta 775:2629 — "Keep My Account" is the primary; deleting stays a
+            quiet text button that only turns red once DELETE is typed. */}
         <View style={sheetSection.cta}>
+          <Button label="Keep My Account" onPress={() => setDeleteVisible(false)} />
           <Button
             label={deleteMe.isPending ? 'Deleting…' : 'Delete Account'}
             type="destructive"
+            style={styles.sheetTextBtn}
             disabled={!deleteArmed || deleteMe.isPending}
             onPress={() => {
               setDeleteVisible(false);
               void confirmDelete();
             }}
           />
-          <Button label="Cancel" type="text" onPress={() => setDeleteVisible(false)} />
         </View>
       </BottomSheet>
     </SafeAreaView>
@@ -293,31 +290,15 @@ const styles = StyleSheet.create({
     ...theme.typography.h1, // Manrope Bold 28/38
     color: theme.text.primary,
   },
-  sheetBody: {
+  /** title block holds headline + subtitle 12 apart (770:3149, 770:3157) */
+  sheetTitleStack: { gap: theme.spacing.m },
+  sheetSubtitle: {
     ...theme.typography.body, // Inter Regular 16/20
-    color: theme.text.primary,
-  },
-  primaryBtn: {
-    height: 52,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.s,
-  },
-  primaryBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
-  textBtn: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textBtnLabel: {
-    ...theme.typography.buttonLabelM,
     color: theme.text.secondary,
   },
+  /** the destructive text button in confirm sheets is 44 tall, not the DS 40 */
+  sheetTextBtn: { height: 44 },
+  deleteBody: { gap: theme.spacing.s }, // 8
   subNotice: {
     flexDirection: 'row',
     gap: theme.spacing.s,
@@ -335,34 +316,9 @@ const styles = StyleSheet.create({
     color: theme.text.secondary,
     lineHeight: 18,
   },
+  // 770:3163 — the confirm prompt is Body, not a heading
   confirmHint: {
-    ...theme.typography.h4,
+    ...theme.typography.body, // Inter Regular 16/20
     color: theme.text.primary,
-  },
-  confirmInput: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: theme.border.strong,
-    borderRadius: theme.radius.s,
-    paddingHorizontal: theme.spacing.l,
-    ...theme.typography.body,
-    color: theme.text.primary,
-  },
-  deleteBtn: {
-    height: 52,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.text.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBtnDisabled: {
-    backgroundColor: theme.border.default,
-  },
-  deleteBtnLabel: {
-    ...theme.typography.buttonLabelM,
-    color: theme.text.onColor,
-  },
-  deleteBtnLabelDisabled: {
-    color: theme.text.hint,
   },
 });

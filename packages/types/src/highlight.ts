@@ -4,7 +4,6 @@
 export interface HighlightAsset {
   fileUrls: string[];       // ordered by display_order
   textNote: string | null;
-  tags: string[];
   capturedAt: string;
 }
 
@@ -15,7 +14,7 @@ export interface Highlight {
   coverFileId: string | null;          // asset_files.id; null if cover was deleted
   coverOrientation: 'portrait' | 'landscape'; // derived from cover file width/height; drives HL-01 card variant
   title: string | null;                // AI-generated or user-overwritten; null while pending
-  cardType: string;                    // matched from tags, e.g. "playtime" | "outdoor" | "default"
+  cardType: string;                    // stored column, e.g. "playtime" | "outdoor" | "default"
   renderedImageUrl: string | null;     // async render; null while pending
   asset: HighlightAsset;
   createdAt: string;

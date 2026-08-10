@@ -1,6 +1,7 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import * as Sentry from '@sentry/node';
 import IORedis from 'ioredis';
+import { purgeDeletedAccounts, PURGE_AFTER_DAYS } from './accountPurge';
 import { prisma, whereNotDeleted } from './prisma';
 import { toMonthKey } from './month';
 import { generateStory, type MomentInput } from './storyAi';
@@ -15,9 +16,16 @@ const DISPATCHER_ID   = 'story-dispatcher-daily';
 // job. Cron pattern is in the worker's local time — UTC for our deployment.
 const DISPATCH_PATTERN = '30 2 * * *';
 
+// Account purge rides the same queue rather than standing up a second one — it
+// is one short DB/storage sweep a night. 03:15 UTC keeps it clear of the story
+// dispatcher above, which can occupy the single worker slot for a while.
+const PURGE_ID      = 'account-purge-daily';
+const PURGE_PATTERN = '15 3 * * *';
+
 export type StoryJobPayload =
   | { kind: 'generate'; childId: string; monthKey: string }
-  | { kind: 'dispatch' };
+  | { kind: 'dispatch' }
+  | { kind: 'purge' };
 
 let _connection: IORedis | null = null;
 let _queue:      Queue | null = null;
@@ -84,6 +92,8 @@ export function startStoryWorker(log: (msg: string, data?: unknown) => void): Wo
     async (job: Job<StoryJobPayload>) => {
       if (job.data.kind === 'dispatch') {
         await runDispatcher(log);
+      } else if (job.data.kind === 'purge') {
+        await purgeDeletedAccounts(log);
       } else {
         await processGenerateJob(job as Job<{ kind: 'generate'; childId: string; monthKey: string }>, log);
       }
@@ -119,6 +129,20 @@ export function startStoryWorker(log: (msg: string, data?: unknown) => void): Wo
     },
   ).then(() => log(`[story-worker] dispatcher scheduled (${DISPATCH_PATTERN} UTC)`))
    .catch((err: Error) => log(`[story-worker] dispatcher scheduler upsert failed: ${err.message}`));
+
+  void getStoryQueue().upsertJobScheduler(
+    PURGE_ID,
+    { pattern: PURGE_PATTERN, tz: 'UTC' },
+    {
+      name: 'purge',
+      data: { kind: 'purge' } satisfies StoryJobPayload,
+      opts: {
+        removeOnComplete: { age: 60 * 60 * 24 * 7 },
+        removeOnFail:     { age: 60 * 60 * 24 * 14 },
+      },
+    },
+  ).then(() => log(`[account-purge] scheduled (${PURGE_PATTERN} UTC, ${PURGE_AFTER_DAYS}d retention)`))
+   .catch((err: Error) => log(`[account-purge] scheduler upsert failed: ${err.message}`));
 
   return _worker;
 }
@@ -212,7 +236,6 @@ async function processGenerateJob(
   const moments: MomentInput[] = momentsInMonth.map(a => ({
     capturedAt: a.capturedAt.toISOString(),
     textNote:   a.textNote,
-    tags:       a.tags,
     fileUrls:   a.files.map(f => f.fileUrl),
   }));
 
@@ -238,7 +261,6 @@ async function processGenerateJob(
         id:         a.id,
         capturedAt: a.capturedAt.toISOString(),
         text:       a.textNote ?? '',
-        tags:       a.tags,
         photos: a.files.map(f => ({
           url:      f.fileUrl,
           widthPx:  f.widthPx,

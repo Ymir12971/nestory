@@ -71,9 +71,12 @@ export async function apiFetch<T>(
     if (qs) url += `?${qs}`;
   }
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  // Only declare a content type when there is actually content. Fastify
+  // rejects `Content-Type: application/json` with an empty body
+  // (FST_ERR_CTP_EMPTY_JSON_BODY → 400), which broke every bodyless DELETE:
+  // delete account, delete moment, delete child, remove tag.
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (!skipAuth) {
     headers.Authorization = `Bearer ${await getAuthToken()}`;
   }

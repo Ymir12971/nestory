@@ -35,7 +35,6 @@ const MAX_IMAGES     = 10;
 export interface MomentInput {
   capturedAt: string;       // ISO 8601
   textNote:   string | null;
-  tags:       string[];
   fileUrls:   string[];     // not sent to the model in v1; reserved for vision later
 }
 
@@ -112,7 +111,7 @@ Hard rules:
 
 When photos are attached:
 - Use them as grounding for sensory details (what the child is wearing, where they are, what their face shows). Don't describe the photos as "in the photo..." or "you can see..." — weave the observation directly into the narrative.
-- Photos are reference, not the subject. The captions and tags drive the story; photos add texture.
+- Photos are reference, not the subject. The captions drive the story; photos add texture.
 - If a photo's content contradicts the caption, trust the caption — photos can be mislabeled.`;
 
 // ─── Public function ───────────────────────────────────────────────────────
@@ -276,13 +275,12 @@ function buildUserContent(input: GenerateStoryInput): UserContentBlock[] {
       const dateLabel = new Date(m.capturedAt).toLocaleDateString(input.locale, {
         month: 'short', day: 'numeric',
       });
-      const tagPart   = m.tags.length > 0 ? `  [${m.tags.join(', ')}]` : '';
       const photoIdxs = photoIndexByMoment.get(i);
       const photoPart = photoIdxs && photoIdxs.length > 0
         ? `  (photos #${photoIdxs.join(', #')}${m.fileUrls.length > photoIdxs.length ? ` of ${m.fileUrls.length}` : ''})`
         : m.fileUrls.length > 0 ? `  (${m.fileUrls.length} photo${m.fileUrls.length === 1 ? '' : 's'}, not attached)` : '';
       const note      = (m.textNote?.trim()) || '(no caption)';
-      lines.push(`- ${dateLabel}${photoPart}${tagPart}: ${note}`);
+      lines.push(`- ${dateLabel}${photoPart}: ${note}`);
     }
   }
   lines.push('');

@@ -101,18 +101,6 @@ function Body({ moment }: { moment: Moment }) {
           </View>
         )}
 
-        {/* Tags aren't drawn in the frame but the annotation lists them as part
-            of the view page, and Tags ship as a feature — kept. */}
-        {moment.tags.length > 0 && (
-          <View style={styles.tagsRow}>
-            {moment.tags.map((tag) => (
-              <View key={tag} style={styles.tagPill}>
-                <Text style={styles.tagLabel}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
         <View style={styles.metaRow}>
           <RemixIcon name="time-line" size={16} color={theme.text.secondary} />
           <Text style={styles.metaText}>{formatCapturedAt(moment.capturedAt)}</Text>
@@ -198,22 +186,6 @@ const styles = StyleSheet.create({
   noteText: {
     ...theme.typography.body,
     color: theme.text.primary,
-  },
-
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.s,
-  },
-  tagPill: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.brand,
-  },
-  tagLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.onColor,
   },
 
   metaRow: {

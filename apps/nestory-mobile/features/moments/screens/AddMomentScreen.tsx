@@ -8,7 +8,6 @@ import { theme, palette } from '@/shared/theme';
 import { Button } from '@/shared/components/Button';
 import { NavBar } from '@/shared/components/NavBar';
 import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
-import { TagPickerSheet } from '@/shared/components/TagPickerSheet';
 import { DateTimePickerSheet } from '@/shared/components/DateTimePickerSheet';
 import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { uploadPhoto, useChildren, useCreateAsset } from '@/api';
@@ -36,10 +35,8 @@ export function AddMomentScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const [noteText, setNoteText]       = useState('');
   const [photos, setPhotos]           = useState<PickedPhoto[]>([]);
-  const [tags, setTags]               = useState<string[]>([]);
   const [capturedAt, setCapturedAt]   = useState(() => new Date());
   const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
-  const [tagSheetVisible, setTagSheetVisible] = useState(false);
   const [dateSheetVisible, setDateSheetVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -84,7 +81,6 @@ export function AddMomentScreen() {
         childId:    activeChildId,
         capturedAt: capturedAt.toISOString(),
         ...(noteText.trim() ? { textNote: noteText.trim() } : {}),
-        ...(tags.length > 0 ? { tagValues: tags } : {}),
         files: uploaded,
       });
 
@@ -205,29 +201,9 @@ export function AddMomentScreen() {
           )}
         </View>
 
-        {/* detailsList 742:3153 — the design only draws the Memory Date row; the
-            Tags row is kept because Tags ship as a feature (WorkPlan §3 保留). */}
+        {/* detailsList 742:3153 — Memory Date only, matching the frame. Tags
+            were removed from the product (Justin 2026-08-09). */}
         <View style={styles.detailsList}>
-          <Pressable style={styles.detailRow} onPress={() => setTagSheetVisible(true)}>
-            <Text style={styles.detailLabel}>Tags</Text>
-            <View style={styles.detailRight}>
-              {tags.length > 0 ? (
-                <>
-                  <View style={styles.miniChip}>
-                    <Text style={styles.miniChipLabel}>{tags[0]}</Text>
-                  </View>
-                  {tags.length > 1 && (
-                    <Text style={styles.detailValue}>+{tags.length - 1}</Text>
-                  )}
-                </>
-              ) : (
-                <Text style={styles.detailValue}>Add tags</Text>
-              )}
-              <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.hint} />
-            </View>
-          </Pressable>
-
-          <View style={styles.rowDivider} />
 
           <Pressable style={styles.detailRow} onPress={() => setDateSheetVisible(true)}>
             <Text style={styles.detailLabel}>Memory Date</Text>
@@ -246,13 +222,6 @@ export function AddMomentScreen() {
         onTakePhoto={() => void handleTakePhoto()}
         onChooseLibrary={() => void handleChooseFromLibrary()}
         onDismiss={() => setPhotoSourceVisible(false)}
-      />
-
-      <TagPickerSheet
-        visible={tagSheetVisible}
-        selected={tags}
-        onDone={setTags}
-        onDismiss={() => setTagSheetVisible(false)}
       />
 
       <DateTimePickerSheet
@@ -372,17 +341,6 @@ const styles = StyleSheet.create({
     ...theme.typography.caption, // Inter 14/16
     color: theme.text.secondary,
   },
-  miniChip: {
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 3,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.surface.brandSubtle,
-  },
-  miniChipLabel: {
-    ...theme.typography.tagBadge,
-    color: theme.text.brand,
-  },
-
   // CTA
   cta: {
     paddingHorizontal: theme.spacing.xl,

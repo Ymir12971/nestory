@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
+import { PURGE_AFTER_DAYS } from './accountPurge';
 import { Errors } from './errors';
 import { prisma } from './prisma';
 import { getSupabase } from './supabase';
@@ -15,7 +16,22 @@ import { getSupabase } from './supabase';
  *   2. Real Supabase JWT (always available, including in dev): the token is
  *      verified via the Supabase Auth API; on first request the corresponding
  *      `users` + `linked_providers` rows are upserted from the JWT identities.
+ *
+ * Both paths reject a soft-deleted account (`users.deleted_at` set by
+ * DELETE /users/me) with 401 `ACCOUNT_DELETED`. Without this the delete is
+ * cosmetic: a live token keeps working and a fresh sign-in silently restores
+ * the whole account.
+ *
+ * POST /users/me/restore is the one exception — it is how a user takes back a
+ * deletion inside the grace window, so it has to be reachable by exactly the
+ * accounts every other route turns away. It is still fully authenticated.
  */
+const RESTORE_PATH = '/users/me/restore';
+
+/** When the daily purge will erase an account soft-deleted at `deletedAt`. */
+export function purgeDateFor(deletedAt: Date): Date {
+  return new Date(deletedAt.getTime() + PURGE_AFTER_DAYS * 24 * 60 * 60 * 1000);
+}
 async function authPlugin(app: FastifyInstance) {
   app.decorateRequest('userId', '');
 
@@ -35,12 +51,19 @@ async function authPlugin(app: FastifyInstance) {
     const token = extractBearer(req);
     if (!token) throw Errors.unauthorized('Missing Authorization header');
 
+    const restoring = req.url.split('?')[0] === RESTORE_PATH;
+
     if (process.env.NODE_ENV !== 'production' && token.startsWith('dev-')) {
-      req.userId = token.slice(4);
+      const userId = token.slice(4);
+      const row = await prisma.user.findUnique({ where: { id: userId }, select: { deletedAt: true } });
+      // A missing row still passes through: dev tokens are minted before the
+      // user exists and the routes answer 404 on their own.
+      if (row?.deletedAt && !restoring) throw Errors.accountDeleted(purgeDateFor(row.deletedAt));
+      req.userId = userId;
       return;
     }
 
-    req.userId = await verifySupabaseJwt(token, req);
+    req.userId = await verifySupabaseJwt(token, req, restoring);
   });
 }
 
@@ -53,13 +76,21 @@ function checkAdminToken(candidate: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-async function verifySupabaseJwt(token: string, req: FastifyRequest): Promise<string> {
+async function verifySupabaseJwt(
+  token: string,
+  req: FastifyRequest,
+  restoring: boolean,
+): Promise<string> {
   const { data, error } = await getSupabase().auth.getUser(token);
   if (error || !data.user) {
     req.log.info({ err: error }, 'Supabase JWT verification failed');
     throw Errors.unauthorized('Invalid or expired token');
   }
-  await ensureUser(data.user, req);
+  // A soft-deleted account must not come back to life just because the provider
+  // still authenticates it — signing in again would otherwise silently restore
+  // every Story, Moment and Profile the delete sheet said was gone.
+  const { deletedAt } = await ensureUser(data.user, req);
+  if (deletedAt && !restoring) throw Errors.accountDeleted(purgeDateFor(deletedAt));
   return data.user.id;
 }
 
@@ -73,7 +104,10 @@ interface SupabaseAuthUser {
   }[] | null;
 }
 
-async function ensureUser(user: SupabaseAuthUser, req: FastifyRequest): Promise<void> {
+async function ensureUser(
+  user: SupabaseAuthUser,
+  req: FastifyRequest,
+): Promise<{ deletedAt: Date | null }> {
   const email = user.email ?? `${user.id}@no-email.local`; // Apple "Hide My Email" can return null
   const name  = pickName(user);
   const tz    = 'UTC'; // mobile can PATCH /users/me with the real tz once it has it
@@ -81,11 +115,15 @@ async function ensureUser(user: SupabaseAuthUser, req: FastifyRequest): Promise<
   // Upsert the User row. We rely on the JWT `sub` matching our users.id, which
   // is true for users we provision via Supabase Auth — Prisma id and Supabase
   // user.id share the same UUID space.
-  await prisma.user.upsert({
+  const row = await prisma.user.upsert({
     where:  { id: user.id },
     update: {}, // don't overwrite user-edited name/timezone on every login
     create: { id: user.id, email, name, timezone: tz },
+    select: { deletedAt: true },
   });
+  // Deleted accounts are rejected by the caller — don't re-create their
+  // subscription / provider rows on the way out.
+  if (row.deletedAt) return row;
 
   // Every user needs a Subscription row — /subscriptions/me and four other
   // routes do `findUnique({ where: { userId } })` and treat a missing row as a
@@ -123,6 +161,8 @@ async function ensureUser(user: SupabaseAuthUser, req: FastifyRequest): Promise<
       req.log.warn({ err, provider: ident.provider }, 'LinkedProvider upsert skipped');
     }
   }
+
+  return row;
 }
 
 function pickName(user: SupabaseAuthUser): string {

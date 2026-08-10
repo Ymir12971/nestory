@@ -56,3 +56,20 @@ export async function ensureBuckets(log: (msg: string) => void): Promise<void> {
 export function publicUrlFor(bucket: StorageBucket, path: string): string {
   return getSupabase().storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
+
+/**
+ * Deletes objects from a bucket, chunked — Storage takes a path array and we
+ * don't want an unbounded request. Throws on the first failing chunk; callers
+ * that must not fail the surrounding request should catch and log.
+ *
+ * Deleting a database row never removes its file: without a call to this, the
+ * object outlives the record and keeps costing storage.
+ */
+export async function removeStorageObjects(bucket: StorageBucket, paths: string[]): Promise<number> {
+  const CHUNK = 100;
+  for (let i = 0; i < paths.length; i += CHUNK) {
+    const { error } = await getSupabase().storage.from(bucket).remove(paths.slice(i, i + CHUNK));
+    if (error) throw new Error(`remove from ${bucket} failed: ${error.message}`);
+  }
+  return paths.length;
+}

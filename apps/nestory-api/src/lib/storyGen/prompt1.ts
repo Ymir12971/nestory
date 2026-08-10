@@ -6,15 +6,14 @@ import { type StoryGenConfig, maxThemesForMomentCount } from './config';
 // Prompt 1 · 结构决策 (StoryGenPrompts §2, Step A-D). STRUCTURE ONLY — no
 // user-facing text. Low temperature: the structure should be reproducible.
 //
-// Deviation from the doc: highlight/is_highlight signals are dropped — the
-// Highlight feature was removed in the 2026-07 redesign, so moments carry
-// only text/tags/photo counts as signals.
+// Deviation from the doc: highlight/is_highlight and tag signals are dropped —
+// Highlights went in the 2026-07 redesign and Tags followed (Justin 2026-08-09),
+// so moments carry only text and photo counts as signals.
 
 export interface P1Moment {
   id:         string;
   capturedAt: string;        // ISO 8601
   text:       string;        // moments are text-required since the redesign
-  tags:       string[];
   photoCount: number;
 }
 
@@ -76,8 +75,6 @@ Hard rules:
 - Skip any moment that is clearly NOT about the child (list it in
   skipped_moment_ids); if fewer than 5 usable moments remain, return
   generate=false with a reason.
-- Tags are SUPPORTING signals only; do not let an unfamiliar custom tag drive
-  your grouping. Ignore tags you don't understand.
 - You do NOT choose photos — downstream code does. Use photo COUNT only as a
   hint of how rich a moment is.`;
 
@@ -87,7 +84,6 @@ function buildUserPrompt(input: P1Input, cfg: StoryGenConfig): string {
     id:          m.id,
     captured_at: m.capturedAt,
     text:        m.text,
-    tags:        m.tags,
     photo_count: m.photoCount,
   }));
   return [

@@ -21,7 +21,6 @@ export interface Moment {
   assetType: AssetType;
   files: MomentFile[];      // empty array for text-only moments
   textNote: string | null;
-  tags: string[];           // value snapshot, e.g. ["Playtime", "第一次独站"]
   isHighlight: boolean;
   linkedHighlight: { id: string; title: string | null } | null; // M-04 detail page surfaces title
   capturedAt: string;       // ISO 8601, client local time (used for month grouping)
@@ -34,7 +33,6 @@ export interface MomentCreate {
   childId: string;          // required
   capturedAt: string;       // required, ISO 8601
   textNote?: string;        // ≤ 500 chars
-  tagValues?: string[];     // tag name strings; new custom tags auto-added to user_tag_library
   isHighlight?: boolean;
   // photos: File[]         // attached as multipart; ≤ 10 files, ≤ 10MB each, JPEG/PNG/HEIF
 }
@@ -42,7 +40,6 @@ export interface MomentCreate {
 // PATCH /assets/:id — multipart/form-data
 export interface MomentPatch {
   textNote?: string;
-  tagValues?: string[];     // full replacement of tags array
   isHighlight?: boolean;
   // addPhotos: File[]       // append to asset_files, display_order continues
   // removeFileIds: string[] // asset_files.id list to delete

@@ -47,7 +47,6 @@ function serializeHighlight(row: any): Highlight {
   const asset: HighlightAsset = {
     fileUrls:   row.rawAsset.files.map((f: any) => f.fileUrl),
     textNote:   row.rawAsset.textNote,
-    tags:       row.rawAsset.tags,
     capturedAt: row.rawAsset.capturedAt.toISOString(),
   };
 

@@ -28,6 +28,14 @@ export async function deleteMe(): Promise<{ deletedAt: string }> {
   return res.data;
 }
 
+/** Takes back a deletion inside the grace window. */
+export async function restoreMe(): Promise<{ restored: boolean }> {
+  const res = await apiFetch<{ data: { restored: boolean } }>('/users/me/restore', {
+    method: 'POST',
+  });
+  return res.data;
+}
+
 // ---------- Hooks ----------
 
 export function useMe() {

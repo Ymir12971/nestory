@@ -4,7 +4,6 @@ export * from './child';
 export * from './asset';
 export * from './highlight';
 export * from './share';
-export * from './tag';
 export * from './story';
 export * from './subscription';
 export * from './permission';

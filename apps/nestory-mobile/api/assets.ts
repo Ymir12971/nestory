@@ -19,13 +19,11 @@ export interface MomentCreateInput {
   childId:     string;
   capturedAt:  string;          // ISO 8601
   textNote?:   string;
-  tagValues?:  string[];
   files?:      AssetFileInput[];
 }
 
 export interface MomentPatchInput {
   textNote?:       string;
-  tagValues?:      string[];
   addFiles?:       AssetFileInput[];
   removeFileIds?:  string[];
   reorderFileIds?: string[];

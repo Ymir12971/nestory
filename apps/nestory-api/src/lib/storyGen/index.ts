@@ -17,7 +17,6 @@ export interface V3Moment {
   id:         string;
   capturedAt: string;
   text:       string;
-  tags:       string[];
   photos:     V3Photo[];
 }
 
@@ -68,7 +67,6 @@ export async function generateStoryV3(
     id:         m.id,
     capturedAt: m.capturedAt,
     text:       m.text,
-    tags:       m.tags,
     photoCount: m.photos.length,
   }));
   const structure: StructureDecision = await runPrompt1(client, {

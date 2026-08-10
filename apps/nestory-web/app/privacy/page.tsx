@@ -17,7 +17,7 @@ export default function PrivacyPage() {
       <p style={metaStyle}>Effective {EFFECTIVE_DATE}</p>
 
       <p>
-        Nestory ("we", "us") is a mobile and web app that helps families capture
+        Nestory (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is a mobile and web app that helps families capture
         photo moments of their children and turn them into AI-generated monthly
         stories. This policy explains what data we collect, why, and how to
         control it.
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
       <h2 style={h2Style}>1. What we collect</h2>
       <ul style={ulStyle}>
         <li><strong>Account info</strong> — your email and name, supplied via Google sign-in or email/password registration.</li>
-        <li><strong>Child profile info</strong> you enter — child's name, birthday, gender, height, weight, avatar photo.</li>
+        <li><strong>Child profile info</strong> you enter — child&rsquo;s name, birthday, gender, height, weight, avatar photo.</li>
         <li><strong>Moments you create</strong> — photos and notes you upload to record moments. Photos are stored in Supabase Storage; metadata in our Supabase Postgres database.</li>
         <li><strong>Generated content</strong> — AI Story documents created from your moments.</li>
         <li><strong>Subscription state</strong> — when you purchase a Premium plan, the store (Google Play / App Store) reports purchase status to us via RevenueCat.</li>

@@ -106,11 +106,14 @@ export function ChildProfileListScreen() {
 
       {renderBody()}
 
-      {/* CTA — Add Child */}
+      {/* CTA — Add Child. Goes to the onboarding profile form, same as the
+          "+Add child" action on the Settings page. `/settings/profiles/new`
+          would land on the [id] edit route and fetch GET /children/new, which
+          fails uuid validation and dead-ends on "Failed to load profile". */}
       <View style={styles.cta}>
         <Pressable
           style={({ pressed }) => [styles.addBtnWrap, pressed && { opacity: 0.85 }]}
-          onPress={() => router.push('/settings/profiles/new')}
+          onPress={() => router.push('/onboarding/profile?another=1&from=settings')}
         >
           <LinearGradient
             colors={[palette.primary[500], palette.primary[400]]}

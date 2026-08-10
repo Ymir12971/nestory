@@ -56,7 +56,6 @@ model User {
   highlights      Highlight[]
   stories         Story[]
   subscription    Subscription?
-  tagLibrary      UserTagLibrary[]
   linkedProviders LinkedProvider[]
   auditLogs       AuditLog[]
   pushTokens      PushToken[]
@@ -131,7 +130,6 @@ model RawAsset {
   exifTakenAt   DateTime? @map("exif_taken_at") @db.Timestamptz(6)
   aiDescription String?   @map("ai_description") @db.Text
   aiKeywords    Json?     @map("ai_keywords") @db.JsonB
-  tags          String[]  @default([])
   isHighlight   Boolean   @default(false) @map("is_highlight")
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6) // 决策 5："最近删除"30 天
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -143,7 +141,6 @@ model RawAsset {
 
   @@index([childId, capturedAt(sort: Desc)], map: "idx_assets_child_captured")
   @@index([deletedAt], map: "idx_assets_deleted_at")
-  // GIN(tags) 索引在 migration SQL 后置脚本加（Prisma DSL 不支持 GIN）
   @@map("raw_assets")
 }
 
@@ -172,27 +169,6 @@ model AssetFile {
 
   @@index([assetId, displayOrder], map: "idx_asset_files_asset")
   @@map("asset_files")
-}
-
-// ============================================================================
-// user_tag_library
-// ============================================================================
-
-model UserTagLibrary {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  name      String   @db.VarChar(50)
-  // matching key = LOWER(TRIM(name))，应用层 normalize；UNIQUE 约束基于此
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // 真实唯一约束是 functional index idx_user_tag_library_user_normalized_name
-  // (user_id, LOWER(TRIM(name)))，见 migrations/…_post_init_and_redesign。
-  // Prisma DSL 无法表达函数索引，故此处不声明 @@unique —— 否则每次 migrate
-  // 都会把 DB 判成漂移并要求重建字面唯一索引。
-  @@index([userId], map: "idx_user_tag_library_user")
-  @@map("user_tag_library")
 }
 
 // ============================================================================

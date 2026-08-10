@@ -6,6 +6,7 @@ import { ApiError, Errors } from '../lib/errors';
 import { parseBody, parseParams, parseQuery, uuidParam, cursorPagination } from '../lib/validation';
 import { isCurrentMonth, toMonthKey } from '../lib/month';
 import { enqueuePhotoPreprocess } from '../lib/photoPreprocess';
+import { removeStorageObjects } from '../lib/supabase';
 
 // ---------- Schemas ----------
 
@@ -24,7 +25,6 @@ const momentCreateSchema = z.object({
   capturedAt:  z.string().datetime(),
   // Redesign: text is required to save a Moment (photos optional).
   textNote:    z.string().min(1).max(MOMENT_CONSTRAINTS.maxTextChars),
-  tagValues:   z.array(z.string().min(1).max(50)).max(20).optional(),
   isHighlight: z.boolean().optional(),
   files:       z.array(fileInputSchema).max(MOMENT_CONSTRAINTS.maxPhotos).optional(),
 });
@@ -32,7 +32,6 @@ const momentCreateSchema = z.object({
 // Highlight toggle 走 POST /highlights（配额校验），不在 PATCH 里处理
 const momentPatchSchema = z.object({
   textNote:        z.string().max(MOMENT_CONSTRAINTS.maxTextChars).optional(),
-  tagValues:       z.array(z.string().min(1).max(50)).max(20).optional(),
   addFiles:        z.array(fileInputSchema).optional(),
   removeFileIds:   z.array(z.string().uuid()).optional(),
   reorderFileIds:  z.array(z.string().uuid()).optional(),
@@ -64,7 +63,6 @@ function serializeMoment(row: any): Moment {
       displayOrder: f.displayOrder,
     })),
     textNote:      row.textNote,
-    tags:          row.tags,
     isHighlight:   row.isHighlight,
     linkedHighlight: row.highlight
       ? { id: row.highlight.id, title: row.highlight.title }
@@ -116,40 +114,6 @@ async function stampStoryMomentsChanged(childId: string, capturedAt: Date, tz: s
   }
 }
 
-/**
- * Normalize tags: trim, drop empties, dedupe case-insensitively.
- * Preserves first-occurrence casing so "Playtime" + "playtime" → ["Playtime"].
- */
-function normalizeTags(tagValues: string[] | undefined): string[] {
-  if (!tagValues) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of tagValues) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(trimmed);
-  }
-  return out;
-}
-
-async function upsertCustomTags(userId: string, tagValues: string[]): Promise<void> {
-  // 把不在预设/library 里的写入 user_tag_library；不存在则插入，存在则跳过
-  // 用 raw SQL 才能用 LOWER(TRIM(name)) unique 索引去重
-  for (const tag of tagValues) {
-    const normalized = tag.trim().toLowerCase();
-    if (!normalized) continue;
-    await prisma.$executeRaw`
-      INSERT INTO user_tag_library (user_id, name)
-      VALUES (${userId}::uuid, ${tag.trim()})
-      ON CONFLICT DO NOTHING
-    `;
-    // 注：post-init.sql 已建 (user_id, LOWER(TRIM(name))) 唯一索引；冲突自动跳过
-  }
-}
-
 // ---------- Routes ----------
 
 export async function assetsRoutes(app: FastifyInstance) {
@@ -180,7 +144,6 @@ export async function assetsRoutes(app: FastifyInstance) {
     }
     const assetType: 'photo' | 'text' | 'mixed' =
       hasFiles && hasText ? 'mixed' : hasFiles ? 'photo' : 'text';
-    const normalizedTags = normalizeTags(body.tagValues);
 
     const moment = await prisma.$transaction(async (tx) => {
       const created = await tx.rawAsset.create({
@@ -189,7 +152,6 @@ export async function assetsRoutes(app: FastifyInstance) {
           userId:      req.userId,
           assetType,
           textNote:    body.textNote ?? null,
-          tags:        normalizedTags,
           isHighlight: false, // 必须走 POST /highlights 走配额校验
           capturedAt,
           files: body.files
@@ -208,10 +170,6 @@ export async function assetsRoutes(app: FastifyInstance) {
         },
         include: { files: { orderBy: { displayOrder: 'asc' } } },
       });
-
-      if (normalizedTags.length > 0) {
-        await upsertCustomTags(req.userId, normalizedTags);
-      }
 
       return created;
     });
@@ -402,14 +360,9 @@ export async function assetsRoutes(app: FastifyInstance) {
       );
     }
 
-    const normalizedPatchTags = body.tagValues !== undefined
-      ? normalizeTags(body.tagValues)
-      : undefined;
-
     const updated = await prisma.$transaction(async (tx) => {
       const data: any = {};
       if (body.textNote        !== undefined) data.textNote = body.textNote;
-      if (normalizedPatchTags  !== undefined) data.tags     = normalizedPatchTags;
 
       if (Object.keys(data).length > 0) {
         await tx.rawAsset.update({ where: { id }, data });
@@ -450,17 +403,6 @@ export async function assetsRoutes(app: FastifyInstance) {
             where: { id: body.reorderFileIds[i]! },
             data:  { displayOrder: i },
           });
-        }
-      }
-
-      // 自定义 tags 入库
-      if (normalizedPatchTags && normalizedPatchTags.length > 0) {
-        for (const tag of normalizedPatchTags) {
-          await tx.$executeRaw`
-            INSERT INTO user_tag_library (user_id, name)
-            VALUES (${req.userId}::uuid, ${tag})
-            ON CONFLICT DO NOTHING
-          `;
         }
       }
 
@@ -524,7 +466,22 @@ export async function assetsRoutes(app: FastifyInstance) {
       return { data: { deletedAt: new Date().toISOString() } };
     }
 
+    // Grab the storage paths before the cascade takes asset_files with it —
+    // otherwise the photos outlive the Moment in the bucket forever.
+    const files = await prisma.assetFile.findMany({
+      where:  { assetId: id },
+      select: { storagePath: true },
+    });
     await prisma.rawAsset.delete({ where: { id } });
+    if (files.length > 0) {
+      // Best effort: the rows are already gone, so a Storage hiccup must not
+      // turn a successful delete into an error for the client.
+      try {
+        await removeStorageObjects('memories', files.map((f) => f.storagePath));
+      } catch (err) {
+        req.log.warn({ err, assetId: id }, 'storage cleanup after hard delete failed');
+      }
+    }
     await stampStoryMomentsChanged(existing.childId, existing.capturedAt, tz);
     return { data: { hardDeleted: true } };
   });
