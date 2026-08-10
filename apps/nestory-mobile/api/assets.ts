@@ -131,9 +131,15 @@ export function useCreateAsset() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createAsset,
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: queryKeys.assets(vars.childId) });
-      qc.invalidateQueries({ queryKey: queryKeys.subscription }); // story_quota / hl count 可能变
+    onSuccess: () => {
+      // Must be the bare ['assets'] prefix, like update/delete use. Passing
+      // queryKeys.assets(childId) builds ['assets', childId, null], and a
+      // month-scoped list is ['assets', childId, '2026-08'] — the keys differ
+      // at the last element, so prefix matching misses it and the timeline
+      // never refreshes after adding a Moment. It also has to reach
+      // ['assets','months',childId], which grows a new month.
+      qc.invalidateQueries({ queryKey: ['assets'] });
+      qc.invalidateQueries({ queryKey: queryKeys.subscription }); // story_quota 可能变
     },
   });
 }

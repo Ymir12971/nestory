@@ -148,7 +148,7 @@ export function AddMomentScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* NavBar Type=withButton (742:3083) — Save lives here, not in a footer */}
       <NavBar
-        title="Add Memory"
+        title="Add Moment"
         onBack={goBack}
         right={
           <Button
@@ -206,7 +206,7 @@ export function AddMomentScreen() {
         <View style={styles.detailsList}>
 
           <Pressable style={styles.detailRow} onPress={() => setDateSheetVisible(true)}>
-            <Text style={styles.detailLabel}>Memory Date</Text>
+            <Text style={styles.detailLabel}>Moment Date</Text>
             <View style={styles.detailRight}>
               <Text style={styles.detailValue}>{formatCapturedAt(capturedAt)}</Text>
               <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.hint} />

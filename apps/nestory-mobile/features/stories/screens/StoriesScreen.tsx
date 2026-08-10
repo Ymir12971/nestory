@@ -295,7 +295,7 @@ export function StoriesScreen() {
         type: 'info',
         message: res.status === 'already_in_progress'
           ? 'Your Story is already on its way — give it a moment.'
-          : 'Generating your Story… give it ~30 seconds, then pull to refresh.',
+          : 'Generating your Story… this usually takes under a minute.',
         duration: 5000,
       });
     } catch (e) {

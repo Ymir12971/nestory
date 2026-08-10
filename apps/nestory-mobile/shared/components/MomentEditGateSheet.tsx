@@ -43,8 +43,8 @@ export function MomentEditGateSheet({
       <View style={sheetSection.body}>
         <Text style={styles.body}>
           {isFree
-            ? 'This Memory was used to create a Story.\nYou can upgrade to Premium to edit and recreate that Story.'
-            : 'This Memory was used to create a Story.\n\nAs our Premium user, you have the chance to regenerate that Story later.'}
+            ? 'This Moment was used to create a Story.\nYou can upgrade to Premium to edit and recreate that Story.'
+            : 'This Moment was used to create a Story.\n\nAs our Premium user, you have the chance to regenerate that Story later.'}
         </Text>
       </View>
 

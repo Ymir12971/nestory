@@ -26,7 +26,7 @@ export function AddMomentEntrySheet({ visible, onSelect, onDismiss }: AddMomentE
   return (
     <BottomSheet visible={visible} onRequestClose={onDismiss}>
       <View style={sheetSection.title}>
-        <Text style={styles.title}>Add Memory</Text>
+        <Text style={styles.title}>Add Moment</Text>
       </View>
 
       <View style={styles.listBlock}>

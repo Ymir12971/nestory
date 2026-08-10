@@ -40,7 +40,7 @@ export function MomentDetailScreen() {
         </View>
       ) : momentQ.isError || !momentQ.data ? (
         <View style={styles.center}>
-          <NavBar title="Memory" onBack={goBack} />
+          <NavBar title="Moment" onBack={goBack} />
           <Text style={styles.errorText}>Failed to load moment.</Text>
           <Pressable onPress={() => momentQ.refetch()}>
             <Text style={styles.retryText}>Tap to retry</Text>
@@ -78,7 +78,7 @@ function Body({ moment }: { moment: Moment }) {
     <>
       {/* NavBar Type=withButton (743:3280) — Edit is a DS Text button */}
       <NavBar
-        title="Memory"
+        title="Moment"
         onBack={goBack}
         right={<Button label="Edit" type="text" style={styles.editBtn} onPress={onEditPress} />}
       />

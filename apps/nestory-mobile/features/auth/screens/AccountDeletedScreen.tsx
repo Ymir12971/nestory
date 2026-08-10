@@ -66,8 +66,11 @@ export function AccountDeletedScreen() {
           disabled={restoring}
           onPress={() => void handleRestore()}
         />
+        {/* Not "Sign Out" — the user just signed IN and landed here, so being
+            offered a sign-out reads backwards. It does end the session, but
+            what the user is choosing is to go back and use another account. */}
         <Button
-          label="Sign Out"
+          label="Back to Sign In"
           type="text"
           style={styles.textBtn}
           disabled={restoring}

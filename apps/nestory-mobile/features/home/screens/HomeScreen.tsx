@@ -197,7 +197,7 @@ export function HomeScreen() {
   return (
     <View style={styles.root}>
       {assetsQ.isError && hasAnyMoments ? (
-        /* H-Memories couldn't load 774:3710 — header keeps a hairline, the
+        /* H-Moments couldn't load 774:3710 — header keeps a hairline, the
            Filter is hidden, and the Abnormal block centres in the body.
            Pull-to-refresh stays per the annotation. */
         <>
@@ -218,7 +218,7 @@ export function HomeScreen() {
                   build, so the equivalent wifi-off-line stands in. */}
               <RemixIcon name="wifi-off-line" size={48} color={theme.text.secondary} />
               <View style={styles.abnormalText}>
-                <Text style={styles.abnormalTitle}>Memories couldn't load</Text>
+                <Text style={styles.abnormalTitle}>Moments couldn't load</Text>
                 <Text style={styles.abnormalBody}>Check your connection and try again.</Text>
               </View>
             </View>
@@ -342,7 +342,7 @@ export function HomeScreen() {
 
           {/* cta 731:1468 — floating block with an upward shadow */}
           <View style={styles.floatingCta}>
-            <Button label="+ Add Memory" onPress={() => setAddEntryVisible(true)} />
+            <Button label="+ Add Moment" onPress={() => setAddEntryVisible(true)} />
           </View>
         </>
       ) : (
@@ -371,7 +371,7 @@ export function HomeScreen() {
             </View>
             <View style={styles.emptyCtaBlock}>
               <Text style={styles.emptyHint}>A photo or a quick note :)</Text>
-              <Button label="+ Add Memory" onPress={() => setAddEntryVisible(true)} />
+              <Button label="+ Add Moment" onPress={() => setAddEntryVisible(true)} />
             </View>
           </View>
         </>

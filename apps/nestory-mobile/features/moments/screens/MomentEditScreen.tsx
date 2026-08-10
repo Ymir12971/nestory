@@ -36,7 +36,7 @@ export function MomentEditScreen() {
       {/* The loaded state renders its own NavBar so Save can live in the right
           slot (743:4824); these placeholder states just need the bar. */}
       {(momentQ.isLoading || momentQ.isError || !momentQ.data) && (
-        <NavBar title="Edit Memory" onBack={goBack} />
+        <NavBar title="Edit Moment" onBack={goBack} />
       )}
 
       {momentQ.isLoading ? (
@@ -177,7 +177,7 @@ function EditForm({ moment }: { moment: Moment }) {
     <>
       {/* NavBar Type=withButton (743:4824) — Save sits in the right slot */}
       <NavBar
-        title="Edit Memory"
+        title="Edit Moment"
         onBack={goBack}
         right={
           <Button
@@ -239,7 +239,7 @@ function EditForm({ moment }: { moment: Moment }) {
         <View style={styles.detailsList}>
           {/* Memory Date — read-only here; capture date is fixed at create */}
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Memory Date</Text>
+            <Text style={styles.detailLabel}>Moment Date</Text>
             <Text style={styles.detailValue}>{formatDate(moment.capturedAt)}</Text>
           </View>
         </View>
@@ -250,7 +250,7 @@ function EditForm({ moment }: { moment: Moment }) {
       {/* cta 743:4885 — the footer only carries Delete Memory */}
       <View style={styles.cta}>
         <Button
-          label={deleting ? 'Deleting…' : 'Delete Memory'}
+          label={deleting ? 'Deleting…' : 'Delete Moment'}
           type="destructive"
           style={styles.deleteBtn}
           disabled={saving || deleting}
@@ -273,12 +273,12 @@ function EditForm({ moment }: { moment: Moment }) {
         </View>
         {/* Same grammar as the two spec'd confirm sheets (770:3145 / 770:3155):
             keeping is the primary, deleting is the quiet 44-tall text button.
-            The "Keep This Memory" label is inferred — the design's copy for
+            The "Keep This Moment" label is inferred — the design's copy for
             this sheet only covers the title and body. */}
         <View style={sheetSection.cta}>
-          <Button label="Keep This Memory" onPress={() => setDeleteConfirmVisible(false)} />
+          <Button label="Keep This Moment" onPress={() => setDeleteConfirmVisible(false)} />
           <Button
-            label={deleting ? 'Deleting…' : 'Delete Memory'}
+            label={deleting ? 'Deleting…' : 'Delete Moment'}
             type="destructive"
             style={styles.sheetTextBtn}
             disabled={deleting}

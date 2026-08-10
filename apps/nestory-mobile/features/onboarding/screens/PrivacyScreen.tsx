@@ -4,24 +4,27 @@ import { NavBar } from '@/shared/components/NavBar';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
+// Copy transcribed verbatim from O-Privacy Policy 739:1566 — the design's
+// placeholder wording, "(placeholder)" markers and date included.
 const PRIVACY_SECTIONS = [
   {
-    title: 'Information We Collect',
-    body: 'We collect information you provide directly, such as your name, email address, and the content you create in the app. We also collect usage data to improve the service.',
+    title: '1. Data we collect',
+    body: 'We may collect account details, child profile info you provide, and product usage diagnostics.',
   },
   {
-    title: 'How We Use Your Information',
-    body: 'We use your information to provide and improve Nestory, send you updates, and personalize your experience. We do not sell your personal data to third parties.',
+    title: '2. How we use data',
+    body: 'Data is used to provide features, improve reliability, and deliver relevant notifications.',
   },
   {
-    title: 'Data Storage and Security',
-    body: 'Your data is stored securely on our servers. We use industry-standard encryption to protect your information. You can request deletion of your account and data at any time.',
+    title: '3. Your choices',
+    body: 'You can request access, correction, or deletion by contacting us.',
   },
   {
-    title: 'Your Rights',
-    body: 'You have the right to access, correct, or delete your personal data. To exercise these rights or for privacy inquiries, please contact us through the app\'s feedback feature.',
+    title: '4. Contact',
+    body: 'Privacy: privacy@nestory.app (placeholder)',
   },
 ];
+
 
 export function PrivacyScreen() {
   const goBack = useGoBack();
@@ -32,10 +35,8 @@ export function PrivacyScreen() {
 
       {/* body 739:1569 — sections sit flat on the page, no card wrapper */}
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <Text style={styles.updatedLabel}>Last updated: January 1, 2025</Text>
-        <Text style={styles.hint}>
-          Your privacy matters to us. This policy explains how we handle your data.
-        </Text>
+        <Text style={styles.updatedLabel}>Last updated: Apr 15, 2026 · Placeholder copy</Text>
+        <Text style={styles.hint}>Placeholder content for legal review and layout validation.</Text>
 
         {PRIVACY_SECTIONS.map((section, i) => (
           <View key={i} style={styles.section}>

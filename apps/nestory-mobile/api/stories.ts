@@ -55,6 +55,12 @@ export function useStories(args: { childId: string; year?: number }) {
     queryKey: queryKeys.stories(args.childId, args.year),
     queryFn:  () => listStories(args),
     enabled:  !!args.childId,
+    // The Stories screen renders a spinner card while the worker runs, but
+    // nothing else on that screen refetches — sitting on it, the spinner was
+    // permanent even after the story finished seconds later. Poll only while
+    // generation is actually in flight, then stop.
+    refetchInterval: (query) =>
+      query.state.data?.currentMonth.listItemState === 'current_in_progress' ? 5000 : false,
   });
 }
 

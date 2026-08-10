@@ -4,24 +4,29 @@ import { NavBar } from '@/shared/components/NavBar';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
+// Copy transcribed verbatim from O-Terms of Service 739:1547. It is the
+// design's placeholder wording, including the "(placeholder)" markers and the
+// Apr 15, 2026 date — Justin asked for these two pages to follow the frame
+// exactly. Handoff still says both will become an embedded Termly page.
 const TERMS_SECTIONS = [
   {
-    title: 'Acceptance of Terms',
-    body: 'By accessing or using Nestory, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the app.',
+    title: '1. Agreement',
+    body: 'By using Nestory, you agree to these terms. If you disagree, please stop using the service.',
   },
   {
-    title: 'Use of the Service',
-    body: 'Nestory is a personal moment-keeping app. You are responsible for all content you create and share. You agree not to use the service for any unlawful purpose.',
+    title: '2. Accounts',
+    body: 'You are responsible for your account security and all activity under your credentials.',
   },
   {
-    title: 'Intellectual Property',
-    body: 'All content you upload remains yours. By using Nestory, you grant us a limited license to store and display your content solely to provide the service.',
+    title: '3. Billing',
+    body: 'Paid subscriptions and refunds follow the platform billing rules shown at checkout.',
   },
   {
-    title: 'Limitation of Liability',
-    body: 'Nestory is provided "as is" without warranties of any kind. We are not liable for any indirect, incidental, or consequential damages arising from your use of the service.',
+    title: '4. Contact',
+    body: 'Questions: support@nestory.app (placeholder)',
   },
 ];
+
 
 export function TermsScreen() {
   const goBack = useGoBack();
@@ -32,8 +37,8 @@ export function TermsScreen() {
 
       {/* body 739:1550 — sections sit flat on the page, no card wrapper */}
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <Text style={styles.updatedLabel}>Last updated: January 1, 2025</Text>
-        <Text style={styles.hint}>Please read these terms carefully before using Nestory.</Text>
+        <Text style={styles.updatedLabel}>Last updated: Apr 15, 2026 · Placeholder copy</Text>
+        <Text style={styles.hint}>Placeholder content for legal review and layout validation.</Text>
 
         {TERMS_SECTIONS.map((section, i) => (
           <View key={i} style={styles.section}>
