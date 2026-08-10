@@ -3,6 +3,10 @@
 > 自动提取自 Figma 页面 `Nestory-new version` (731:1269),文件 wS1hJeZhXMkUnn8YwLtFcv。
 > 提取时间: 2026-07-15。共 60 个 annotation frame。
 
+> [!NOTE]
+> 本文是设计师 annotation 的**逐字转录**，保持原样不做修改。其中提到的 Tag 显示规则
+> （Add 页与 View 页）已于 2026-08-09 随 Tag 体系整体废弃，实现中不再存在。
+
 
 ## Onboarding (O-)
 

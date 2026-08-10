@@ -1,5 +1,16 @@
 # Nestory — 安全与合规设计
 
+> [!WARNING]
+> **Tag 体系已于 2026-08-09 整体废弃。**
+>
+> 本文中所有关于 Tag / Tag Picker / `user_tag_library` / `tag_values` / `raw_assets.tags`
+> 的内容均已作废 —— 代码、接口、数据库、storyGen prompt 输入全部删除
+> （迁移 `20260809220000_remove_tags`）。现状以 [figma-calibration-2026-08-05.md](../new-version-2026-07-14/figma-calibration-2026-08-05.md) 的「Tag 体系整体下线」一节为准。
+> 
+> **不含 DS 的 `Tag` 原子**（Selected/Unselected/Disabled 三态 chip，`shared/components/Tag.tsx`）——
+> 那是设计系统组件，仍在使用（性别、称呼等选择），与本条无关。
+
+
 **版本：** v1.0
 **日期：** 2026-04-25
 **依赖文档：** 技术架构 v1.3 · 数据库设计 v1.2 · API 设计 v1.1 · ARCH-DECISIONS-20260425

@@ -1,5 +1,16 @@
 # Nestory — 换机器交接说明
 
+> [!WARNING]
+> **Tag 体系已于 2026-08-09 整体废弃。**
+>
+> 本文中所有关于 Tag / Tag Picker / `user_tag_library` / `tag_values` / `raw_assets.tags`
+> 的内容均已作废 —— 代码、接口、数据库、storyGen prompt 输入全部删除
+> （迁移 `20260809220000_remove_tags`）。现状以 [figma-calibration-2026-08-05.md](../new-version-2026-07-14/figma-calibration-2026-08-05.md) 的「Tag 体系整体下线」一节为准。
+> 
+> **不含 DS 的 `Tag` 原子**（Selected/Unselected/Disabled 三态 chip，`shared/components/Tag.tsx`）——
+> 那是设计系统组件，仍在使用（性别、称呼等选择），与本条无关。
+
+
 **生成日期**：2026-04-30
 **最近更新**：2026-05-03(本地端到端联调 — DB 接通,API 跑通,mobile bundle 受阻)
 **用途**：在另一台机器上恢复 Claude Code 协作上下文

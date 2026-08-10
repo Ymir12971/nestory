@@ -29,7 +29,7 @@
 
 ## 2 · 项目一句话
 
-Nestory 是一款 **iOS / Android 双端 App**（React Native + Expo），让家长记录孩子的日常（照片+文字+Tag/Highlight），按月由 AI 自动生成图文回顾 Story，用户可把特别的时刻 Pin 成 Highlight。核心价值是**低负担、高回忆密度**。
+Nestory 是一款 **iOS / Android 双端 App**（React Native + Expo），让家长记录孩子的日常（照片 + 文字），按月由 AI 自动生成图文回顾 Story，用户可把特别的时刻 Pin 成 Highlight。核心价值是**低负担、高回忆密度**。
 
 ---
 

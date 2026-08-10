@@ -1,5 +1,16 @@
 # Nestory_Handoff_v1.0
 
+> [!WARNING]
+> **Tag 体系已于 2026-08-09 整体废弃。**
+>
+> 本文中所有关于 Tag / Tag Picker / `user_tag_library` / `tag_values` / `raw_assets.tags`
+> 的内容均已作废 —— 代码、接口、数据库、storyGen prompt 输入全部删除
+> （迁移 `20260809220000_remove_tags`）。现状以 [figma-calibration-2026-08-05.md](figma-calibration-2026-08-05.md) 的「Tag 体系整体下线」一节为准。
+> 
+> **不含 DS 的 `Tag` 原子**（Selected/Unselected/Disabled 三态 chip，`shared/components/Tag.tsx`）——
+> 那是设计系统组件，仍在使用（性别、称呼等选择），与本条无关。
+
+
 **用途：** 本文档与 Figma 文件 `Nestory`（页面 `Nestory-new version`）配套，供开发工具理解项目背景与业务规则。
 **分工原则：** 页面明细、跳转逻辑、组件状态、界面文案，一律以 Figma 为准（每个界面正下方有同名 `-annotation` Frame 做说明）；本文档只写 Figma 未覆盖的产品背景与业务规则，两边不重复。
 **交付范围：** 本次开发仅覆盖客户端 UI；后端由团队另行处理，不在本文档与本次开发范围内。
@@ -50,7 +61,7 @@ Story 的阅读详情页为 H5 页面（App 内以 WebView 内嵌，分享出去
 
 | 权益维度 | Free | Premium |
 |---|---|---|
-| Memory 录入（数量、照片、文字、Tag） | 无限制，与 Premium 完全一致 | 无限制 |
+| Memory 录入（数量、照片、文字、~~Tag~~<sup>废弃</sup>） | 无限制，与 Premium 完全一致 | 无限制 |
 | 当月 Memory 编辑/删除 | 可以 | 可以 |
 | 过往月份 Memory 编辑 | 不可（触发升级弹窗，见 Figma） | 可以 |
 | 孩子 Profile 创建 | 不限数量（Onboarding 与 Settings 均可创建） | 不限数量 |
@@ -91,7 +102,8 @@ Story 的阅读详情页为 H5 页面（App 内以 WebView 内嵌，分享出去
 - **Memory 技术约束：** 单张照片 ≤ 10MB，格式 JPEG / PNG / HEIF。（单条 Memory 照片上限 9 张、文字上限 500 字符等交互层约束已在 Figma 中说明，此处不重复。）
 - **生日校验：** 孩子生日不可选择未来日期（Date Picker 上限为当天）。
 - **年龄显示规则：** Profile 的年龄展示按孩子月龄分三档，采用缩写格式——不满 1 个月显示 `Xd old`（如 `12d old`）；1–23 个月显示 `Xmo old`（如 `12mo old`）；满 2 岁显示 `Xy Ymo old`（如 `2y 4mo old`，Y = 0 时省略，仅 `Xy old`）。按孩子生日与当前日期的日历差计算。Figma 中所有示例文案已按此格式统一。
-- **Tag：** Tag 为系统预设的固定集合，用户只能从中选择，**不支持自定义创建 Tag**。可选 Tag 清单以 Figma 为准。
+- ~~**Tag：** Tag 为系统预设的固定集合，用户只能从中选择，**不支持自定义创建 Tag**。可选 Tag 清单以 Figma 为准。~~
+  > **【废弃 2026-08-09】** Tag 体系整体移除，本条不再适用。
 - **推送前提：** 任何远程推送必须同时满足：用户已登录、系统通知权限已授权、Settings 中对应开关开启。具体开关与触发文案见 Figma（ST 行）。
 - **删除孩子 Profile：** 产品内不提供删除 Profile 的入口，如确有需求走反馈/人工通道。
 - **删除账号与订阅：** App 无法替用户取消 Apple / Google 平台订阅。Premium 用户删除账号时，弹窗须明确告知「订阅不会自动取消」并引导用户前往系统订阅设置自行取消（以 Figma `ST-07 / Sheet · Delete Account Confirm · Premium · v2` 为准，旧版弹窗已作废）。
@@ -124,7 +136,7 @@ Story 的阅读详情页为 H5 页面（App 内以 WebView 内嵌，分享出去
 
 | 术语 | 含义 |
 |---|---|
-| Memory / Memories | 用户上传的单条记录（照片 + 文字 + Tag + 日期） |
+| Memory / Memories | 用户上传的单条记录（照片 + 文字 + 日期）。<br>~~Tag~~ 已于 2026-08-09 废弃 |
 | Story / Stories | AI 按自然月生成的叙事型成长故事，详情页为 H5 |
 | Profile | 孩子档案（头像、姓名、生日、性别、身高体重等） |
 | Free Plan | 免费方案 |

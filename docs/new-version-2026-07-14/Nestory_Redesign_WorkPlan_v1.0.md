@@ -1,5 +1,16 @@
 # Nestory 新版设计重实现 · 施工文档
 
+> [!WARNING]
+> **Tag 体系已于 2026-08-09 整体废弃。**
+>
+> 本文中所有关于 Tag / Tag Picker / `user_tag_library` / `tag_values` / `raw_assets.tags`
+> 的内容均已作废 —— 代码、接口、数据库、storyGen prompt 输入全部删除
+> （迁移 `20260809220000_remove_tags`）。现状以 [figma-calibration-2026-08-05.md](figma-calibration-2026-08-05.md) 的「Tag 体系整体下线」一节为准。
+> 
+> **不含 DS 的 `Tag` 原子**（Selected/Unselected/Disabled 三态 chip，`shared/components/Tag.tsx`）——
+> 那是设计系统组件，仍在使用（性别、称呼等选择），与本条无关。
+
+
 | 项目 | 内容 |
 |---|---|
 | **文档版本** | v1.0 |
@@ -60,7 +71,7 @@
 | H-Sheet · Profile Switcher(Free / Premium) | — | 新 | M | Free:列表只读 + 金色 Upgrade + View benefits 链;Premium:可切换,Stories 跟随;徽标 Active/Current 照稿(决策 7) |
 | H-First Moment / Normal list / Current month empty | `home/HomeScreen` + `moments/MomentListScreen` | 改 | L | **月份 filter 从首条 Moment 月起算**;当前月恒最左;无 moment 过往月不显示 filter;当月空态卡 |
 | H-Add Moment Popup | `shared/PhotoSourceSheet` | 改 | S | 3 项:Just a Note / Take a photo / Choose from Album(`ADD_MOMENT_ENTRY_OPTIONS`) |
-| H-Add Moment page(空态 + 3 入口变体) | `moments/AddMomentScreen` | 改 | M | **文字必填才激活 Save**(`textRequiredToSave`);照片 ≤9;Just a Note 直接弹键盘;500 字符超限 toast;Tag 显示"首个 +X" |
+| H-Add Moment page(空态 + 3 入口变体) | `moments/AddMomentScreen` | 改 | M | **文字必填才激活 Save**(`textRequiredToSave`);照片 ≤9;Just a Note 直接弹键盘;500 字符超限 toast;~~Tag 显示"首个 +X"~~(废弃 2026-08-09) |
 | H-New Moment Added | toast(现有) | 改 | S | 成功 toast 2s |
 | H-View Moment | `moments/MomentDetailScreen` | 改 | M | 全文不滚动显示;摘 Highlight |
 | H-NoPremium request to edit Popup | — | 新 | S | 双 CTA 模式(决策 4) |
@@ -118,7 +129,8 @@
 - `packages/types`:`highlight.ts`、`topNotify.ts` 导出(**保留文件到后端同步摘除时一并删**,避免 API 类型断裂)
 
 **保留:**
-- `TagPickerSheet` / `app/moment/tags.tsx`(Tag 保留,仅预设集合)
+- ~~`TagPickerSheet` / `app/moment/tags.tsx`(Tag 保留,仅预设集合)~~
+  > **【废弃 2026-08-09】** Tag 体系整体移除，这两个文件已删除。
 - `moment/date.tsx`(Moment Date 选择,新设计仍有)
 
 ---
