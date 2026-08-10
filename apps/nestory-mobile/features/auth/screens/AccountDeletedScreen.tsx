@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -47,7 +47,15 @@ export function AccountDeletedScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.body}>
+      {/* A bare flex:1 View centred on native but sat at the top on web, leaving
+          a large void above the buttons. flexGrow on a ScrollView's content
+          container centres on both, and lets the copy scroll instead of being
+          clipped on short screens or at large text sizes. */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.iconWrap}>
           <RemixIcon name="error-warning-line" size={32} color={theme.text.warning} />
         </View>
@@ -58,7 +66,7 @@ export function AccountDeletedScreen() {
             ? `Your Stories, Moments and Profiles are still here, but they'll be permanently deleted on ${deadlineLabel}. You can bring the account back until then.`
             : `Your Stories, Moments and Profiles are still here, but they're scheduled for permanent deletion. You can bring the account back until then.`}
         </Text>
-      </View>
+      </ScrollView>
 
       <View style={styles.cta}>
         <Button
@@ -83,8 +91,9 @@ export function AccountDeletedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.surface.default },
+  scroll: { flex: 1 },
   body: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.xl, // 20
     gap: theme.spacing.l, // 16

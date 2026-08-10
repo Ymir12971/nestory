@@ -304,15 +304,22 @@ export function StoriesScreen() {
     }
   };
 
-  // Available years: this year + the user's child birth year; collapse duplicates.
+  // Available years — S-Over one year annotation (761:1405): a year appears
+  // once the Stories actually span into it, current year leftmost and selected
+  // by default. So the set comes from the months that have Moments, never from
+  // the child's birth year: a child born in 2019 with one Moment this month was
+  // offering a 2019 chip and nothing for 2020-2025, none of it selectable.
+  //
+  // `monthsQ` is the right source because it is not year-filtered — `storiesQ`
+  // is scoped to `selectedYear`, so deriving the list from it would be circular.
   const availableYears = useMemo(() => {
     const years = new Set<number>([thisYear]);
-    for (const c of children) {
-      const y = new Date(c.birthDate).getFullYear();
+    for (const m of monthsQ.data ?? []) {
+      const y = Number(m.monthKey.slice(0, 4));
       if (Number.isFinite(y)) years.add(y);
     }
     return [...years].sort((a, b) => b - a);
-  }, [children, thisYear]);
+  }, [monthsQ.data, thisYear]);
 
   const subStatus = subQ.data?.subscriptionStatus;
   const isPremium = subStatus === 'premium_active' || subStatus === 'trial_active';
