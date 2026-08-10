@@ -23,19 +23,22 @@ import type { GenerationMeta, StoryDocument } from '@nestory/types';
  */
 
 const MODEL          = 'claude-sonnet-4-6';
-const PROMPT_VERSION = 'storyAi:v2-vision';
+// v2-text: photos are NEVER sent to the model. Children's photos must not leave
+// our infrastructure for an AI provider (Justin 2026-08-09), so the prompt gets
+// only locally-derived metadata — how many photos a moment has. The version
+// string stays auditable: anything recorded as 'storyAi:v2-vision' was
+// generated while images were still being attached.
+const PROMPT_VERSION = 'storyAi:v2-text';
 const MAX_TOKENS     = 8000;
-// Photos give Claude grounding for the narrative ("the slide", "her bath face"),
-// but each image is ~1.6K input tokens. Cap to keep cost bounded — diminishing
-// returns past ~10 photos for narrative quality anyway.
-const MAX_IMAGES     = 10;
 
 // ─── Inputs ────────────────────────────────────────────────────────────────
 
 export interface MomentInput {
   capturedAt: string;       // ISO 8601
   textNote:   string | null;
-  fileUrls:   string[];     // not sent to the model in v1; reserved for vision later
+  // Only `.length` is ever read. The URLs themselves must not reach the model —
+  // children's photos are not shared with AI providers.
+  fileUrls:   string[];
 }
 
 export interface GenerateStoryInput {
@@ -109,10 +112,9 @@ Hard rules:
 - Do not write "Today" or "Yesterday" — these are written days/weeks after the fact.
 - If moments are extremely sparse (0-1 items), produce a brief "low" quality story acknowledging quietly that the month was quiet.
 
-When photos are attached:
-- Use them as grounding for sensory details (what the child is wearing, where they are, what their face shows). Don't describe the photos as "in the photo..." or "you can see..." — weave the observation directly into the narrative.
-- Photos are reference, not the subject. The captions drive the story; photos add texture.
-- If a photo's content contradicts the caption, trust the caption — photos can be mislabeled.`;
+About photos:
+- You never see the photos. A moment may say it has N photos; treat that only as a signal that the moment mattered enough to be photographed.
+- Never describe what a photo shows, and never imply you looked at one.`;
 
 // ─── Public function ───────────────────────────────────────────────────────
 
@@ -152,28 +154,11 @@ export async function generateStory(input: GenerateStoryInput): Promise<Generate
     output_config: { format: zodOutputFormat(modelOutputSchema as any) },
   };
 
-  let response;
-  try {
-    response = await client.messages.parse({
-      ...baseRequest,
-      messages: [{ role: 'user', content: userContent }],
-    });
-  } catch (err) {
-    // If Anthropic couldn't fetch an attached image (host robots.txt, invalid
-    // URL, etc.), retry text-only — a story without photo grounding is still
-    // far better than a hard failure.
-    if (isImageFetchError(err) && userContent.some(b => b.type === 'image')) {
-      response = await client.messages.parse({
-        ...baseRequest,
-        messages: [{
-          role: 'user',
-          content: userContent.filter(b => b.type !== 'image'),
-        }],
-      });
-    } else {
-      throw err;
-    }
-  }
+  // No image-fetch fallback any more — the request carries text only.
+  const response = await client.messages.parse({
+    ...baseRequest,
+    messages: [{ role: 'user', content: userContent }],
+  });
 
   if (!response.parsed_output) {
     throw new Error(`Story generation returned no parsed output (stop_reason=${response.stop_reason})`);
@@ -231,37 +216,9 @@ export async function generateStory(input: GenerateStoryInput): Promise<Generate
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-type UserContentBlock =
-  | { type: 'text'; text: string }
-  | { type: 'image'; source: { type: 'url'; url: string } };
+type UserContentBlock = { type: 'text'; text: string };
 
 function buildUserContent(input: GenerateStoryInput): UserContentBlock[] {
-  // Pick up to MAX_IMAGES photos: one per moment in chronological order, then
-  // a second pass for moments that have multiple photos. This keeps temporal
-  // coverage broad before getting deep on photo-heavy moments.
-  const selected: { momentIndex: number; fileUrl: string }[] = [];
-  for (const [i, m] of input.moments.entries()) {
-    if (m.fileUrls[0]) selected.push({ momentIndex: i, fileUrl: m.fileUrls[0] });
-    if (selected.length >= MAX_IMAGES) break;
-  }
-  if (selected.length < MAX_IMAGES) {
-    for (const [i, m] of input.moments.entries()) {
-      for (let j = 1; j < m.fileUrls.length; j++) {
-        const url = m.fileUrls[j];
-        if (!url) continue;
-        selected.push({ momentIndex: i, fileUrl: url });
-        if (selected.length >= MAX_IMAGES) break;
-      }
-      if (selected.length >= MAX_IMAGES) break;
-    }
-  }
-  const photoIndexByMoment = new Map<number, number[]>();
-  selected.forEach((s, idx) => {
-    const list = photoIndexByMoment.get(s.momentIndex) ?? [];
-    list.push(idx + 1); // 1-based for human-readable refs in the text
-    photoIndexByMoment.set(s.momentIndex, list);
-  });
-
   const lines: string[] = [];
   lines.push(`Child: ${input.childName} (${formatAge(input.childAgeMonths)})`);
   lines.push(`Month: ${input.monthLabel}`);
@@ -275,34 +232,18 @@ function buildUserContent(input: GenerateStoryInput): UserContentBlock[] {
       const dateLabel = new Date(m.capturedAt).toLocaleDateString(input.locale, {
         month: 'short', day: 'numeric',
       });
-      const photoIdxs = photoIndexByMoment.get(i);
-      const photoPart = photoIdxs && photoIdxs.length > 0
-        ? `  (photos #${photoIdxs.join(', #')}${m.fileUrls.length > photoIdxs.length ? ` of ${m.fileUrls.length}` : ''})`
-        : m.fileUrls.length > 0 ? `  (${m.fileUrls.length} photo${m.fileUrls.length === 1 ? '' : 's'}, not attached)` : '';
+      // Count only — the URLs in `fileUrls` must never be attached or named.
+      const photoPart = m.fileUrls.length > 0
+        ? `  (${m.fileUrls.length} photo${m.fileUrls.length === 1 ? '' : 's'})`
+        : '';
       const note      = (m.textNote?.trim()) || '(no caption)';
       lines.push(`- ${dateLabel}${photoPart}: ${note}`);
     }
   }
   lines.push('');
-  if (selected.length > 0) {
-    lines.push(`${selected.length} photo${selected.length === 1 ? '' : 's'} attached below in the order referenced above.`);
-    lines.push('');
-  }
   lines.push("Write the month's story now. Output JSON conforming to the schema.");
 
-  const blocks: UserContentBlock[] = [{ type: 'text', text: lines.join('\n') }];
-  for (const s of selected) {
-    blocks.push({ type: 'image', source: { type: 'url', url: s.fileUrl } });
-  }
-  return blocks;
-}
-
-// Anthropic refuses to fetch images that violate the host's robots.txt or are
-// otherwise invalid. The structured error text varies; match the common shapes
-// so we can fall back to a text-only retry.
-function isImageFetchError(err: unknown): boolean {
-  const msg = (err as { message?: string })?.message ?? String(err);
-  return /Only HTTPS URLs|robots\.txt|cannot fetch.*image|image.*disallowed|invalid.*image/i.test(msg);
+  return [{ type: 'text', text: lines.join('\n') }];
 }
 
 function formatAge(months: number): string {

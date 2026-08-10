@@ -239,7 +239,14 @@ Nestory 分发到 App Store / Google Play，理论上任意地区用户都能下
 **关键：Nestory 面向父母，不面向儿童**。COPPA 最严的"儿童 app"条款不适用。
 
 Privacy Policy 需明确声明：
-> "Photos are processed by AI to generate story content. Your photos are not used to train third-party AI models and are not shared with third parties."
+> ~~"Photos are processed by AI to generate story content. Your photos are not used to train third-party AI models and are not shared with third parties."~~
+>
+> **【2026-08-09 修订】** 决策变更：**儿童照片一律不发送给任何 AI 服务商**。
+> 照片仅由我们自己的流水线处理（sharp：清晰度、质量分档、blurhash），Story 生成
+> 只使用用户输入的文字和本地算出的元数据（如「这条 Moment 有 N 张照片」）。
+> 新措辞应为：
+> "Your photos never leave our systems for AI processing. Stories are written
+> from the notes you write; photos are laid out by our own code, not by AI."
 
 注册同意流程（Onboarding O-06 Terms / Privacy 勾选）覆盖所有法域的知情同意要求，无需按地区显示不同内容。
 
@@ -264,7 +271,8 @@ Privacy Policy 需明确声明：
 
 | 服务 | 传出数据 | 合规依据 |
 |---|---|---|
-| OpenAI | 照片描述请求（图片 + prompt） | OpenAI API 合同；不用于训练（已在 API tier 关闭 data sharing） |
+| ~~OpenAI~~ | ~~照片描述请求（图片 + prompt）~~ | **【废弃 2026-08-09】** 从未实装（`OPENAI_API_KEY` 仅在 env schema 里声明，无调用点），且与「照片不给 AI」的决策冲突 |
+| Anthropic | **仅文字**：Moment 正文 + 本地算出的元数据（照片数量、质量分档）。**不含任何图片或图片 URL** | 2026-08-09 起 `storyAi` 移除 vision（`storyAi:v2-text`）；v3 图片层本就是无 LLM 的确定性算法 |
 | RevenueCat | 用户匿名 ID + 订阅事件 | DPA 已签 |
 | Supabase | 全量数据 | DPA 已签；自托管 PostgreSQL 选项预留 |
 | Sentry（v1.1） | 错误堆栈（脱敏 PII） | `beforeSend` hook 强制 strip email/phone |
