@@ -26,13 +26,18 @@ export default function TabsLayout() {
           paddingTop: theme.spacing.s,
           paddingBottom: bottomInset,
         },
+        // Two layers of React Navigation's own spacing have to be cancelled or
+        // the label is pushed past the bottom edge and clipped, leaving a bar
+        // of bare icons. Against the 44 of content the design allows:
+        //   tab item     `padding: 5`        (styles.tabVerticalUiKit)
+        //   icon wrapper 31x28               (ICON_SIZE_WIDE/TALL in TabBarIcon)
+        // which is 5+28+4+16+5 = 58. Pinning the wrapper to the 24 the icon
+        // actually draws and dropping the padding gives 24+4+16 = 44 exactly.
         tabBarIconStyle: {
+          width: 24,
+          height: 24,
           marginBottom: theme.spacing.xs,
         },
-        // React Navigation's own tab item carries `padding: 5` (styles
-        // tabVerticalUiKit), so the content wanted 5+24+4+16+5 = 54 inside the
-        // 44 the design allots — the label was pushed out and clipped, leaving
-        // a bar of bare icons. Zeroing it makes 24+4+16 land exactly on 44.
         tabBarItemStyle: {
           paddingVertical: 0,
         },
