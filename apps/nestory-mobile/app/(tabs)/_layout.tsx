@@ -29,6 +29,13 @@ export default function TabsLayout() {
         tabBarIconStyle: {
           marginBottom: theme.spacing.xs,
         },
+        // React Navigation's own tab item carries `padding: 5` (styles
+        // tabVerticalUiKit), so the content wanted 5+24+4+16+5 = 54 inside the
+        // 44 the design allots — the label was pushed out and clipped, leaving
+        // a bar of bare icons. Zeroing it makes 24+4+16 land exactly on 44.
+        tabBarItemStyle: {
+          paddingVertical: 0,
+        },
         tabBarActiveTintColor: theme.text.brand,
         tabBarInactiveTintColor: theme.text.secondary,
         tabBarLabelStyle: theme.typography.tagBadge,
