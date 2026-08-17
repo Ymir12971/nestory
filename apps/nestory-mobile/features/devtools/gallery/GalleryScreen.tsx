@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { theme } from '@/shared/theme';
 import { showToast } from '@/features/ui/toast';
+import { setApiReadOnly } from '@/api/client';
 import { GALLERY_CASES, GALLERY_MODULES, type GalleryCase } from './cases';
 import { clearForcedState } from './forceState';
 
@@ -28,6 +29,10 @@ export function GalleryScreen() {
 
   const open = (c: GalleryCase) => {
     clearForcedState(qc);
+    // Every button on these screens is live. Without this, walking the
+    // onboarding frames creates real child profiles, and the dev database is
+    // the one production reads.
+    setApiReadOnly(true);
     c.prepare?.(qc);
     router.push(c.route as never);
   };
@@ -52,6 +57,9 @@ export function GalleryScreen() {
         <Text style={s.sub}>
           {GALLERY_CASES.length} 个用例 · {GALLERY_CASES.filter(c => c.hardToReach).length} 个正常操作难以触发
         </Text>
+        <Text style={s.sub}>
+          打开任一用例即进入只读：写操作被拦截，不会污染数据库。Reset 解除。
+        </Text>
         <View style={s.actions}>
           <Pressable style={[s.chip, onlyHard && s.chipOn]} onPress={() => setOnlyHard(v => !v)}>
             <Text style={[s.chipLabel, onlyHard && s.chipLabelOn]}>只看难触发的</Text>
@@ -60,7 +68,8 @@ export function GalleryScreen() {
             style={s.chip}
             onPress={() => {
               clearForcedState(qc);
-              showToast({ type: 'success', message: '已恢复真实数据' });
+              setApiReadOnly(false);
+              showToast({ type: 'success', message: '已恢复真实数据，写操作解除拦截' });
             }}
           >
             <Text style={s.chipLabel}>Reset</Text>

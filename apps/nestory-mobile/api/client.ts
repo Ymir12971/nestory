@@ -54,11 +54,36 @@ interface RequestOptions {
   skipAuth?: boolean; // 给 /shares/public/:token 用
 }
 
+/**
+ * Read-only mode for the dev frame gallery. The gallery renders real screens
+ * against seeded cache data, and their buttons are real — Continue on the
+ * child-details flow was firing POST /children and writing junk profiles into
+ * a database production also reads. Writes are refused while it is on; reads
+ * still go through, since a screen the gallery didn't seed should still work.
+ */
+let readOnly = false;
+
+export function setApiReadOnly(on: boolean): void {
+  readOnly = __DEV__ && on;
+}
+
+export function isApiReadOnly(): boolean {
+  return readOnly;
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
   const { method = 'GET', body, query, signal, skipAuth } = options;
+
+  if (readOnly && method !== 'GET') {
+    throw new ApiClientError(
+      'VALIDATION_ERROR',
+      'Gallery 预览模式：已拦截写操作，不会改动数据',
+      400,
+    );
+  }
 
   // 拼 query string
   let url = `${config.apiBaseUrl}${path}`;
