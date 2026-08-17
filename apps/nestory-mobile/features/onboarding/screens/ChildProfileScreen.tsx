@@ -470,9 +470,12 @@ export function ChildProfileScreen() {
             style={styles.skipBtn}
             onPress={() => {
               // Skip = discard this page's inputs entirely (annotation: 全部当空内容).
+              // reset() clears cm/ft/inches together — clearing just the field
+              // on screen left a value behind whenever the user had toggled units.
               setGender(null);
-              heightState.setCm('');
+              heightState.reset();
               setWeight('');
+              setWeightSystem('metric');
               advanceFromDetails();
             }}
           >

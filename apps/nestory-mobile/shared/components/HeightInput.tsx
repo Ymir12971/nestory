@@ -120,6 +120,13 @@ export interface HeightState {
   setFt:     (v: string) => void;
   setInches: (v: string) => void;
   toggle:    () => void;
+  /**
+   * Clears every field and returns to cm. There are three values behind this
+   * one input — cm, ft and inches — so callers that mean "no height" have to
+   * clear all of them; clearing only the visible one leaves a stale value that
+   * `resolve()` still returns after a unit toggle.
+   */
+  reset:     () => void;
   /** Returns the API-shape height field, or null if no value entered. */
   resolve:   () => { heightValue: number; heightUnit: 'cm' | 'in' } | null;
 }
@@ -214,12 +221,20 @@ export function useHeightState(opts?: {
     return null;
   };
 
+  const reset = () => {
+    setCmRaw('');
+    setFtRaw('');
+    setInchesRaw('');
+    setSystem('metric');
+  };
+
   return {
     system, cm, ft, inches,
     setCm:     setCmRaw,
     setFt:     setFtRaw,
     setInches: setInchesRaw,
     toggle,
+    reset,
     resolve,
   };
 }
