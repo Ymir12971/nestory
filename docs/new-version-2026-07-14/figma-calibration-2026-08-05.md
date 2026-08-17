@@ -7,16 +7,15 @@
 
 ---
 
-## ⚠️ 待 Justin 决策（5 项）
+## ⚠️ 待 Justin 决策（4 项）
 
-> 这 5 项在各自章节里都有上下文，这里汇总一份便于一次性过。**#1 / #2 会影响后续实现或后端排期，其余是文案与取舍。**
+> 这 4 项在各自章节里都有上下文，这里汇总一份便于一次性过。**#1 / #2 会影响后续实现或后端排期，其余是文案与取舍。**
 
 | # | 事项 | 现状 | 我的建议 | 详见 |
 |---|---|---|---|---|
 | **1** | **启动页两套规范冲突** —— [`docs/delivery/启动页.md`](../delivery/启动页.md)（自称 hifi 完整规范，含 2.5s 呼吸动效 + live preview）与 Figma `O-Launch Page 739:1985` 对不上：logo 90 vs 120、字标 Manrope 800/36 vs Bold/40、slogan 灰色两行 vs 纯黑单行、光晕 440@46% 带呼吸 vs 248@53% 静态 | **未动**。现有 `SplashScreen.tsx` 严格按 `启动页.md` 实现 | **以 `启动页.md` 为准**，把 Figma 那帧当过时稿（它画不出动效，尺寸也更粗）。若反过来，`739:2032` 与 `H-Launch 810:2993` 要一并改 | §5 |
 | **2** | **Generated StoryCard 的摘要行缺后端字段** —— 稿中每张已生成 Story 卡有一行摘要正文（Body 16/20，例「Emma had the most eventful month yet — from her first steps to her first word…」），但 `StoryListItem` 没有 excerpt/subtitle 字段（story 文档里有 `subtitle`，`/stories` 列表接口没暴露） | 前端按缺字段处理，**暂不渲染** | 后端在 `/stories` 列表项里带出摘要（可直接复用 story 文档的 `subtitle`），前端一行即可接上 | §7 |
 | **3** | **Stats 卡删除后身高体重的入口** —— 方案 A 把 Home 改成时间轴，稿中 header 只有头像 + 名字，原来的三格 Stats 卡（年龄/身高/体重，点击跳 ST-03 Edit）已删 | 已删。身高体重现在**只在 Settings → Child Profile Edit 可见** | 若接受就不用动；若想保留快捷入口，需要在稿外另找位置 | §6 |
-| **4** | **空态标题措辞** —— 稿是「Turn every moment into a **Memory**」/「Start with Emma's first **Memory**」，按 Memory→Moment 全局改名后变成「…into a **Moment**」，moment 与 Moment 同词，读着绕。这是新用户第一眼看到的句子 | 按字面改名实现 | 给个新说法即可，我替换 | §6 |
 | **6** | **Collecting StoryCard 上的两个按钮** —— 稿中该卡是整卡可点 + chevron，**没有** "Add Moment" / "Generate Now" 按钮；但 Generate Now 是 main 分支已上线的功能（`e3487a3`） | **保留两个按钮** | 二选一：按稿去掉（Generate Now 另找入口），或承认为稿外功能 | §7 |
 
 ### 另外三点已知妥协（不需决策，但记录在案）
@@ -105,6 +104,14 @@ Justin 报了 Delete Account 的问题后做的一轮排查，结果如下。
 **不可逆**：`raw_assets.tags` 的字符串快照没有别处备份。执行时 dev 库只有 1 条 moment 带 tag、6 行 library，无真实数据损失。
 
 实测：`/tags` 与 `/tags/user` 双双 404；`/users/me`、`/children`、`/subscriptions/me`、`/assets`、`/highlights` 全部 200 且响应里不再出现 `tags` 字段；POST/PATCH/DELETE `/assets` 全部 200；旧客户端如果仍传 `tagValues`，zod 会静默忽略而不是报错（不会因为版本不同步炸掉）。typecheck 四包绿、lint 绿、Metro 打包成功。
+
+### 空态标题措辞 —— 已定（Justin 2026-08-09）
+
+原决策 #4。稿写的是「Turn every moment into a **Memory**」，Memory→Moment 全局改名后变成「…into a **Moment**」，同一句里两个 moment，而这是新用户看到的第一句话。
+
+**定稿：「Every little moment is worth keeping.」** —— Home 空态（单孩子与多孩子两个变体共用同一个 hero，改一处即可）。
+
+副标题「Start with Emma's first Moment」保持不变，它读着没有歧义。
 
 ---
 

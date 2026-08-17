@@ -356,7 +356,11 @@ export function HomeScreen() {
           >
             <View style={{ height: insets.top }} />
             <View style={styles.heroHeadlineBlock}>
-              <Text style={styles.heroHeadline}>Turn every moment into a Moment</Text>
+              {/* Copy per Justin 2026-08-09. The frame reads "Turn every moment
+                  into a Memory", which the Memory→Moment rename turned into
+                  "...into a Moment" — the same word twice, and this is the
+                  first line a new user sees. */}
+              <Text style={styles.heroHeadline}>Every little moment is worth keeping.</Text>
             </View>
             <View style={styles.heroAvatarBlock}>{avatarRow(true)}</View>
           </ImageBackground>
