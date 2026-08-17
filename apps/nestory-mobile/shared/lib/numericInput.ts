@@ -56,3 +56,6 @@ export function decimalOnly(value: string, places = 2, max?: number): string {
  * that one is arithmetic, not a product call.
  */
 export const HEIGHT_MAX = { cm: 250, ft: 7, inches: 11 } as const;
+
+/** Same reasoning for weight: a child aged 0-10, with room to spare. */
+export const WEIGHT_MAX = { kg: 100, lb: 220 } as const;

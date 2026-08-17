@@ -11,7 +11,7 @@ import { NavBar } from '@/shared/components/NavBar';
 import { useChild, useSubscription, useUpdateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { useGoBack } from '@/shared/hooks/useGoBack';
-import { decimalOnly } from '@/shared/lib/numericInput';
+import { decimalOnly, WEIGHT_MAX } from '@/shared/lib/numericInput';
 
 type UnitSystem = 'metric' | 'imperial';
 
@@ -261,11 +261,23 @@ function EditForm({ child }: { child: Child }) {
           <Text style={styles.fieldLabel}>Weight</Text>
           <UnitInput
             value={weight}
-            onChangeText={(v) => setWeight(decimalOnly(v))}
+            onChangeText={(v) =>
+                  setWeight(decimalOnly(v, 2, weightSystem === 'metric' ? WEIGHT_MAX.kg : WEIGHT_MAX.lb))
+                }
             metricUnit="kg"
             imperialUnit="lb"
             system={weightSystem}
-            onToggle={() => setWeightSystem(u => (u === 'metric' ? 'imperial' : 'metric'))}
+            onToggle={() =>
+              setWeightSystem((u) => {
+                // Toggling changes the unit, not the number (height converts,
+                // weight does not) — re-check against the new ceiling.
+                const next = u === 'metric' ? 'imperial' : 'metric';
+                setWeight((w) =>
+                  decimalOnly(w, 2, next === 'metric' ? WEIGHT_MAX.kg : WEIGHT_MAX.lb),
+                );
+                return next;
+              })
+            }
           />
         </View>
       </ScrollView>

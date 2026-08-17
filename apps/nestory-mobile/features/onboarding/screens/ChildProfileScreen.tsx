@@ -22,7 +22,7 @@ import { useCreateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { WheelColumn } from '@/shared/components/WheelColumn';
 import { useGoBack } from '@/shared/hooks/useGoBack';
-import { decimalOnly } from '@/shared/lib/numericInput';
+import { decimalOnly, WEIGHT_MAX } from '@/shared/lib/numericInput';
 
 // 2026-07 redesign (O-Child basic info → O-Child more Details → O-Relationship):
 //   step 0 basic    — avatar + name + birthday, ALL required; Continue → confirm sheet
@@ -375,11 +375,24 @@ export function ChildProfileScreen() {
               <Text style={styles.fieldLabel}>Weight</Text>
               <UnitInput
                 value={weight}
-                onChangeText={(v) => setWeight(decimalOnly(v))}
+                onChangeText={(v) =>
+                  setWeight(decimalOnly(v, 2, weightSystem === 'metric' ? WEIGHT_MAX.kg : WEIGHT_MAX.lb))
+                }
                 metricUnit="kg"
                 imperialUnit="lb"
                 system={weightSystem}
-                onToggle={() => setWeightSystem((u) => (u === 'metric' ? 'imperial' : 'metric'))}
+                onToggle={() =>
+                  setWeightSystem((u) => {
+                    // The toggle changes the unit, not the number (unlike
+                    // height, which converts) — so re-check the value against
+                    // the new ceiling, or 200 lb would survive as 200 kg.
+                    const next = u === 'metric' ? 'imperial' : 'metric';
+                    setWeight((w) =>
+                      decimalOnly(w, 2, next === 'metric' ? WEIGHT_MAX.kg : WEIGHT_MAX.lb),
+                    );
+                    return next;
+                  })
+                }
               />
             </View>
           </View>
