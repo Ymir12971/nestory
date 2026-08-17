@@ -9,6 +9,7 @@ import { theme, palette } from '@/shared/theme';
 import { useSubscription, queryClient, queryKeys } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
+import { PremiumCrown } from '@/shared/components/PremiumCrown';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { NavBar } from '@/shared/components/NavBar';
@@ -243,7 +244,7 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
           <View style={[styles.blob, styles.blobTopLeft]} />
           <View style={[styles.blob, styles.blobRight]} />
           <View style={[styles.blob, styles.blobTopRight]} />
-          <RemixIcon name="vip-crown-fill" size={41} color={theme.text.onColor} />
+          <PremiumCrown size={41} color={theme.text.onColor} />
           <Text style={styles.premiumCurrentName}>Premium Plan</Text>
         </LinearGradient>
 

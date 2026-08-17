@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '@/shared/components/Button';
+import { PremiumCrown } from '@/shared/components/PremiumCrown';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
@@ -60,7 +61,7 @@ export function WelcomeToPremiumScreen() {
           <View style={[styles.blob, styles.blobTopLeft]} />
           <View style={[styles.blob, styles.blobRight]} />
           <View style={[styles.blob, styles.blobTopRight]} />
-          <RemixIcon name="vip-crown-fill" size={41} color={theme.text.onColor} />
+          <PremiumCrown size={41} color={theme.text.onColor} />
           <Text style={styles.heroLabel}>Premium Plan</Text>
         </LinearGradient>
 
