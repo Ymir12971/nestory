@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import RemixIcon from 'react-native-remix-icon';
 import { theme } from '@/shared/theme';
-import { decimalOnly, intOnly } from '@/shared/lib/numericInput';
+import { decimalOnly, HEIGHT_MAX, intOnly } from '@/shared/lib/numericInput';
 
 export type HeightSystem = 'metric' | 'imperial';
 
@@ -233,10 +233,10 @@ export function useHeightState(opts?: {
   return {
     system, cm, ft, inches,
     // ft / in are whole numbers; cm keeps two decimals, matching the
-    // Decimal(6,2) column behind it.
-    setCm:     (v: string) => setCmRaw(decimalOnly(v)),
-    setFt:     (v: string) => setFtRaw(intOnly(v)),
-    setInches: (v: string) => setInchesRaw(intOnly(v)),
+    // Decimal(6,2) column behind it. Bounds in HEIGHT_MAX.
+    setCm:     (v: string) => setCmRaw(decimalOnly(v, 2, HEIGHT_MAX.cm)),
+    setFt:     (v: string) => setFtRaw(intOnly(v, HEIGHT_MAX.ft)),
+    setInches: (v: string) => setInchesRaw(intOnly(v, HEIGHT_MAX.inches)),
     toggle,
     reset,
     resolve,
