@@ -221,6 +221,20 @@ export const GALLERY_CASES: GalleryCase[] = [
 
   // ── Global ────────────────────────────────────────────────────────────────
   {
+    id: 'paywall', module: 'Global', label: 'global-Paywall', nodeId: '775:1819',
+    route: '/__overlay?name=paywall',
+    hardToReach: true,
+    note: '它是弹窗不是路由，四个屏各自持有 visible —— 走导航到不了，靠 __overlay 挂载',
+    prepare: (qc) => base(qc),
+  },
+  {
+    id: 'welcome-premium-global', module: 'Global', label: 'global-Welcome to premium', nodeId: '771:3311',
+    route: '/welcome-premium?cycle=yearly',
+    hardToReach: true,
+    note: '与 O-Welcome to premium 同屏，区别只在 from：没有 from 就退回原位置',
+    prepare: (qc) => base(qc, { sub: fxSubPremium }),
+  },
+  {
     id: 'account-deleted', module: 'Global', label: 'Account deleted gate (稿外)', nodeId: '—',
     route: `/onboarding/account-deleted?purgeAt=${encodeURIComponent(new Date(Date.now() + 30 * 864e5).toISOString())}`,
     hardToReach: true, note: '真机上要先注销账号再登录',
