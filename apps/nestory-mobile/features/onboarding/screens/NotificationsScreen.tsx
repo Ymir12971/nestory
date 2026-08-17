@@ -31,12 +31,16 @@ export function NotificationsScreen() {
         <Text style={styles.subtitle}>Get notified when the monthly Story is ready</Text>
       </View>
 
-      {/* Body 758:1344 → storySample 758:1348 */}
+      {/* Body 758:1344 → storySample 758:1348.
+          The mark is logo.png (the leaf), not icon.png — 758:1349 puts the
+          Logo component on a primary/50 tile. icon.png is the packaged app
+          icon: it carries its own opaque cream field and square corners, which
+          covered the tile's colour and its 24px radius entirely. */}
       <View style={styles.body}>
         <View style={styles.storySample}>
           <View style={styles.appIconTile}>
             <Image
-              source={require('@/assets/images/icon.png')}
+              source={require('@/assets/images/logo.png')}
               style={styles.appIcon}
               resizeMode="contain"
             />
@@ -48,7 +52,7 @@ export function NotificationsScreen() {
           <View style={styles.pushRow}>
             <View style={styles.pushIcon}>
               <Image
-                source={require('@/assets/images/icon.png')}
+                source={require('@/assets/images/logo.png')}
                 style={styles.pushIconImg}
                 resizeMode="contain"
               />
