@@ -55,20 +55,28 @@ interface RequestOptions {
 }
 
 /**
- * Read-only mode for the dev frame gallery. The gallery renders real screens
- * against seeded cache data, and their buttons are real — Continue on the
- * child-details flow was firing POST /children and writing junk profiles into
- * a database production also reads. Writes are refused while it is on; reads
- * still go through, since a screen the gallery didn't seed should still work.
+ * Offline mode for the dev frame gallery.
+ *
+ * The gallery seeds the cache and renders real screens, but those screens are
+ * fully live: their buttons fire real mutations, and anything that triggers a
+ * refetch — a poll, a month chip, a year filter — calls the real queryFn with
+ * fixture ids the server rejects. Seeding cannot prevent that, because a
+ * queryFn passed to useQuery wins over one installed with setQueryDefaults.
+ *
+ * So the block belongs here, at the one point every request passes through.
+ * Writes reject with a message that says why. Reads never settle: the screen
+ * keeps showing whatever the gallery seeded instead of flipping to an error,
+ * and nothing reaches the network. A hanging promise is acceptable in a
+ * dev-only tool that a Reset tears down.
  */
-let readOnly = false;
+let offline = false;
 
 export function setApiReadOnly(on: boolean): void {
-  readOnly = __DEV__ && on;
+  offline = __DEV__ && on;
 }
 
 export function isApiReadOnly(): boolean {
-  return readOnly;
+  return offline;
 }
 
 export async function apiFetch<T>(
@@ -77,12 +85,16 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const { method = 'GET', body, query, signal, skipAuth } = options;
 
-  if (readOnly && method !== 'GET') {
-    throw new ApiClientError(
-      'VALIDATION_ERROR',
-      'Gallery 预览模式：已拦截写操作，不会改动数据',
-      400,
-    );
+  if (offline) {
+    if (method !== 'GET') {
+      throw new ApiClientError(
+        'VALIDATION_ERROR',
+        'Gallery 预览模式：已拦截写操作，不会改动数据',
+        400,
+      );
+    }
+    // Hold, don't fail — an unseeded read should leave the frame as it is.
+    return new Promise<T>(() => {});
   }
 
   // 拼 query string

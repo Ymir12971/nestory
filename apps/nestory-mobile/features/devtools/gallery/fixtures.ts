@@ -12,10 +12,13 @@ import type {
  * key like `queryKeys.asset(FIXTURE_MOMENT_ID)` and then navigate to
  * `/moment/<that id>` and have the real screen find it.
  */
-export const FX_CHILD_ID  = 'fixture-child-0000-0000-000000000001';
-export const FX_CHILD2_ID = 'fixture-child-0000-0000-000000000002';
-export const FX_MOMENT_ID = 'fixture-momnt-0000-0000-000000000001';
-export const FX_STORY_ID  = 'fixture-story-0000-0000-000000000001';
+// Real UUIDs. The old readable ids ('fixture-child-…') failed the server's
+// zod `.uuid()` check, so anything that escaped the cache came back 400 rather
+// than a clean 404 — noise that looked like a bug in the screen.
+export const FX_CHILD_ID  = 'f1c70000-0000-4000-8000-000000000001';
+export const FX_CHILD2_ID = 'f1c70000-0000-4000-8000-000000000002';
+export const FX_MOMENT_ID = 'f1c70000-0000-4000-8000-000000000101';
+export const FX_STORY_ID  = 'f1c70000-0000-4000-8000-000000000201';
 
 const PHOTO = 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=800&q=60';
 
@@ -126,8 +129,8 @@ export function fxMoment(over: Partial<Moment> = {}): Moment {
 
 export const fxMoments: Moment[] = [
   fxMoment(),
-  fxMoment({ id: 'fixture-momnt-2', textNote: 'First taste of watermelon. Verdict: enthusiastic.', capturedAt: monthsAgo(0) }),
-  fxMoment({ id: 'fixture-momnt-3', assetType: 'text', files: [], textNote: 'Said something that was almost "dog".', capturedAt: monthsAgo(0) }),
+  fxMoment({ id: 'f1c70000-0000-4000-8000-000000000102', textNote: 'First taste of watermelon. Verdict: enthusiastic.', capturedAt: monthsAgo(0) }),
+  fxMoment({ id: 'f1c70000-0000-4000-8000-000000000103', assetType: 'text', files: [], textNote: 'Said something that was almost "dog".', capturedAt: monthsAgo(0) }),
 ];
 
 export const fxMonths = [0, 1, 2].map(n => ({ monthKey: monthKey(n), count: 3 }));

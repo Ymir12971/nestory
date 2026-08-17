@@ -169,7 +169,7 @@ export const GALLERY_CASES: GalleryCase[] = [
   {
     id: 'story-recovered', module: 'Stories', label: 'Premium recovered', nodeId: '731:3426', route: '/(tabs)/stories',
     hardToReach: true,
-    prepare: (qc) => { base(qc, { sub: fxSubPremium }); storiesData(qc, fxCurrentMonth(), [fxStoryItem(), fxStoryItem({ id: 'fx-s2', monthKey: fxMonths[2]!.monthKey })]); },
+    prepare: (qc) => { base(qc, { sub: fxSubPremium }); storiesData(qc, fxCurrentMonth(), [fxStoryItem(), fxStoryItem({ id: 'f1c70000-0000-4000-8000-000000000202', monthKey: fxMonths[2]!.monthKey })]); },
   },
   {
     id: 'story-regen', module: 'Stories', label: 'Regeneration allowed', nodeId: '761:2628', route: '/(tabs)/stories',
