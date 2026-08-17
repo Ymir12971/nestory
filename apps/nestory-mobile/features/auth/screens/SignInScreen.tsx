@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { setDevSession, useSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient, isSupabaseAuthAvailable } from '@/features/auth/supabaseClient';
@@ -17,6 +17,7 @@ const DEMO_USER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
 export function SignInScreen() {
   const router = useRouter();
+  const { preview } = useLocalSearchParams<{ preview?: string }>();
   const insets = useSafeAreaInsets();
   const { session } = useSession();
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +33,17 @@ export function SignInScreen() {
   // restored — no explicit navigation runs in that flow. Redirect once a real
   // session appears. Dev sessions carry a null accessToken and are navigated
   // by handleDevSignIn, so they don't trigger this.
+  //
+  // `?preview=1` holds the screen still: while signed in this frame is
+  // otherwise impossible to look at, because the redirect fires on mount. Dev
+  // builds only — see features/devtools/gallery.
+  const previewHold = __DEV__ && preview === '1';
   useEffect(() => {
+    if (previewHold) return;
     if (session?.accessToken) {
       router.replace('/onboarding/privacy-claim');
     }
-  }, [session?.accessToken, router]);
+  }, [previewHold, session?.accessToken, router]);
 
   const blurFocus = () => {
     // Avoids React Navigation aria-hidden warning when a Pressable keeps focus.

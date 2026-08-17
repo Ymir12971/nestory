@@ -206,7 +206,8 @@ export const GALLERY_CASES: GalleryCase[] = [
 
   // ── Onboarding ────────────────────────────────────────────────────────────
   { id: 'welcome', module: 'Onboarding', label: 'Welcome-1 / Welcome-2', nodeId: '739:1085', route: '/onboarding/welcome' },
-  { id: 'signin', module: 'Onboarding', label: 'Sign In', nodeId: '739:1134', route: '/onboarding/auth' },
+  { id: 'signin', module: 'Onboarding', label: 'Sign In', nodeId: '739:1134', route: '/onboarding/auth?preview=1',
+    hardToReach: true, note: '登录状态下这屏会自动跳走，?preview=1 才停得住' },
   { id: 'privacy-claim', module: 'Onboarding', label: 'Privacy claim', nodeId: '752:1639', route: '/onboarding/privacy-claim' },
   { id: 'child-basic', module: 'Onboarding', label: 'Child basic info', nodeId: '739:1155', route: '/onboarding/profile' },
   { id: 'child-another', module: 'Onboarding', label: 'Child info (?another=1)', nodeId: '739:1256', route: '/onboarding/profile?another=1' },
