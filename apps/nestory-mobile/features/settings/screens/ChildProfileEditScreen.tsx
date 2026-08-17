@@ -11,6 +11,7 @@ import { NavBar } from '@/shared/components/NavBar';
 import { useChild, useSubscription, useUpdateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { decimalOnly } from '@/shared/lib/numericInput';
 
 type UnitSystem = 'metric' | 'imperial';
 
@@ -260,7 +261,7 @@ function EditForm({ child }: { child: Child }) {
           <Text style={styles.fieldLabel}>Weight</Text>
           <UnitInput
             value={weight}
-            onChangeText={setWeight}
+            onChangeText={(v) => setWeight(decimalOnly(v))}
             metricUnit="kg"
             imperialUnit="lb"
             system={weightSystem}

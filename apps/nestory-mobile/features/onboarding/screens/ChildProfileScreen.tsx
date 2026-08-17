@@ -22,6 +22,7 @@ import { useCreateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { WheelColumn } from '@/shared/components/WheelColumn';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { decimalOnly } from '@/shared/lib/numericInput';
 
 // 2026-07 redesign (O-Child basic info → O-Child more Details → O-Relationship):
 //   step 0 basic    — avatar + name + birthday, ALL required; Continue → confirm sheet
@@ -374,7 +375,7 @@ export function ChildProfileScreen() {
               <Text style={styles.fieldLabel}>Weight</Text>
               <UnitInput
                 value={weight}
-                onChangeText={setWeight}
+                onChangeText={(v) => setWeight(decimalOnly(v))}
                 metricUnit="kg"
                 imperialUnit="lb"
                 system={weightSystem}
