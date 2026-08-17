@@ -79,6 +79,7 @@ const unitStyles = StyleSheet.create({
   row: { flexDirection: 'row', gap: theme.spacing.s, alignItems: 'center' },
   input: {
     flex: 1,
+    minWidth: 0, // 750:2499 min-w-px — see HeightInput
     height: 48,
     borderWidth: 1,
     borderColor: theme.border.strong,

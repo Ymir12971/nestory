@@ -54,11 +54,12 @@ export function HeightInput(props: HeightInputProps) {
         keyboardType="numeric"
         placeholderTextColor={theme.text.hint}
       />
+      {/* 750:2496 — only the `in` pill carries the toggle arrow; `ft` is the
+          bare unit. Both still toggle, so either one flips back to cm. */}
       <Pressable style={styles.pill} onPress={props.onToggle}>
         <View style={styles.unitSlot}>
           <Text style={styles.unitLabel}>ft</Text>
         </View>
-        <RemixIcon name="arrow-up-down-line" size={16} color={theme.text.brand} />
       </Pressable>
       <TextInput
         style={styles.input}
@@ -240,9 +241,21 @@ export function useHeightState(opts?: {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: theme.spacing.s, alignItems: 'center' },
+  row: {
+    flexDirection: 'row',
+    gap: theme.spacing.s,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    overflow: 'hidden', // 750:2496 clips rather than letting the row grow
+  },
   input: {
     flex: 1,
+    // Figma's `min-w-px` on both inputs, and not decoration: a flex item
+    // defaults to min-width:auto, so it refuses to shrink below its intrinsic
+    // width. On web a TextInput is an <input> with a ~170px intrinsic width,
+    // so the ft+in row (2 inputs + 2 pills) blew past 353 and pushed the `in`
+    // pill off screen. cm and weight have one input each and never hit it.
+    minWidth: 0,
     height: 48,
     borderWidth: 1,
     borderColor: theme.border.strong,
