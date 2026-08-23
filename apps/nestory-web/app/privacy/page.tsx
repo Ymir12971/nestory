@@ -40,7 +40,8 @@ export default function PrivacyPage() {
       <h2 style={h2Style}>2. How we use it</h2>
       <ul style={ulStyle}>
         <li>Display your moments and generated stories in the app.</li>
-        <li>Generate monthly AI stories from photos and notes you provide.</li>
+        <li>Generate monthly AI stories from the notes you write. Your photos are
+            not sent to the AI provider — they are laid out by our own code.</li>
         <li>Manage your account, subscription, and entitlements.</li>
         <li>Respond to your support requests and act on feedback you submit.</li>
         <li>Diagnose crashes and operational issues.</li>
