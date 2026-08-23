@@ -105,6 +105,7 @@ function CurrentGeneratedCard({
       <View style={styles.generatedBody}>
         <View style={styles.generatedTextGroup}>
           <Text style={styles.storyTitle}>{data.title ?? '—'}</Text>
+          {data.excerpt && <Text style={styles.storyExcerpt}>{data.excerpt}</Text>}
         </View>
         <View style={styles.cardFooter}>
           <Text style={styles.nsCaption}>{data.momentCount} moments</Text>
@@ -181,6 +182,7 @@ function GeneratedCard({
       <View style={styles.generatedBody}>
         <View style={styles.generatedTextGroup}>
           <Text style={styles.storyTitle}>{item.title ?? '—'}</Text>
+          {item.excerpt && <Text style={styles.storyExcerpt}>{item.excerpt}</Text>}
         </View>
         <View style={styles.cardFooter}>
           {item.momentCount != null && (

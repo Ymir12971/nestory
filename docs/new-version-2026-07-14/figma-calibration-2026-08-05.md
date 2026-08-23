@@ -7,16 +7,12 @@
 
 ---
 
-## ⚠️ 待 Justin 决策（4 项）
+## ✅ 待决策已全部结案（2026-08-09）
 
-> 这 4 项在各自章节里都有上下文，这里汇总一份便于一次性过。**#1 / #2 会影响后续实现或后端排期，其余是文案与取舍。**
+> 校准期间挂起的问题都已由 Justin 定夺，结论见下。表已清空，保留标题以便对照历史提交。
 
 | # | 事项 | 现状 | 我的建议 | 详见 |
 |---|---|---|---|---|
-| **1** | **启动页两套规范冲突** —— [`docs/delivery/启动页.md`](../delivery/启动页.md)（自称 hifi 完整规范，含 2.5s 呼吸动效 + live preview）与 Figma `O-Launch Page 739:1985` 对不上：logo 90 vs 120、字标 Manrope 800/36 vs Bold/40、slogan 灰色两行 vs 纯黑单行、光晕 440@46% 带呼吸 vs 248@53% 静态 | **未动**。现有 `SplashScreen.tsx` 严格按 `启动页.md` 实现 | **以 `启动页.md` 为准**，把 Figma 那帧当过时稿（它画不出动效，尺寸也更粗）。若反过来，`739:2032` 与 `H-Launch 810:2993` 要一并改 | §5 |
-| **2** | **Generated StoryCard 的摘要行缺后端字段** —— 稿中每张已生成 Story 卡有一行摘要正文（Body 16/20，例「Emma had the most eventful month yet — from her first steps to her first word…」），但 `StoryListItem` 没有 excerpt/subtitle 字段（story 文档里有 `subtitle`，`/stories` 列表接口没暴露） | 前端按缺字段处理，**暂不渲染** | 后端在 `/stories` 列表项里带出摘要（可直接复用 story 文档的 `subtitle`），前端一行即可接上 | §7 |
-| **3** | **Stats 卡删除后身高体重的入口** —— 方案 A 把 Home 改成时间轴，稿中 header 只有头像 + 名字，原来的三格 Stats 卡（年龄/身高/体重，点击跳 ST-03 Edit）已删 | 已删。身高体重现在**只在 Settings → Child Profile Edit 可见** | 若接受就不用动；若想保留快捷入口，需要在稿外另找位置 | §6 |
-| **6** | **Collecting StoryCard 上的两个按钮** —— 稿中该卡是整卡可点 + chevron，**没有** "Add Moment" / "Generate Now" 按钮；但 Generate Now 是 main 分支已上线的功能（`e3487a3`） | **保留两个按钮** | 二选一：按稿去掉（Generate Now 另找入口），或承认为稿外功能 | §7 |
 
 ### 另外三点已知妥协（不需决策，但记录在案）
 
@@ -112,6 +108,15 @@ Justin 报了 Delete Account 的问题后做的一轮排查，结果如下。
 **定稿：「Every little moment is worth keeping.」** —— Home 空态（单孩子与多孩子两个变体共用同一个 hero，改一处即可）。
 
 副标题「Start with Emma's first Moment」保持不变，它读着没有歧义。
+
+### 四项决策的结论（Justin 2026-08-09）
+
+| 事项 | 结论 | 处理 |
+|---|---|---|
+| **启动页两套规范冲突** | **以 [`docs/delivery/启动页.md`](../delivery/启动页.md) 为准** —— 现有 `SplashScreen.tsx` 就是按它实现的（logo 90、字标 Manrope 800/36、光晕 440@46% + 2.5s 呼吸）。Figma 的 `O-Launch 739:1985`、`739:2032`、`H-Launch 810:2993` 三帧画不出动效、尺寸也更粗，**作废** | 代码不动。逐帧比对时这三帧按作废处理 |
+| **Story 卡摘要行缺后端字段** | **后端补** | `StoryListItem.excerpt` / `CurrentMonthStatus.excerpt`，取 `document.shareMeta.ogDescription` —— v2 由模型直接产出、v3 映射自 `cover.subtitle`，两条链路都有，列表层不必判断是谁生成的。前端两张卡都已渲染 |
+| **Stats 卡删除后身高体重的入口** | **不加快捷入口** | 身高体重是低频编辑，留在 Settings → Child Profile Edit。Home 头部保持稿的「头像 + 名字」 |
+| **Collecting 卡上的两个按钮** | **保留** | Generate Now 是 main 已上线功能（`e3487a3`），也是目前唯一的手动生成入口。承认为稿外功能，不再当作差异 |
 
 ---
 

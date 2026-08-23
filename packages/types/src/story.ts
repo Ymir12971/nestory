@@ -28,6 +28,13 @@ export interface StoryListItem {
   listItemState: StoryListItemState;
   coverImageUrl: string | null;
   title: string | null;                 // e.g. "March · 8 months"
+  /**
+   * One-line summary under the card title. Comes from
+   * `document.shareMeta.ogDescription`, which both pipelines produce — v2 has
+   * the model write it, v3 maps it from the cover subtitle — so the list does
+   * not need to know which one generated the story. Null when not generated.
+   */
+  excerpt: string | null;
   isLastFreeStory: boolean;             // Paywall A trigger — check on return from S-02
   watermarkEnabled: boolean | null;     // null when no story
   generatedAt: string | null;
@@ -62,6 +69,8 @@ export interface CurrentMonthStatus {
   // card show the title + navigate to /story/:storyId.
   storyId: string | null;
   title: string | null;
+  /** Same source as StoryListItem.excerpt. */
+  excerpt: string | null;
   coverImageUrl: string | null;
 }
 

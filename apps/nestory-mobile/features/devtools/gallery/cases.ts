@@ -240,7 +240,7 @@ export const GALLERY_CASES: GalleryCase[] = [
       base(qc);
       storiesData(
         qc,
-        fxCurrentMonth({ listItemState: 'current_generated', storyId: FX_STORY_ID, title: 'The Month She Found Her Feet', momentCount: 12 }),
+        fxCurrentMonth({ listItemState: 'current_generated', storyId: FX_STORY_ID, title: 'The Month She Found Her Feet', excerpt: 'Emma had the most eventful month yet — from her first steps to her first word.', momentCount: 12 }),
         [fxStoryItem()],
       );
     },

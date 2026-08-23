@@ -148,6 +148,7 @@ export async function storiesRoutes(app: FastifyInstance) {
       milestoneLevel:      memCount >= 15 ? '15+' : memCount >= 10 ? '10' : memCount >= 3 ? '3' : memCount >= 1 ? '1' : null,
       storyId:       isCurGenerated ? curStory!.id : null,
       title:         isCurGenerated ? (curStoryDoc?.meta.title ?? null) : null,
+      excerpt:       isCurGenerated ? (curStoryDoc?.shareMeta?.ogDescription ?? null) : null,
       coverImageUrl: isCurGenerated ? (curStoryDoc?.meta.coverImageUrl ?? null) : null,
     };
 
@@ -180,6 +181,7 @@ export async function storiesRoutes(app: FastifyInstance) {
           listItemState:    'historical_not_generated',
           coverImageUrl:    null,
           title:            null,
+          excerpt:          null,
           isLastFreeStory:  false,
           watermarkEnabled: null,
           generatedAt:      null,
@@ -195,6 +197,7 @@ export async function storiesRoutes(app: FastifyInstance) {
         listItemState:    'historical_generated',
         coverImageUrl:    doc?.meta.coverImageUrl ?? null,
         title:            doc?.meta.title ?? null,
+        excerpt:          doc?.shareMeta?.ogDescription ?? null,
         isLastFreeStory:  s.isLastFreeStory,
         watermarkEnabled: doc?.watermark.enabled ?? null,
         generatedAt:      s.generatedAt?.toISOString() ?? null,

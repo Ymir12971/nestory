@@ -150,6 +150,7 @@ export function fxCurrentMonth(over: Partial<CurrentMonthStatus> = {}): CurrentM
     milestoneLevel: '3',
     storyId: null,
     title: null,
+    excerpt: null,
     coverImageUrl: null,
     ...over,
   };
@@ -163,6 +164,7 @@ export function fxStoryItem(over: Partial<StoryListItem> = {}): StoryListItem {
     listItemState: 'historical_generated',
     coverImageUrl: PHOTO,
     title: 'The Month She Found Her Feet',
+    excerpt: 'Emma had the most eventful month yet — from her first steps to her first word.',
     isLastFreeStory: false,
     watermarkEnabled: true,
     generatedAt: monthsAgo(1),
