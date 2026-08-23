@@ -4,11 +4,13 @@ import { forceData, forceError, forceLoading } from './forceState';
 import {
   FX_CHILD_ID,
   FX_MOMENT_ID,
+  FX_STORY_ID,
   fxChild,
   fxChild2,
   fxCurrentMonth,
   fxMoment,
   fxMoments,
+  fxCrossYearMonths,
   fxMonths,
   fxStoryItem,
   fxSubFree,
@@ -126,6 +128,48 @@ export const GALLERY_CASES: GalleryCase[] = [
   { id: 'moment-add', module: 'Home', label: 'Add Memory page Empty', nodeId: '742:3144', route: '/moment/add', prepare: base },
   { id: 'moment-add-note', module: 'Home', label: 'Add from "Just a note"', nodeId: '741:2053', route: '/moment/add?mode=note', prepare: base },
 
+  {
+    id: 'moment-add-photo', module: 'Home', label: 'Add from "Take a photo"/album', nodeId: '742:3081',
+    route: '/moment/add?mode=album', prepare: base,
+  },
+  {
+    id: 'add-entry-popup', module: 'Home', label: 'Add Memory Popup', nodeId: '742:2985',
+    route: '/__overlay?name=add-entry', hardToReach: true,
+    note: '弹窗组件，不是路由',
+    prepare: (qc) => base(qc),
+  },
+  {
+    id: 'moment-added', module: 'Home', label: 'New Memory Added', nodeId: '762:3341', route: '/(tabs)',
+    hardToReach: true, note: '刚添加完返回时的列表状态',
+    prepare: (qc) => { base(qc); homeData(qc, [fxMoments[0]!], [fxMonths[0]!]); },
+  },
+  {
+    id: 'edit-gate-free', module: 'Home', label: 'Memory Edit Alert (free)', nodeId: '745:1252',
+    route: '/__overlay?name=edit-gate-free', hardToReach: true,
+    note: '弹窗组件；真机上要有一条已生成 Story 的过往 Moment',
+    prepare: (qc) => base(qc),
+  },
+  {
+    id: 'edit-gate-premium', module: 'Home', label: 'Memory Edit Alert (premium)', nodeId: '745:1252',
+    route: '/__overlay?name=edit-gate-premium', hardToReach: true,
+    prepare: (qc) => base(qc, { sub: fxSubPremium }),
+  },
+  {
+    id: 'full-picture', module: 'Home', label: 'full picture', nodeId: '774:4717',
+    route: '/__overlay?name=photo', hardToReach: true, note: '全屏看图浮层',
+    prepare: (qc) => base(qc),
+  },
+  {
+    id: 'home-launch', module: 'Home', label: 'Launch', nodeId: '810:2993',
+    route: '/__overlay?name=splash', hardToReach: true,
+    note: '启动动画约 2.5 秒后淡出',
+  },
+  {
+    id: 'home-signin', module: 'Home', label: 'Sign In', nodeId: '810:3006',
+    route: '/onboarding/auth?preview=1', hardToReach: true,
+    note: '与 Onboarding 的 Sign In 同屏',
+  },
+
   // ── Stories ───────────────────────────────────────────────────────────────
   {
     id: 'story-empty', module: 'Stories', label: 'Story Empty', nodeId: '821:1534', route: '/(tabs)/stories',
@@ -190,6 +234,57 @@ export const GALLERY_CASES: GalleryCase[] = [
     },
   },
 
+  {
+    id: 'story-generation-2', module: 'Stories', label: 'Normal Generation 2', nodeId: '731:1569', route: '/(tabs)/stories',
+    prepare: (qc) => {
+      base(qc);
+      storiesData(
+        qc,
+        fxCurrentMonth({ listItemState: 'current_generated', storyId: FX_STORY_ID, title: 'The Month She Found Her Feet', momentCount: 12 }),
+        [fxStoryItem()],
+      );
+    },
+  },
+  {
+    id: 'story-paused-folded', module: 'Stories', label: 'Past months folded', nodeId: '731:3602', route: '/(tabs)/stories',
+    hardToReach: true, note: '要连续几个月有 Moment 却没生成 Story，真机上造不出来',
+    prepare: (qc) => {
+      base(qc, { sub: fxSubQuotaGone });
+      storiesData(qc, fxCurrentMonth({ listItemState: 'current_quota_exhausted' }), [
+        fxStoryItem({ id: null, status: null, listItemState: 'historical_not_generated', title: null, coverImageUrl: null, momentCount: null, generatedAt: null, watermarkEnabled: null, monthKey: fxMonths[1]!.monthKey }),
+        fxStoryItem({ id: null, status: null, listItemState: 'historical_not_generated', title: null, coverImageUrl: null, momentCount: null, generatedAt: null, watermarkEnabled: null, monthKey: fxMonths[2]!.monthKey }),
+        fxStoryItem({ id: null, status: null, listItemState: 'historical_not_generated', title: null, coverImageUrl: null, momentCount: null, generatedAt: null, watermarkEnabled: null, monthKey: fxMonths[3]!.monthKey }),
+      ]);
+    },
+  },
+  {
+    id: 'story-over-year', module: 'Stories', label: 'Over one year', nodeId: '731:3336', route: '/(tabs)/stories',
+    hardToReach: true, note: '要跨年数据，真机上得等一年',
+    prepare: (qc) => {
+      base(qc, { sub: fxSubPremium });
+      forceData(qc, queryKeys.assetMonths(FX_CHILD_ID), fxCrossYearMonths);
+      const payload = {
+        currentMonth: fxCurrentMonth(),
+        historical: fxCrossYearMonths.slice(1).map((m, n) =>
+          fxStoryItem({ monthKey: m.monthKey, id: `f1c70000-0000-4000-8000-0000000003${String(n).padStart(2, '0')}` }),
+        ),
+      };
+      const year = new Date().getFullYear();
+      forceData(qc, queryKeys.stories(FX_CHILD_ID), payload);
+      forceData(qc, queryKeys.stories(FX_CHILD_ID, year), payload);
+      forceData(qc, queryKeys.stories(FX_CHILD_ID, year - 1), payload);
+    },
+  },
+  {
+    id: 'story-regen-confirm', module: 'Stories', label: 'Regeneration confirm', nodeId: '761:2717',
+    route: `/(tabs)/stories?regen=${fxMonths[1]!.monthKey}`,
+    hardToReach: true, note: '要 Premium + 生成后改动过 Moment 才点得到',
+    prepare: (qc) => {
+      base(qc, { sub: fxSubPremium });
+      storiesData(qc, fxCurrentMonth(), [fxStoryItem({ momentsChanged: true, canRegenerate: true })]);
+    },
+  },
+
   // ── Settings ──────────────────────────────────────────────────────────────
   { id: 'settings-free', module: 'Settings', label: 'Settings (free)', nodeId: '768:4581', route: '/(tabs)/settings', prepare: (qc) => base(qc) },
   { id: 'settings-premium', module: 'Settings', label: 'Settings (premium)', nodeId: '731:2891', route: '/(tabs)/settings', prepare: (qc) => base(qc, { sub: fxSubPremium }) },
@@ -218,6 +313,16 @@ export const GALLERY_CASES: GalleryCase[] = [
   { id: 'welcome-premium', module: 'Onboarding', label: 'Welcome to premium', nodeId: '761:2377', route: '/welcome-premium?cycle=yearly&from=onboarding', prepare: (qc) => base(qc, { sub: fxSubPremium }) },
   { id: 'terms', module: 'Onboarding', label: 'Terms of Service', nodeId: '739:1547', route: '/onboarding/terms' },
   { id: 'privacy-policy', module: 'Onboarding', label: 'Privacy Policy', nodeId: '739:1566', route: '/onboarding/privacy' },
+
+  { id: 'launch', module: 'Onboarding', label: 'O-Launch', nodeId: '739:1985', route: '/__overlay?name=splash', hardToReach: true, note: '启动动画约 2.5 秒后淡出，这里让它停住' },
+  { id: 'launch-transition', module: 'Onboarding', label: 'O-Launch (transition)', nodeId: '739:2032', route: '/__overlay?name=splash', hardToReach: true, note: '同上，过场那一瞬' },
+  { id: 'welcome-2', module: 'Onboarding', label: 'Welcome-2', nodeId: '739:1104', route: '/onboarding/welcome?step=1', hardToReach: true, note: '要先划过第一屏' },
+  { id: 'child-basic-filled', module: 'Onboarding', label: 'Child basic info (filled)', nodeId: '739:1176', route: '/onboarding/profile?step=0&filled=1', hardToReach: true },
+  { id: 'birthday-confirm', module: 'Onboarding', label: 'Birthday Confirm', nodeId: '739:1224', route: '/onboarding/profile?step=0&filled=1&sheet=birthday', hardToReach: true, note: '要填完三项再点 Continue 才会弹' },
+  { id: 'child-details-filled', module: 'Onboarding', label: 'Child more Details (filled)', nodeId: '739:1282', route: '/onboarding/profile?step=1&filled=1', hardToReach: true },
+  { id: 'relationship', module: 'Onboarding', label: 'Relationship', nodeId: '751:1396', route: '/onboarding/profile?step=2&filled=1', hardToReach: true },
+  { id: 'relationship-custom', module: 'Onboarding', label: 'Relationship (custom)', nodeId: '752:1570', route: '/onboarding/profile?step=2&filled=1&sheet=custom', hardToReach: true, note: '选中 Other… 并输入内容后的状态' },
+  { id: 'plan-monthly', module: 'Onboarding', label: 'Choose plan (monthly)', nodeId: '758:1219', route: '/onboarding/plan?plan=monthly', prepare: (qc) => base(qc) },
 
   // ── Global ────────────────────────────────────────────────────────────────
   {

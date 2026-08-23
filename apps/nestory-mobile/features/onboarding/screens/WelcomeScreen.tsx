@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from '@/shared/components/Button';
 import { palette, theme } from '@/shared/theme';
@@ -341,7 +341,10 @@ function StepTwo({ onEnter }: { onEnter: () => void }) {
 
 export function WelcomeScreen() {
   const router = useRouter();
-  const [step, setStep] = useState(0);
+  // `?step=` opens straight onto a later panel — the frames are separate in
+  // Figma but one screen here. Dev-only; see features/devtools/gallery.
+  const { step: stepParam } = useLocalSearchParams<{ step?: string }>();
+  const [step, setStep] = useState(__DEV__ && stepParam ? Number(stepParam) || 0 : 0);
   const opacity = useRef(new Animated.Value(1)).current;
 
   const goToStep = (next: number) => {

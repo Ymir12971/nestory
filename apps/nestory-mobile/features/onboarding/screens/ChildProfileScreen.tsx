@@ -144,12 +144,23 @@ export function ChildProfileScreen() {
   // `from=settings` marks the Settings entry points (Settings page "+Add child"
   // and the Child Profile list CTA) so we return there instead of continuing
   // the onboarding chain.
-  const { another, from } = useLocalSearchParams<{ another?: string; from?: string }>();
+  //
+  // The gallery also drives this screen: `?step=` opens on a later step,
+  // `?filled=1` prefills it, `?sheet=birthday` opens the confirm sheet. Five
+  // Figma frames are states of this one screen, and the later ones are only
+  // reachable by filling in the earlier ones. Dev-only — see
+  // features/devtools/gallery.
+  const { another, from, step: stepParam, filled, sheet } =
+    useLocalSearchParams<{ another?: string; from?: string; step?: string; filled?: string; sheet?: string }>();
   const isAnother = another === '1';
   const fromSettings = from === 'settings';
-  const [step, setStep] = useState<Step>(0);
+  const preview = __DEV__ && (stepParam != null || filled != null || sheet != null);
+  const previewFilled = preview && filled === '1';
+  const [step, setStep] = useState<Step>(
+    preview && stepParam ? (Math.min(2, Math.max(0, Number(stepParam) || 0)) as Step) : 0,
+  );
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(previewFilled ? 'Emma' : '');
   const [avatarPhoto, setAvatarPhoto] = useState<PickedPhoto | null>(null);
 
   // Birthday defaults to today (annotation: 缺省显示当天日期); picker capped at today.
@@ -157,19 +168,23 @@ export function ChildProfileScreen() {
   const [monthIdx, setMonthIdx] = useState(today.getMonth());
   const [dayIdx, setDayIdx] = useState(today.getDate() - 1);
   const [yearIdx, setYearIdx] = useState(YEARS.indexOf(String(THIS_YEAR)));
-  const [birthdayTouched, setBirthdayTouched] = useState(false);
-  const [birthdaySheetVisible, setBirthdaySheetVisible] = useState(false);
+  const [birthdayTouched, setBirthdayTouched] = useState(previewFilled);
+  const [birthdaySheetVisible, setBirthdaySheetVisible] = useState(preview && sheet === 'picker');
 
-  const [gender, setGender] = useState<Gender>(null);
+  const [gender, setGender] = useState<Gender>(previewFilled ? 'Girl' : null);
   const heightState = useHeightState();
-  const [weight, setWeight] = useState('');
+  const [weight, setWeight] = useState(previewFilled ? '11.2' : '');
   const [weightSystem, setWeightSystem] = useState<UnitSystem>('metric');
 
-  const [relationship, setRelationship] = useState<Relationship>(null);
-  const [customRelationship, setCustomRelationship] = useState('');
+  const [relationship, setRelationship] = useState<Relationship>(
+    previewFilled ? (sheet === 'custom' ? 'Other...' : 'Mom') : null,
+  );
+  const [customRelationship, setCustomRelationship] = useState(
+    previewFilled && sheet === 'custom' ? 'Papa' : '',
+  );
 
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [birthdayConfirmVisible, setBirthdayConfirmVisible] = useState(false);
+  const [birthdayConfirmVisible, setBirthdayConfirmVisible] = useState(preview && sheet === 'birthday');
 
   const onBack = () => {
     if (step === 0) goBack();

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Modal } from 'react-native';
 import type { CurrentMonthStatus, StoryListItem } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
@@ -281,8 +281,13 @@ export function StoriesScreen() {
   const storiesQ = useStories({ childId: activeChildId, year: selectedYear });
   const monthsQ  = useAssetMonths(activeChildId);
   const generateNow = useGenerateStoryNow();
-  // monthKey pending regenerate confirmation (S-Regeneration confirm popup)
-  const [regenMonthKey, setRegenMonthKey] = useState<string | null>(null);
+  // monthKey pending regenerate confirmation (S-Regeneration confirm popup).
+  // `?regen=<monthKey>` opens it directly — the sheet otherwise needs Premium
+  // plus a month whose moments changed after generation. Dev-only.
+  const { regen } = useLocalSearchParams<{ regen?: string }>();
+  const [regenMonthKey, setRegenMonthKey] = useState<string | null>(
+    __DEV__ && regen ? regen : null,
+  );
 
   const handleGenerateNow = async (monthKey?: string) => {
     if (!activeChildId || generateNow.isPending) return;

@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showToast } from '@/features/ui/toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '@/shared/components/Button';
 import { NavBar } from '@/shared/components/NavBar';
 import { theme, palette } from '@/shared/theme';
@@ -33,7 +33,11 @@ export function PlanScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const childrenQ = useChildren();
-  const [plan, setPlan] = useState<Plan>('yearly');
+  // `?plan=monthly` starts on the monthly card (758:1219). Dev-only.
+  const { plan: planParam } = useLocalSearchParams<{ plan?: string }>();
+  const [plan, setPlan] = useState<Plan>(
+    __DEV__ && planParam === 'monthly' ? 'monthly' : 'yearly',
+  );
   const [purchasing, setPurchasing] = useState(false);
 
   const profileCount = childrenQ.data?.length ?? 0;

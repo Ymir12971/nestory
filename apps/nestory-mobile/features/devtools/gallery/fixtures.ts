@@ -133,7 +133,13 @@ export const fxMoments: Moment[] = [
   fxMoment({ id: 'f1c70000-0000-4000-8000-000000000103', assetType: 'text', files: [], textNote: 'Said something that was almost "dog".', capturedAt: monthsAgo(0) }),
 ];
 
-export const fxMonths = [0, 1, 2].map(n => ({ monthKey: monthKey(n), count: 3 }));
+export const fxMonths = [0, 1, 2, 3].map(n => ({ monthKey: monthKey(n), count: 3 }));
+
+/** Reaches back past January so the Stories year filter has two years in it. */
+export const fxCrossYearMonths = Array.from({ length: 15 }, (_, n) => ({
+  monthKey: monthKey(n),
+  count: 3,
+}));
 
 export function fxCurrentMonth(over: Partial<CurrentMonthStatus> = {}): CurrentMonthStatus {
   return {
