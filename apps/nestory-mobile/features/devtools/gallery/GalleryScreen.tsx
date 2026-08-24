@@ -79,7 +79,12 @@ export function GalleryScreen() {
 
       <ScrollView contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
         {GALLERY_MODULES.map((mod) => {
-          const rows = shown.filter(c => c.module === mod);
+          // Ordered by where the screen falls in the flow, not by when the
+          // case was written — walking a module top to bottom should follow
+          // the path a user takes.
+          const rows = shown
+            .filter(c => c.module === mod)
+            .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
           if (rows.length === 0) return null;
           return (
             <View key={mod} style={s.section}>

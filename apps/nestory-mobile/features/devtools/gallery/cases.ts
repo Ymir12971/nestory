@@ -34,6 +34,13 @@ export interface GalleryCase {
   prepare?: (qc: QueryClient) => void;
   /** Set when the frame can't be reached by using the app normally. */
   hardToReach?: boolean;
+  /**
+   * Position within its module. Cases were appended as they were written, so
+   * without this the list reads in the order it was typed rather than the
+   * order a user meets the screens — which is the order you want when walking
+   * a flow frame by frame. Unset sorts last, keeping its relative position.
+   */
+  order?: number;
   note?: string;
 }
 
@@ -300,29 +307,29 @@ export const GALLERY_CASES: GalleryCase[] = [
   { id: 'privacy-settings', module: 'Settings', label: 'Data & Privacy', nodeId: '770:2563', route: '/settings/privacy', prepare: (qc) => base(qc) },
 
   // ── Onboarding ────────────────────────────────────────────────────────────
-  { id: 'welcome', module: 'Onboarding', label: 'Welcome-1 / Welcome-2', nodeId: '739:1085', route: '/onboarding/welcome' },
-  { id: 'signin', module: 'Onboarding', label: 'Sign In', nodeId: '739:1134', route: '/onboarding/auth?preview=1',
+  { id: 'welcome', order: 3, module: 'Onboarding', label: 'Welcome-1 / Welcome-2', nodeId: '739:1085', route: '/onboarding/welcome' },
+  { id: 'signin', order: 5, module: 'Onboarding', label: 'Sign In', nodeId: '739:1134', route: '/onboarding/auth?preview=1',
     hardToReach: true, note: '登录状态下这屏会自动跳走，?preview=1 才停得住' },
-  { id: 'privacy-claim', module: 'Onboarding', label: 'Privacy claim', nodeId: '752:1639', route: '/onboarding/privacy-claim' },
-  { id: 'child-basic', module: 'Onboarding', label: 'Child basic info', nodeId: '739:1155', route: '/onboarding/profile' },
-  { id: 'child-another', module: 'Onboarding', label: 'Child info (?another=1)', nodeId: '739:1256', route: '/onboarding/profile?another=1' },
-  { id: 'children-list', module: 'Onboarding', label: 'Children list', nodeId: '750:2581', route: '/onboarding/children', prepare: (qc) => base(qc) },
-  { id: 'children-list-more', module: 'Onboarding', label: 'Children list (more)', nodeId: '751:1334', route: '/onboarding/children', prepare: (qc) => base(qc, { children: [fxChild, fxChild2] }) },
-  { id: 'notifications', module: 'Onboarding', label: 'Notification access', nodeId: '739:1940', route: '/onboarding/permissions' },
-  { id: 'plan-yearly', module: 'Onboarding', label: 'Choose plan', nodeId: '739:1406', route: '/onboarding/plan', prepare: (qc) => base(qc) },
-  { id: 'welcome-premium', module: 'Onboarding', label: 'Welcome to premium', nodeId: '761:2377', route: '/welcome-premium?cycle=yearly&from=onboarding', prepare: (qc) => base(qc, { sub: fxSubPremium }) },
-  { id: 'terms', module: 'Onboarding', label: 'Terms of Service', nodeId: '739:1547', route: '/onboarding/terms' },
-  { id: 'privacy-policy', module: 'Onboarding', label: 'Privacy Policy', nodeId: '739:1566', route: '/onboarding/privacy' },
+  { id: 'privacy-claim', order: 6, module: 'Onboarding', label: 'Privacy claim', nodeId: '752:1639', route: '/onboarding/privacy-claim' },
+  { id: 'child-basic', order: 7, module: 'Onboarding', label: 'Child basic info', nodeId: '739:1155', route: '/onboarding/profile' },
+  { id: 'child-another', order: 15, module: 'Onboarding', label: 'Child info (?another=1)', nodeId: '739:1256', route: '/onboarding/profile?another=1' },
+  { id: 'children-list', order: 13, module: 'Onboarding', label: 'Children list', nodeId: '750:2581', route: '/onboarding/children', prepare: (qc) => base(qc) },
+  { id: 'children-list-more', order: 14, module: 'Onboarding', label: 'Children list (more)', nodeId: '751:1334', route: '/onboarding/children', prepare: (qc) => base(qc, { children: [fxChild, fxChild2] }) },
+  { id: 'notifications', order: 16, module: 'Onboarding', label: 'Notification access', nodeId: '739:1940', route: '/onboarding/permissions' },
+  { id: 'plan-yearly', order: 17, module: 'Onboarding', label: 'Choose plan', nodeId: '739:1406', route: '/onboarding/plan', prepare: (qc) => base(qc) },
+  { id: 'welcome-premium', order: 19, module: 'Onboarding', label: 'Welcome to premium', nodeId: '761:2377', route: '/welcome-premium?cycle=yearly&from=onboarding', prepare: (qc) => base(qc, { sub: fxSubPremium }) },
+  { id: 'terms', order: 20, module: 'Onboarding', label: 'Terms of Service', nodeId: '739:1547', route: '/onboarding/terms' },
+  { id: 'privacy-policy', order: 21, module: 'Onboarding', label: 'Privacy Policy', nodeId: '739:1566', route: '/onboarding/privacy' },
 
-  { id: 'launch', module: 'Onboarding', label: 'O-Launch', nodeId: '739:1985', route: '/__overlay?name=splash', hardToReach: true, note: '启动动画约 2.5 秒后淡出，这里让它停住' },
-  { id: 'launch-transition', module: 'Onboarding', label: 'O-Launch (transition)', nodeId: '739:2032', route: '/__overlay?name=splash', hardToReach: true, note: '同上，过场那一瞬' },
-  { id: 'welcome-2', module: 'Onboarding', label: 'Welcome-2', nodeId: '739:1104', route: '/onboarding/welcome?step=1', hardToReach: true, note: '要先划过第一屏' },
-  { id: 'child-basic-filled', module: 'Onboarding', label: 'Child basic info (filled)', nodeId: '739:1176', route: '/onboarding/profile?step=0&filled=1', hardToReach: true },
-  { id: 'birthday-confirm', module: 'Onboarding', label: 'Birthday Confirm', nodeId: '739:1224', route: '/onboarding/profile?step=0&filled=1&sheet=birthday', hardToReach: true, note: '要填完三项再点 Continue 才会弹' },
-  { id: 'child-details-filled', module: 'Onboarding', label: 'Child more Details (filled)', nodeId: '739:1282', route: '/onboarding/profile?step=1&filled=1', hardToReach: true },
-  { id: 'relationship', module: 'Onboarding', label: 'Relationship', nodeId: '751:1396', route: '/onboarding/profile?step=2&filled=1', hardToReach: true },
-  { id: 'relationship-custom', module: 'Onboarding', label: 'Relationship (custom)', nodeId: '752:1570', route: '/onboarding/profile?step=2&filled=1&sheet=custom', hardToReach: true, note: '选中 Other… 并输入内容后的状态' },
-  { id: 'plan-monthly', module: 'Onboarding', label: 'Choose plan (monthly)', nodeId: '758:1219', route: '/onboarding/plan?plan=monthly', prepare: (qc) => base(qc) },
+  { id: 'launch', order: 1, module: 'Onboarding', label: 'O-Launch', nodeId: '739:1985', route: '/__overlay?name=splash', hardToReach: true, note: '启动动画约 2.5 秒后淡出，这里让它停住' },
+  { id: 'launch-transition', order: 2, module: 'Onboarding', label: 'O-Launch (transition)', nodeId: '739:2032', route: '/__overlay?name=splash', hardToReach: true, note: '同上，过场那一瞬' },
+  { id: 'welcome-2', order: 4, module: 'Onboarding', label: 'Welcome-2', nodeId: '739:1104', route: '/onboarding/welcome?step=1', hardToReach: true, note: '要先划过第一屏' },
+  { id: 'child-basic-filled', order: 8, module: 'Onboarding', label: 'Child basic info (filled)', nodeId: '739:1176', route: '/onboarding/profile?step=0&filled=1', hardToReach: true },
+  { id: 'birthday-confirm', order: 9, module: 'Onboarding', label: 'Birthday Confirm', nodeId: '739:1224', route: '/onboarding/profile?step=0&filled=1&sheet=birthday', hardToReach: true, note: '要填完三项再点 Continue 才会弹' },
+  { id: 'child-details-filled', order: 10, module: 'Onboarding', label: 'Child more Details (filled)', nodeId: '739:1282', route: '/onboarding/profile?step=1&filled=1', hardToReach: true },
+  { id: 'relationship', order: 11, module: 'Onboarding', label: 'Relationship', nodeId: '751:1396', route: '/onboarding/profile?step=2&filled=1', hardToReach: true },
+  { id: 'relationship-custom', order: 12, module: 'Onboarding', label: 'Relationship (custom)', nodeId: '752:1570', route: '/onboarding/profile?step=2&filled=1&sheet=custom', hardToReach: true, note: '选中 Other… 并输入内容后的状态' },
+  { id: 'plan-monthly', order: 18, module: 'Onboarding', label: 'Choose plan (monthly)', nodeId: '758:1219', route: '/onboarding/plan?plan=monthly', prepare: (qc) => base(qc) },
 
   // ── Global ────────────────────────────────────────────────────────────────
   {
