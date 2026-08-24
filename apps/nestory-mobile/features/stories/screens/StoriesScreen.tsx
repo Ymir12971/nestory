@@ -7,6 +7,7 @@ import { Modal } from 'react-native';
 import type { CurrentMonthStatus, StoryListItem } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { Button } from '@/shared/components/Button';
+import { GlobalOffIcon } from '@/shared/components/GlobalOffIcon';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
 import { useAssetMonths, useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
@@ -448,7 +449,7 @@ export function StoriesScreen() {
         >
           {/* DS Abnormal · Type=WebIssue, same block as H-Memories couldn't load */}
           <View style={styles.abnormal}>
-            <RemixIcon name="wifi-off-line" size={48} color={theme.text.secondary} />
+            <GlobalOffIcon size={48} color={theme.text.secondary} />
             <View style={styles.abnormalText}>
               <Text style={styles.abnormalTitle}>Stories couldn't load</Text>
               <Text style={styles.abnormalBody}>Check your connection and try again.</Text>

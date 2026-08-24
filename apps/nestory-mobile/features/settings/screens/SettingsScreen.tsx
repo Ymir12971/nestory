@@ -212,6 +212,26 @@ export function SettingsScreen() {
             end={{ x: 0.9, y: 1 }}
             style={styles.promoCard}
           >
+            {/* 768:4590-4592 + 774:4680-4682 — six shapes bled off the card's
+                edges, behind the content. Three are flat circles, so they are
+                Views rather than assets; the other three are the same
+                money-dollar-circle glyph as the tile, at 60/28/14. The card
+                already clips, which is what makes them read as bleeding out. */}
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              <View style={[styles.promoBlob, { left: 303, top: 36, width: 64, height: 64, borderRadius: 32, backgroundColor: '#3b6fef' }]} />
+              <View style={[styles.promoBlob, { left: 155, top: -58, width: 92, height: 92, borderRadius: 46, backgroundColor: '#4e7df6' }]} />
+              <View style={[styles.promoBlob, { left: 56, top: 51, width: 34, height: 34, borderRadius: 17, backgroundColor: '#4476f2' }]} />
+              <View style={[styles.promoBlob, { left: 84, top: -26 }]}>
+                <RemixIcon name="money-dollar-circle-fill" size={60} color="#4a7af4" />
+              </View>
+              <View style={[styles.promoBlob, { left: 207, top: 42 }]}>
+                <RemixIcon name="money-dollar-circle-fill" size={28} color="#4b7bf5" />
+              </View>
+              <View style={[styles.promoBlob, { left: 289, top: 7 }]}>
+                <RemixIcon name="money-dollar-circle-fill" size={14} color="#5180f7" />
+              </View>
+            </View>
+
             <View style={styles.promoIconTile}>
               <RemixIcon name="money-dollar-circle-fill" size={32} color="#2660e7" />
             </View>
@@ -443,6 +463,8 @@ const styles = StyleSheet.create({
   planAction: { alignSelf: 'center' },
 
   // Promo card 768:4588 — blue gradient, 2px #c6d7ff edge, radius/m
+  // Decorations sit in an absolutely-filled layer under the content.
+  promoBlob: { position: 'absolute' },
   promoCard: {
     flexDirection: 'row',
     alignItems: 'center',

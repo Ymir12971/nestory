@@ -14,11 +14,11 @@
 | # | 事项 | 现状 | 我的建议 | 详见 |
 |---|---|---|---|---|
 
-### 另外三点已知妥协（不需决策，但记录在案）
+### 已知妥协（2026-08-23 更新）
 
-1. **未跑真机** —— 全程只做了 `pnpm typecheck`。本次含多处结构性改动（Home 合并成时间轴、Save 移进 NavBar、Toast 改屏幕正中），建议起一次 app 走主流程。
-2. **Settings 优惠卡的 6 个装饰图形** —— 稿中蓝色渐变卡里有 6 个绝对定位的圆形/矢量装饰（出血裁切），需要导出 SVG 资源才能 1:1；当前只实现了渐变 + 描边 + 图标砖 + 文案。
-3. **`global-off-line` 图标缺失** —— 加载失败态稿用 `global-off-line`，当前 `react-native-remix-icon` 版本类型里没有，改用语义等价的 `wifi-off-line`；要精确一致需升级 icon 包或内联该 SVG。
+1. **未跑真机** —— 仍未在真机走过完整流程。已产出 versionCode 10 的 APK 供验证；相机 / 相册 / OAuth 深链 / 推送 / IAP 五条原生路径都还没验。
+2. ~~**Settings 优惠卡的 6 个装饰图形**~~ —— **已补**（2026-08-23）。取到实际几何后发现三个是纯色圆（`#3b6fef` 64 / `#4e7df6` 92 / `#4476f2` 34），用 View 画即可；另三个是同一个 `money-dollar-circle-fill` 图标的 60 / 28 / 14 三种尺寸。卡片本来就有 `overflow: hidden`，出血裁切自然成立，不需要导出任何资源。
+3. ~~**`global-off-line` 图标缺失**~~ —— **已补**（2026-08-23）。`react-native-remix-icon` 4.7.0 里这一族只有 `GlobalFill` / `GlobalLine`，没有可替换的名字，所以照皇冠的做法内联稿的导出（`shared/components/GlobalOffIcon.tsx`）。原来的 `wifi-off-line` 语义偏了 —— 它读作「Wi-Fi 有问题」而不是「没有连接」。Home 和 Stories 两个失败态都已替换。
 
 ### 已在实现中修正的设计稿笔误 / 内容问题
 

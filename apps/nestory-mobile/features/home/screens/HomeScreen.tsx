@@ -16,6 +16,7 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import type { Child, Moment } from '@nestory/types';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
+import { GlobalOffIcon } from '@/shared/components/GlobalOffIcon';
 import { Button } from '@/shared/components/Button';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { PaywallModal } from '@/shared/components/PaywallModal';
@@ -214,9 +215,7 @@ export function HomeScreen() {
             }
           >
             <View style={styles.abnormal}>
-              {/* Design uses global-off-line; not in this react-native-remix-icon
-                  build, so the equivalent wifi-off-line stands in. */}
-              <RemixIcon name="wifi-off-line" size={48} color={theme.text.secondary} />
+              <GlobalOffIcon size={48} color={theme.text.secondary} />
               <View style={styles.abnormalText}>
                 <Text style={styles.abnormalTitle}>Moments couldn't load</Text>
                 <Text style={styles.abnormalBody}>Check your connection and try again.</Text>
