@@ -51,6 +51,8 @@ android/app/build/
 
 # Sensitive
 .credentials.json
+secrets/
+*service-account*.json
 
 # Generated
 prisma/migrations/dev.db*
