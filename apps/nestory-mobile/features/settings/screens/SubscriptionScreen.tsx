@@ -6,14 +6,19 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import type { Subscription } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { useSubscription, queryClient, queryKeys } from '@/api';
+import { useSubscription, refreshMySubscription, queryClient, queryKeys } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { PremiumCrown } from '@/shared/components/PremiumCrown';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { NavBar } from '@/shared/components/NavBar';
-import { purchasePlan, openManageSubscriptions, isPurchasesAvailable } from '@/features/billing/purchases';
+import {
+  purchasePlan,
+  restorePurchases,
+  openManageSubscriptions,
+  isPurchasesAvailable,
+} from '@/features/billing/purchases';
 import { track } from '@/shared/lib/analytics';
 import { showToast } from '@/features/ui/toast';
 
@@ -53,6 +58,7 @@ const PREMIUM_BENEFITS = [
 function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnType<typeof useRouter> }) {
   const [cycle, setCycle] = useState<PlanCycle>('yearly');
   const [purchasing, setPurchasing] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const handleUpgrade = async () => {
     if (!isPurchasesAvailable()) {
@@ -73,6 +79,42 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
       showToast({ type: 'error', message: `Purchase failed: ${msg}` });
     } finally {
       setPurchasing(false);
+    }
+  };
+
+  // App Store Review Guideline 3.1.1 — a subscriber who reinstalled, or signed
+  // in on a second device, has no other route back to Premium.
+  //
+  // Two steps on purpose: restorePurchases() only re-attaches the store
+  // purchase to this RevenueCat customer, and RC does not reliably webhook us
+  // about a transfer. Our own `subscriptions` row is what gates the app, so we
+  // ask the server to re-read RC before deciding what to tell the user.
+  const handleRestore = async () => {
+    if (!isPurchasesAvailable()) {
+      showToast({ type: 'warning', message: 'In-app purchases require the mobile app.' });
+      return;
+    }
+    setRestoring(true);
+    try {
+      const res = await restorePurchases();
+      if (res.status === 'restored') {
+        const { applied } = await refreshMySubscription();
+        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        if (applied) {
+          track('subscription_restored');
+          showToast({ type: 'success', message: 'Premium restored.' });
+          return;
+        }
+      }
+      showToast({
+        type: 'info',
+        message: 'No active subscription found for this store account.',
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      showToast({ type: 'error', message: `Restore failed: ${msg}` });
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -162,6 +204,12 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
           type="premium"
           disabled={purchasing}
           onPress={handleUpgrade}
+        />
+        <Button
+          label={restoring ? 'Restoring…' : 'Restore Purchases'}
+          type="text"
+          disabled={purchasing || restoring}
+          onPress={handleRestore}
         />
         <Text style={styles.ctaCaption}>
           Auto-renews until canceled. Manage in Settings.{'\n'}

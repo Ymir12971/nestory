@@ -17,6 +17,11 @@ const envSchema = z.object({
   // mobile-render path without burning tokens or coupling to today's prompt.
   STORY_AI_MOCK: z.string().optional(),
   REVENUECAT_WEBHOOK_SECRET: z.string().optional(),
+  // RevenueCat REST secret key (sk_…), used by POST /subscriptions/refresh to
+  // re-read a subscriber's authoritative entitlements — the recovery path when a
+  // webhook was missed or a restore only produced an event we don't act on.
+  // Unset = the endpoint refuses rather than guessing.
+  REVENUECAT_API_KEY: z.string().optional(),
   // Shared-secret bearer for /internal/* admin endpoints (queue control,
   // dispatcher backfills, etc.). When unset, the routes refuse all traffic.
   ADMIN_TOKEN: z.string().optional(),

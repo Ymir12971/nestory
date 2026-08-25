@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 /**
  * Runtime config — replace placeholder values before each environment's build.
@@ -13,6 +14,23 @@ const dev = __DEV__;
 const expoHostUri = Constants.expoConfig?.hostUri ?? '';
 const devHost     = expoHostUri.split(':')[0] || 'localhost';
 
+/**
+ * RevenueCat public SDK keys are per-store: an Android `goog_…` key rejects
+ * every call when handed to the iOS SDK, and vice versa. Resolve by platform
+ * rather than shipping one key to both. Empty → IAP disabled
+ * (isPurchasesAvailable() false), which is the web and un-provisioned case.
+ *
+ * Both branches name the env var literally because Metro inlines
+ * `process.env.EXPO_PUBLIC_*` textually at build time — a computed key would
+ * come back undefined.
+ */
+const revenueCatKey =
+  Platform.select({
+    ios:     process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
+    android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
+    default: '',
+  }) ?? '';
+
 export const config = {
   // Non-dev builds (EAS preview/production) hit the deployed Railway API + Vercel web.
   apiBaseUrl: dev ? `http://${devHost}:3001` : 'https://nestoryapi-production.up.railway.app',
@@ -21,6 +39,5 @@ export const config = {
   // Supabase client can be constructed lazily and produce a clear error if missing.
   supabaseUrl:     process.env.EXPO_PUBLIC_SUPABASE_URL     ?? '',
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
-  // RevenueCat public SDK key (Android). Empty → IAP disabled (isPurchasesAvailable() false).
-  revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '',
+  revenueCatKey,
 } as const;
