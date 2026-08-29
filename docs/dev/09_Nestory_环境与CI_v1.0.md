@@ -90,11 +90,14 @@
 
 ## 3. 签名与发布
 
+> **本节已被 `RELEASE-MOBILE.md` 取代。** 下面的 Bundle ID 写于账号注册之前，与实际不符
+> （两端实际都是 `com.blakard.nestory`），3.3 的 OTA channel 也尚未实现。发布请以 `RELEASE-MOBILE.md` 为准。
+
 ### 3.1 iOS（通过 EAS Build + EAS Submit）
 
 | 项 | 值 |
 |---|---|
-| Bundle ID | `app.nestory.ios` |
+| Bundle ID | ~~`app.nestory.ios`~~ → `com.blakard.nestory` |
 | Team ID | （Apple Developer 账户绑定，待补） |
 | Distribution Certificate | EAS managed |
 | Provisioning Profile | EAS managed |
@@ -105,7 +108,7 @@
 
 | 项 | 值 |
 |---|---|
-| Package name | `app.nestory.android` |
+| Package name | ~~`app.nestory.android`~~ → `com.blakard.nestory` |
 | Keystore | EAS managed（首次自动生成，备份到 1Password） |
 | Service Account JSON | Google Play Console 生成，存 EAS secret |
 | Internal testing track | staging build 自动上架 |
