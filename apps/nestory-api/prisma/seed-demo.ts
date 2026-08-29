@@ -116,7 +116,6 @@ async function main() {
         assetType:   'photo',
         textNote:    m.textNote,
         capturedAt:  new Date(m.capturedAt),
-        tags:        [],
         isHighlight: m.isHighlight,
       },
     });
