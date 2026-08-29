@@ -76,6 +76,20 @@ iOS 上传到 App Store Connect 的包默认只进 TestFlight，不点提审就�
      （至少要有"管理测试轨道版本"权限）
    - JSON 放到仓库根目录 `secrets/play-service-account.json`
      （`.gitignore` 已排除 `secrets/` 与 `*service-account*.json`，**不要提交**）
+
+   > [!WARNING]
+   > **2026-08-29 实测：这一步在本组织下走不通。** `blakard.com` 组织启用了
+   > `iam.disableServiceAccountKeyCreation`（Google "Secure by Default" 对新建组织的默认强制），
+   > 服务账号建得出来、Play 侧也能授权，但**创建 JSON 密钥被拒**，于是 `eas submit` 用不了。
+   >
+   > 排查时注意有**两个同名约束**：组织政策列表里 `iam.managed.disableServiceAccountKeyCreation`
+   > （新版托管）可能显示 `Not enforced`，真正拦路的是旧版 `iam.disableServiceAccountKeyCreation`，
+   > 是另一条。而且改它需要 `roles/orgpolicy.policyAdmin`，项目 Owner 不含这个角色，
+   > 得由 blakard.com 的 Workspace 超管授予。
+   >
+   > **在解决之前，Android 一律手工传**：`eas build`（不加 `--auto-submit-with-profile`）
+   > 出 AAB → 下载 → Play Console → 内部测试 → Create new release → 上传 → 推出。
+   > versionCode 12（2026-08-28）和 13（2026-08-29）都是这么发的。
 5. **Keystore**：交给 EAS 托管，首次 `eas build` 自动生成。
    生成后立刻用 `eas credentials` 导出备份——**弄丢了就再也无法更新这个包名的 App**。
 
@@ -244,6 +258,7 @@ npx eas-cli build -p android --profile production --auto-submit-with-profile pro
 | 症状 | 原因 |
 |---|---|
 | `eas submit` 报 Android 找不到 App | 首个 AAB 还没手工传过（§2.2-3），或 service account 权限不够 |
+| 服务账号建不了 JSON 密钥 | 组织政策 `iam.disableServiceAccountKeyCreation`,见 §2.2-4 的警告框。当前只能手工传 |
 | Play 拒收：versionCode 已存在 | 上次构建后忘了 commit `app.json` |
 | iOS 购买全部失败 / RC 报 401 | `EXPO_PUBLIC_REVENUECAT_IOS_KEY` 没配，或误用了 `goog_` 开头的 key |
 | 购买成功但 App 里仍是 Free | webhook 没通。查 Railway 日志有无 `RC webhook received`；没有就是 RC Dashboard 的 URL 或 `REVENUECAT_WEBHOOK_SECRET` 不对 |
