@@ -16,6 +16,7 @@ import { config } from '@/shared/config';
 import { useStory, getAuthToken, useCreateShare } from '@/api';
 import { showToast } from '@/features/ui/toast';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { NavBar } from '@/shared/components/NavBar';
 import { track } from '@/shared/lib/analytics';
 import { StoryWebView } from '../components/StoryWebView';
 
@@ -97,15 +98,28 @@ export function StoryDetailScreen() {
 
   return (
     <View style={styles.root}>
-      {/* ── NavBar (cover + title rendered by the WebView itself) ──── */}
+      {/* NavBar Type=full (48:759) — back + title + share icon in the right
+          slot. The cover and title inside the page are the WebView's own. */}
       <View style={{ height: insets.top, backgroundColor: theme.surface.default }} />
-      <View style={styles.navBar}>
-        <Pressable hitSlop={8} onPress={goBack}>
-          <RemixIcon name="arrow-left-s-line" size={24} color={theme.text.primary} />
-        </Pressable>
-        <Text style={styles.navTitle} numberOfLines={1}>{navTitle}</Text>
-        <View style={styles.navSpacer} />
-      </View>
+      <NavBar
+        title={navTitle}
+        onBack={goBack}
+        right={
+          <Pressable
+            hitSlop={8}
+            onPress={handleShare}
+            disabled={sharing}
+            accessibilityRole="button"
+            accessibilityLabel="Share this story"
+          >
+            <RemixIcon
+              name="share-line"
+              size={24}
+              color={sharing ? theme.text.disabled : theme.text.primary}
+            />
+          </Pressable>
+        }
+      />
 
       {/* ── WebView body ─────────────────────────────────────── */}
       <View style={styles.webviewWrap}>
@@ -170,23 +184,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.surface.default,
   },
-
-  // NavBar
-  navBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xxl,
-    height: 56,
-    backgroundColor: theme.surface.default,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border.default,
-  },
-  navTitle: {
-    ...theme.typography.h2,
-    color: theme.text.primary,
-  },
-  navSpacer: { width: 24 },
 
   // WebView
   webviewWrap: {
