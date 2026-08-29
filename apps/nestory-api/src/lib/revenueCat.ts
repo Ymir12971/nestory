@@ -121,3 +121,98 @@ function inferBillingCycle(productId?: string): 'yearly' | 'monthly' | null {
   if (productId.includes('monthly')) return 'monthly';
   return null;
 }
+
+// ── Authoritative pull (POST /subscriptions/refresh) ───────────────────────
+//
+// Webhooks are the primary path, but they are not sufficient on their own:
+// a restore on a reinstalled device transfers the entitlement inside RC and
+// may only emit events `deriveSubscriptionUpdate` deliberately ignores, and a
+// webhook dropped while REVENUECAT_WEBHOOK_SECRET was misconfigured is never
+// replayed. Reading the subscriber back from RC covers both.
+
+const RC_API_BASE = 'https://api.revenuecat.com/v1';
+
+/** Subset of the REST subscriber object we read. */
+export interface RCSubscriber {
+  entitlements?: Record<string, {
+    expires_date?:       string | null;
+    product_identifier?: string;
+  }>;
+  subscriptions?: Record<string, {
+    expires_date?:              string | null;
+    period_type?:               string;   // "normal" | "trial" | "intro"
+    unsubscribe_detected_at?:   string | null;
+    billing_issues_detected_at?: string | null;
+  }>;
+}
+
+/**
+ * GET /v1/subscribers/{app_user_id}. Returns null when RC is not configured,
+ * so callers can surface "unavailable" rather than "not subscribed" — the two
+ * must not collapse into the same answer.
+ */
+export async function fetchRCSubscriber(appUserId: string): Promise<RCSubscriber | null> {
+  const key = process.env.REVENUECAT_API_KEY;
+  if (!key) return null;
+
+  const res = await fetch(`${RC_API_BASE}/subscribers/${encodeURIComponent(appUserId)}`, {
+    headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+    signal:  AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) {
+    throw new Error(`RevenueCat returned ${res.status} for subscriber ${appUserId}`);
+  }
+  const body = (await res.json()) as { subscriber?: RCSubscriber };
+  return body.subscriber ?? {};
+}
+
+/**
+ * Same five-state mapping as `deriveSubscriptionUpdate`, driven by a full
+ * subscriber snapshot instead of a single event. Returns null when the
+ * snapshot already agrees with the row, so a refresh that changes nothing
+ * doesn't churn `updatedAt`.
+ */
+export function deriveSubscriptionFromSubscriber(
+  subscriber: RCSubscriber,
+  current: { subscriptionStatus: string; planType: string },
+  now = new Date(),
+): Prisma.SubscriptionUpdateInput | null {
+  const entitlements = subscriber.entitlements ?? {};
+  const active = Object.values(entitlements).find(
+    (e) => !e.expires_date || new Date(e.expires_date) > now,
+  );
+
+  if (active) {
+    const productId = active.product_identifier;
+    const detail    = productId ? subscriber.subscriptions?.[productId] : undefined;
+    const isTrial   = detail?.period_type === 'trial' || detail?.period_type === 'intro';
+    const cycle     = inferBillingCycle(productId);
+    // Cancelled-but-still-entitled: rights run to the end of the paid period,
+    // which is exactly what the CANCELLATION event branch encodes.
+    const cancelled = !!(detail?.unsubscribe_detected_at || detail?.billing_issues_detected_at);
+
+    return {
+      subscriptionStatus: isTrial ? 'trial_active' : 'premium_active',
+      planType:           'premium',
+      status:             cancelled ? 'cancelled' : 'active',
+      ...(cycle ? { billingCycle: cycle } : {}),
+      ...(active.expires_date ? { expiresAt: new Date(active.expires_date) } : {}),
+    };
+  }
+
+  // No active entitlement. Only write if we currently believe they're premium —
+  // otherwise a free user's refresh would rewrite never_paid on every call.
+  if (current.planType !== 'premium') return null;
+
+  const ended =
+    current.subscriptionStatus === 'trial_active'   ? 'trial_ended'   :
+    current.subscriptionStatus === 'premium_active' ? 'premium_ended' :
+    current.subscriptionStatus;
+
+  return {
+    subscriptionStatus: ended,
+    planType:           'free',
+    status:             'expired',
+    billingCycle:       null,
+  };
+}

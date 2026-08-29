@@ -8,6 +8,7 @@
 
 export type PurchaseCycle = 'yearly' | 'monthly';
 export type PurchaseResult = { status: 'purchased' | 'cancelled' };
+export type RestoreResult = { status: 'restored' | 'nothing_to_restore' };
 
 /** True only where RevenueCat is configured (native build + API key present). */
 export function isPurchasesAvailable(): boolean {
@@ -27,6 +28,10 @@ export async function logOutPurchaseUser(): Promise<void> {
 }
 
 export async function purchasePlan(_cycle: PurchaseCycle): Promise<PurchaseResult> {
+  throw new Error('In-app purchases are not available on this platform.');
+}
+
+export async function restorePurchases(): Promise<RestoreResult> {
   throw new Error('In-app purchases are not available on this platform.');
 }
 

@@ -29,6 +29,10 @@
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
+    "beta": {
+      "extends": "production",
+      "distribution": "store"
+    },
     "production": {
       "node": "22.11.0",
       "autoIncrement": true,
@@ -43,6 +47,27 @@
     }
   },
   "submit": {
-    "production": {}
+    "beta": {
+      "ios": {
+        "appleId": "REPLACE_APPLE_ID_EMAIL",
+        "ascAppId": "REPLACE_ASC_APP_ID",
+        "appleTeamId": "REPLACE_APPLE_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "../../secrets/play-service-account.json",
+        "track": "internal"
+      }
+    },
+    "production": {
+      "ios": {
+        "appleId": "REPLACE_APPLE_ID_EMAIL",
+        "ascAppId": "REPLACE_ASC_APP_ID",
+        "appleTeamId": "REPLACE_APPLE_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "../../secrets/play-service-account.json",
+        "track": "production"
+      }
+    }
   }
 }

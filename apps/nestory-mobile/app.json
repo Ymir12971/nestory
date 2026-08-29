@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.blakard.nestory"
+      "bundleIdentifier": "com.blakard.nestory",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.blakard.nestory",

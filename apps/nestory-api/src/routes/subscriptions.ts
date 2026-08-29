@@ -9,7 +9,9 @@ import type {
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
 import {
+  deriveSubscriptionFromSubscriber,
   deriveSubscriptionUpdate,
+  fetchRCSubscriber,
   verifyWebhookAuth,
   type RCWebhookPayload,
 } from '../lib/revenueCat';
@@ -133,6 +135,44 @@ export async function subscriptionsRoutes(app: FastifyInstance) {
       data:  { ...update, lastEventId: event.id, lastEventAt: eventTs },
     });
     return { received: true, applied: true, type: event.type };
+  });
+
+  // POST /subscriptions/refresh — re-read this user's entitlements from
+  // RevenueCat and reconcile the row.
+  //
+  // The webhook stays the primary path; this is the recovery path the client
+  // calls after "Restore Purchases", and it's the only thing that closes two
+  // holes the webhook can't: a transfer to a reinstalled device emits events
+  // deriveSubscriptionUpdate deliberately ignores, and any event dropped while
+  // REVENUECAT_WEBHOOK_SECRET was misconfigured is never redelivered.
+  //
+  // Safe to expose to the user's own JWT: the client supplies no state, we ask
+  // RC about req.userId and believe only RC.
+  app.post('/refresh', async (req): Promise<{ data: { applied: boolean } }> => {
+    const sub = await prisma.subscription.findUnique({ where: { userId: req.userId } });
+    if (!sub) throw Errors.notFound('Subscription');
+
+    let subscriber;
+    try {
+      subscriber = await fetchRCSubscriber(req.userId);
+    } catch (err) {
+      req.log.error({ err, userId: req.userId }, 'RC subscriber fetch failed');
+      throw new ApiError('INTERNAL_ERROR', 'Could not reach the store. Please try again.', 502);
+    }
+
+    if (!subscriber) {
+      // Unset key — refuse rather than answering "not subscribed", which the
+      // client would show as a failed restore to a paying user.
+      req.log.error('REVENUECAT_API_KEY unset — /subscriptions/refresh unavailable');
+      throw new ApiError('INTERNAL_ERROR', 'Subscription refresh is not configured.', 503);
+    }
+
+    const update = deriveSubscriptionFromSubscriber(subscriber, sub);
+    if (!update) return { data: { applied: false } };
+
+    await prisma.subscription.update({ where: { userId: req.userId }, data: update });
+    req.log.info({ userId: req.userId, update }, 'Subscription reconciled from RC');
+    return { data: { applied: true } };
   });
 
   // GET /subscriptions/paywall-config — A/B/C/D 配置（前端 PaywallModal 已硬编码 headlines/benefits，
