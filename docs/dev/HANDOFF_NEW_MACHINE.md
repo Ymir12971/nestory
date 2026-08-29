@@ -82,6 +82,14 @@ pnpm exec expo start --web --clear
 
 - Supabase DB schema/seed 已经在线上(下机器只要拉代码 + 拷 .env 就接得上)
 - `.env` 在 `apps/nestory-api/.env` — **必须手工拷到新机器**(里面有 service_role key + DB password,提醒:之前在聊天里明文出现过,建议在 Supabase Dashboard 重置后再拷新值)
+
+> [!NOTE]
+> **上面两条自 2026-08-29 起只对「要连线上库」的场景成立。**
+> 日常开发已经不连云库了:本地是 Docker 里的 Supabase 栈(`supabase/config.toml`),
+> 新机器上 `pnpm dev` 一条命令搞定 —— 它会自己复制 `.env.example`(默认值就是本地栈,
+> 不含任何真密钥)、起 redis 容器和本地栈、跑迁移、灌种子数据。
+> 线上那份 `.env` 只有在需要连 prod 库时才拷,放 `apps/nestory-api/.env.cloud.local`
+> (被 `.gitignore` 的 `.env.*.local` 盖住),`cp .env.cloud.local .env` 切过去。
 - mobile `.env` 是占位,可以新机器重生成
 - 后台进程已全停(API + Metro)
 
