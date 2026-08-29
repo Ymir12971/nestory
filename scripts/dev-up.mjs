@@ -75,7 +75,15 @@ if (!run('docker version', { quiet: true }).ok) {
 }
 if (!run(`docker start ${REDIS_CONTAINER}`, { quiet: true }).ok) {
   console.log('  容器不存在 → 新建')
-  const created = run(`docker run -d --name ${REDIS_CONTAINER} -p 6380:6379 redis:7-alpine`, { quiet: true })
+  // compose 标签只是为了在 Docker Desktop 里跟 supabase 那堆归到 Nestory 一组。
+  // 不要加 com.supabase.cli.project —— 那个会让 `supabase stop` 把它当自己的容器管。
+  const created = run(
+    `docker run -d --name ${REDIS_CONTAINER} ` +
+    '--label com.docker.compose.project=Nestory ' +
+    '--label com.docker.compose.service=redis ' +
+    '-p 6380:6379 redis:7-alpine',
+    { quiet: true },
+  )
   if (!created.ok) die(`建不出来：\n${created.out}`)
 }
 console.log('  ok（6380）')
