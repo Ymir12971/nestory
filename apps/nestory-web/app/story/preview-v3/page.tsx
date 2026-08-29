@@ -6,7 +6,8 @@ import { StoryRendererV3 } from '@/app/_components/StoryRendererV3';
 // 仅本地/预览环境可用;生产 404。
 export default function PreviewV3Page() {
   if (process.env.NODE_ENV === 'production') notFound();
-  return <StoryRendererV3 doc={FIXTURE} />;
+  // external:样张要能看到水印 —— 它是渲染器画得出来的状态之一
+  return <StoryRendererV3 doc={FIXTURE} external />;
 }
 
 const P = (seed: number, w = 800, h = 600) => `https://picsum.photos/seed/nestory${seed}/${w}/${h}`;

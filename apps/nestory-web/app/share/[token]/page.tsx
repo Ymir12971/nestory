@@ -42,10 +42,16 @@ export default async function SharePage({ params }: SharePageProps) {
   try {
     share = await fetchPublicShare(token);
   } catch (err) {
-    if (err instanceof ApiFetchError && err.status === 404) notFound();
+    // 400 as well as 404: the API's token param is `min(43)`, so a link that a
+    // chat client wrapped or a user truncated fails validation rather than
+    // lookup. Both mean "this link isn't a share" to the visitor — only a real
+    // outage should reach the error boundary.
+    if (err instanceof ApiFetchError && (err.status === 400 || err.status === 404)) notFound();
     throw err;
   }
 
   const doc = asStoryDocument(share.document);
-  return isStoryDocumentV3(doc) ? <StoryRendererV3 doc={doc} /> : <StoryRenderer doc={doc} />;
+  return isStoryDocumentV3(doc)
+    ? <StoryRendererV3 doc={doc} external />
+    : <StoryRenderer doc={doc} external />;
 }

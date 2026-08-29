@@ -67,6 +67,27 @@
   justify-content: space-between;
   pointer-events: none;
 }
+/* 水印:进度条正下方居中,层级同 topBar。 */
+.watermark {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: calc(max(12px, env(safe-area-inset-top)) + 34px);
+  transform: translateX(-50%);
+  margin: 0;
+  pointer-events: none;
+  /* Cover 页是满幅照片,浅色页是 #faf9f6 —— 光靠颜色两边不可能都读得清,
+     所以跟翻页按钮同一套毛玻璃。 */
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: rgba(31, 41, 55, 0.6);
+  white-space: nowrap;
+}
 .navBtn {
   pointer-events: auto;
   border: 1px solid rgba(0, 0, 0, 0.08);

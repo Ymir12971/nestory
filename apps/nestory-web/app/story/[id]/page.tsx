@@ -39,7 +39,8 @@ export default async function StoryPage({ params, searchParams }: StoryPageProps
   try {
     detail = await fetchStory(id, t);
   } catch (err) {
-    if (err instanceof ApiFetchError && (err.status === 404 || err.status === 401)) notFound();
+    // 400 = the id isn't a uuid; same "no such story" outcome as 404 (see /share).
+    if (err instanceof ApiFetchError && [400, 401, 404].includes(err.status)) notFound();
     throw err;
   }
 

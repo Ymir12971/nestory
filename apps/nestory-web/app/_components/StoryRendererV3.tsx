@@ -11,8 +11,14 @@ import styles from './StoryRendererV3.module.css';
  *   Cover/Opening/Closing 强制一屏;Body 章内垂直滚动
  *   顶部 = 细进度条 + ✕(返回上一页/关闭 WebView)
  * 客户端组件(翻页状态);v2 的 StoryRenderer 原样保留,入口按 renderVersion 分流。
+ *
+ * `external` = 被分享者用浏览器打开(/share/[token])。App 内 WebView 传 false:
+ * §9.1 明确 App 内不带水印,§9.3 的水印只作用于外部分享场景。
  */
-export function StoryRendererV3({ doc }: { doc: StoryDocumentV3 }) {
+export function StoryRendererV3({
+  doc,
+  external = false,
+}: { doc: StoryDocumentV3; external?: boolean }) {
   const pages = useMemo(
     () => ['cover' as const, 'opening' as const, ...doc.body.map((_, i) => i), 'closing' as const],
     [doc.body],
@@ -52,6 +58,13 @@ export function StoryRendererV3({ doc }: { doc: StoryDocumentV3 }) {
         <button className={styles.closeBtn} onClick={close} aria-label="Close">✕</button>
       </div>
 
+      {/* §9.3 水印 —— 生成时锁定,免费版永久带,只在外部分享页出现。
+          放进度条下方:底部那条带子在 Opening 页会被加宽的 "Start Reading"
+          按钮占满,顶部这一横是全局唯一不被内容占用的位置。 */}
+      {external && doc.watermark.enabled && (
+        <p className={styles.watermark}>{doc.watermark.text}</p>
+      )}
+
       {/* 当前页(key 驱动淡入过渡) */}
       <div className={styles.page} key={page}>
         {current === 'cover'   && <CoverPage doc={doc} />}
@@ -65,6 +78,7 @@ export function StoryRendererV3({ doc }: { doc: StoryDocumentV3 }) {
         {!isFirst ? (
           <button className={styles.navBtn} onClick={prev} aria-label="Previous">←</button>
         ) : <span />}
+
         {!isLast ? (
           <button
             className={`${styles.navBtn} ${current === 'opening' ? styles.navBtnLabeled : ''}`}

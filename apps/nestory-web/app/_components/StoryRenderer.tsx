@@ -12,7 +12,10 @@ import styles from './StoryRenderer.module.css';
  * Section order is preserved as the model emitted it — the prompt enforces
  * summary → narrative → milestone? → reflection? → closing.
  */
-export function StoryRenderer({ doc }: { doc: StoryDocument }) {
+export function StoryRenderer({
+  doc,
+  external = false,
+}: { doc: StoryDocument; external?: boolean }) {
   return (
     <article className={styles.story}>
       <header className={styles.hero}>
@@ -36,7 +39,8 @@ export function StoryRenderer({ doc }: { doc: StoryDocument }) {
         ))}
       </main>
 
-      {doc.watermark.enabled && (
+      {/* §9.1:App 内不带水印。§9.3 的规则只作用于外部分享页。 */}
+      {external && doc.watermark.enabled && (
         <footer className={styles.watermark}>{doc.watermark.text}</footer>
       )}
     </article>
