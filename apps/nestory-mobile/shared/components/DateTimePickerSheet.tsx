@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { theme } from '@/shared/theme';
+import { SheetModal } from '@/shared/components/SheetModal';
 import { WheelColumn } from '@/shared/components/WheelColumn';
 
 const MONTHS = [
@@ -57,42 +58,40 @@ export function DateTimePickerSheet({ visible, value, onConfirm, onDismiss }: Da
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <Pressable style={styles.scrim} onPress={onDismiss} />
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <View style={styles.header}>
-          <Text style={styles.title}>Date & Time</Text>
-          <Pressable hitSlop={8} onPress={handleConfirm}>
-            <Text style={styles.doneBtn}>Done</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.wheelRow}>
-          <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={setMonthIdx} />
-          <View style={styles.colDivider} />
-          <WheelColumn items={DAYS} selectedIndex={dayIdx} onChange={setDayIdx} />
-          <View style={styles.colDivider} />
-          <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={setYearIdx} />
-        </View>
-
-        <View style={styles.wheelRow}>
-          <WheelColumn items={HOURS} selectedIndex={hourIdx} onChange={setHourIdx} />
-          <View style={styles.colDivider} />
-          <WheelColumn items={MINUTES} selectedIndex={minuteIdx} onChange={setMinuteIdx} />
-          <View style={styles.colDivider} />
-          <WheelColumn items={MERIDIEM} selectedIndex={meridiemIdx} onChange={setMeridiemIdx} />
-        </View>
+    <SheetModal
+      visible={visible}
+      onRequestClose={onDismiss}
+      sheetStyle={styles.sheet}
+      scrimColor="rgba(0,0,0,0.45)"
+    >
+      <View style={styles.handle} />
+      <View style={styles.header}>
+        <Text style={styles.title}>Date & Time</Text>
+        <Pressable hitSlop={8} onPress={handleConfirm}>
+          <Text style={styles.doneBtn}>Done</Text>
+        </Pressable>
       </View>
-    </Modal>
+
+      <View style={styles.wheelRow}>
+        <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={setMonthIdx} />
+        <View style={styles.colDivider} />
+        <WheelColumn items={DAYS} selectedIndex={dayIdx} onChange={setDayIdx} />
+        <View style={styles.colDivider} />
+        <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={setYearIdx} />
+      </View>
+
+      <View style={styles.wheelRow}>
+        <WheelColumn items={HOURS} selectedIndex={hourIdx} onChange={setHourIdx} />
+        <View style={styles.colDivider} />
+        <WheelColumn items={MINUTES} selectedIndex={minuteIdx} onChange={setMinuteIdx} />
+        <View style={styles.colDivider} />
+        <WheelColumn items={MERIDIEM} selectedIndex={meridiemIdx} onChange={setMeridiemIdx} />
+      </View>
+    </SheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
   sheet: {
     backgroundColor: theme.surface.default,
     borderTopLeftRadius: theme.radius.l,

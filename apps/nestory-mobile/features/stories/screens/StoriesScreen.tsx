@@ -3,11 +3,11 @@ import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleS
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Modal } from 'react-native';
 import type { CurrentMonthStatus, StoryListItem } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { Button } from '@/shared/components/Button';
 import { GlobalOffIcon } from '@/shared/components/GlobalOffIcon';
+import { SheetModal } from '@/shared/components/SheetModal';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
 import { useAssetMonths, useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
@@ -549,42 +549,38 @@ export function StoriesScreen() {
       )}
 
       {/* Regenerate confirm popup — the new Story OVERWRITES the old one */}
-      <Modal
+      <SheetModal
         visible={regenMonthKey !== null}
-        transparent
-        animationType="slide"
         onRequestClose={() => setRegenMonthKey(null)}
+        sheetStyle={styles.regenSheet}
       >
-        <Pressable style={styles.regenScrim} onPress={() => setRegenMonthKey(null)} />
-        <View style={styles.regenSheet}>
-          <View style={styles.regenHandle} />
-          <Text style={styles.regenTitle}>You have to know</Text>
-          <Text style={styles.regenBody}>
-            The existing Story will be covered by the new one.{'\n'}
-            {'\n'}
-            Please confirm if you want to continue.
-          </Text>
-          <View style={styles.regenCta}>
-            <Button
-              label="Confirm"
-              onPress={() => {
-                const key = regenMonthKey;
-                setRegenMonthKey(null);
-                if (key) {
-                  track('story_regenerated', { monthKey: key });
-                  void handleGenerateNow(key);
-                }
-              }}
-            />
-            <Button
-              label="Cancel"
-              type="text"
-              style={styles.regenCancelBtn}
-              onPress={() => setRegenMonthKey(null)}
-            />
-          </View>
+        <View style={styles.regenHandle} />
+        <Text style={styles.regenTitle}>You have to know</Text>
+        <Text style={styles.regenBody}>
+          The existing Story will be covered by the new one.{'\n'}
+          {'\n'}
+          Please confirm if you want to continue.
+        </Text>
+        <View style={styles.regenCta}>
+          <Button
+            label="Confirm"
+            onPress={() => {
+              const key = regenMonthKey;
+              setRegenMonthKey(null);
+              if (key) {
+                track('story_regenerated', { monthKey: key });
+                void handleGenerateNow(key);
+              }
+            }}
+          />
+          <Button
+            label="Cancel"
+            type="text"
+            style={styles.regenCancelBtn}
+            onPress={() => setRegenMonthKey(null)}
+          />
         </View>
-      </Modal>
+      </SheetModal>
 
       <PaywallModal
         visible={paywallVisible}
@@ -1007,10 +1003,6 @@ const styles = StyleSheet.create({
   renewBtn: { height: 44 },
 
   // S-Regeneration confirm popup (761:2717) — DS Bottom Sheet geometry
-  regenScrim: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
   regenSheet: {
     backgroundColor: theme.surface.card,
     borderTopLeftRadius: theme.radius.l,

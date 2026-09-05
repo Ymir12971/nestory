@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import RemixIcon from 'react-native-remix-icon';
 import { Button } from '@/shared/components/Button';
+import { SheetModal } from '@/shared/components/SheetModal';
 import { theme } from '@/shared/theme';
 import { track } from '@/shared/lib/analytics';
 
@@ -35,71 +36,66 @@ export function PaywallModal({ visible, onSubscribe, onDismiss, source }: Paywal
   }, [visible, source]);
 
   return (
-    <Modal
+    <SheetModal
       visible={visible}
-      transparent
-      animationType="slide"
       onRequestClose={onDismiss}
+      sheetStyle={styles.sheet}
+      scrimColor="rgba(0,0,0,0.5)"
     >
-      <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onDismiss} />
-        <View style={styles.sheet}>
-          <View style={styles.handleWrap}>
-            <View style={styles.handleBar} />
+      <View style={styles.handleWrap}>
+        <View style={styles.handleBar} />
+      </View>
+
+      {/* header 775:1822 */}
+      <View style={styles.header}>
+        <Text style={styles.headline}>Upgrade to enjoy more!</Text>
+      </View>
+
+      {/* body 775:1990 — Premium card carries benefits + plan picker */}
+      <View style={styles.body}>
+        <View style={styles.premiumCard}>
+          <View style={styles.premiumHeader}>
+            <RemixIcon name="vip-crown-2-line" size={24} color={theme.text.premium} />
+            <Text style={styles.premiumTitle}>Premium</Text>
           </View>
 
-          {/* header 775:1822 */}
-          <View style={styles.header}>
-            <Text style={styles.headline}>Upgrade to enjoy more!</Text>
+          <View style={styles.benefits}>
+            {BENEFITS.map((text) => (
+              <View key={text} style={styles.benefit}>
+                <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
+                <Text style={styles.benefitText}>{text}</Text>
+              </View>
+            ))}
           </View>
 
-          {/* body 775:1990 — Premium card carries benefits + plan picker */}
-          <View style={styles.body}>
-            <View style={styles.premiumCard}>
-              <View style={styles.premiumHeader}>
-                <RemixIcon name="vip-crown-2-line" size={24} color={theme.text.premium} />
-                <Text style={styles.premiumTitle}>Premium</Text>
-              </View>
-
-              <View style={styles.benefits}>
-                {BENEFITS.map((text) => (
-                  <View key={text} style={styles.benefit}>
-                    <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
-                    <Text style={styles.benefitText}>{text}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.planRow}>
-                <PlanOption
-                  selected={cycle === 'year'}
-                  price="$100"
-                  caption="Billed annually"
-                  badge="~17% Off"
-                  onPress={() => setCycle('year')}
-                />
-                <PlanOption
-                  selected={cycle === 'month'}
-                  price="$10"
-                  caption="Billed monthly"
-                  onPress={() => setCycle('month')}
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* cta 775:1856 */}
-          <View style={styles.cta}>
-            <Button
-              label="Upgrade to Premium"
-              type="premium"
-              onPress={() => onSubscribe(cycle)}
+          <View style={styles.planRow}>
+            <PlanOption
+              selected={cycle === 'year'}
+              price="$100"
+              caption="Billed annually"
+              badge="~17% Off"
+              onPress={() => setCycle('year')}
             />
-            <Button label="Back" type="text" style={styles.dismissBtn} onPress={onDismiss} />
+            <PlanOption
+              selected={cycle === 'month'}
+              price="$10"
+              caption="Billed monthly"
+              onPress={() => setCycle('month')}
+            />
           </View>
         </View>
       </View>
-    </Modal>
+
+      {/* cta 775:1856 */}
+      <View style={styles.cta}>
+        <Button
+          label="Upgrade to Premium"
+          type="premium"
+          onPress={() => onSubscribe(cycle)}
+        />
+        <Button label="Back" type="text" style={styles.dismissBtn} onPress={onDismiss} />
+      </View>
+    </SheetModal>
   );
 }
 
@@ -138,14 +134,6 @@ function PlanOption({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
 
   sheet: {
     backgroundColor: theme.surface.card,

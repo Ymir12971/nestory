@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { SheetModal } from '@/shared/components/SheetModal';
 import { theme } from '@/shared/theme';
 
 /**
@@ -13,6 +14,8 @@ import { theme } from '@/shared/theme';
  *
  * Sheets stack section blocks inside: `sheetSection.title` / `.body` (both
  * px 20 / py 16) and `sheetSection.cta` (px 20 / py 8, gap 16).
+ *
+ * `SheetModal` owns the Modal, the scrim and the slide-up.
  */
 export function BottomSheet({
   visible,
@@ -24,20 +27,16 @@ export function BottomSheet({
   children: ReactNode;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onRequestClose}>
-      <Pressable style={s.scrim} onPress={onRequestClose} />
-      <View style={s.sheet}>
-        <View style={s.handleRow}>
-          <View style={s.handle} />
-        </View>
-        {children}
+    <SheetModal visible={visible} onRequestClose={onRequestClose} sheetStyle={s.sheet}>
+      <View style={s.handleRow}>
+        <View style={s.handle} />
       </View>
-    </Modal>
+      {children}
+    </SheetModal>
   );
 }
 
 const s = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: {
     backgroundColor: theme.surface.card,
     borderTopLeftRadius: theme.radius.l,
