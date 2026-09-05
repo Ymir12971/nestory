@@ -60,6 +60,7 @@ model User {
   auditLogs       AuditLog[]
   pushTokens      PushToken[]
   abuseLogs       AbuseLog[]
+  feedback        Feedback[]
 
   @@index([deletedAt(sort: Desc)], map: "idx_users_deleted_at") // 部分索引在 migration SQL 加 WHERE
   @@map("users")
@@ -324,6 +325,27 @@ model AuditLog {
   @@index([userId], map: "idx_audit_log_user_id")
   @@index([createdAt], map: "idx_audit_log_created_at")
   @@map("audit_log")
+}
+
+// ============================================================================
+// feedback — Share Feedback / "Earn 10% Off" 的收件箱（ST-feedback）。
+// 在此之前 POST /feedback 只写一条 pino 日志，Railway 日志一轮转内容就没了，
+// 所以测试时"收不到"（Justin 2026-09-04）。硬删 + CASCADE，走决策 5 的默认。
+// ============================================================================
+
+model Feedback {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  // 提交时可改的联系邮箱，未必等于账号邮箱，所以单独存一份。
+  email     String?  @db.VarChar(255)
+  text      String?  @db.Text
+  photoUrls String[] @map("photo_urls")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)], map: "idx_feedback_created_at")
+  @@map("feedback")
 }
 
 // ============================================================================

@@ -27,6 +27,15 @@ const envSchema = z.object({
   ADMIN_TOKEN: z.string().optional(),
   // Crash/error reporting. Unset = Sentry stays off (dev default).
   SENTRY_DSN: z.string().optional(),
+  // Transactional email (Resend). Any of these unset = no mail is sent, the
+  // app just logs that it would have. See src/lib/mailer.ts.
+  RESEND_API_KEY: z.string().optional(),
+  // Envelope sender, e.g. 'Nestory <noreply@mail.blakard.com>'. Must be on a
+  // domain verified in Resend.
+  MAIL_FROM: z.string().optional(),
+  // Where user feedback notifications land. Unset = feedback still persists to
+  // the DB, we just don't get pinged about it.
+  FEEDBACK_NOTIFY_TO: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
