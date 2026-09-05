@@ -127,7 +127,13 @@ export function HomeScreen() {
   /** No Moment in any month → the H-Home Empty layout. */
   const hasAnyMoments = (monthsQ.data?.length ?? 0) > 0;
 
-  if (childrenQ.isLoading || subQ.isLoading) {
+  // monthsQ is what picks between the two layouts, so the screen has to wait
+  // for it too. Gating on children/sub alone let the hero empty state paint
+  // for a frame before the timeline replaced it. Its `enabled` is keyed on
+  // activeChildId, so only treat it as pending once there IS a child.
+  const monthsPending = !!activeChildId && monthsQ.isPending;
+
+  if (childrenQ.isLoading || subQ.isLoading || monthsPending) {
     return (
       <View style={[styles.root, styles.center]}>
         <ActivityIndicator color={theme.text.brand} />
@@ -135,7 +141,7 @@ export function HomeScreen() {
     );
   }
 
-  if (childrenQ.isError || subQ.isError) {
+  if (childrenQ.isError || subQ.isError || monthsQ.isError) {
     return (
       <View style={[styles.root, styles.center]}>
         <Text style={styles.emptyText}>Failed to load home.</Text>
@@ -143,6 +149,7 @@ export function HomeScreen() {
           onPress={() => {
             childrenQ.refetch();
             subQ.refetch();
+            monthsQ.refetch();
           }}
         >
           <Text style={styles.retryText}>Tap to retry</Text>
@@ -225,8 +232,10 @@ export function HomeScreen() {
         </>
       ) : hasAnyMoments ? (
         <>
-          {/* header 731:1373 */}
-          <View style={[styles.plainHeader, { paddingTop: insets.top }]}>{avatarRow(false)}</View>
+          {/* header 731:1373 — hairline under it, matching the Stories header */}
+          <View style={[styles.plainHeader, styles.headerRuled, { paddingTop: insets.top }]}>
+            {avatarRow(false)}
+          </View>
 
           {/* Filter 744:2530 */}
           <View style={styles.filterBar}>
@@ -514,7 +523,8 @@ const styles = StyleSheet.create({
   plainHeader: {
     paddingHorizontal: theme.spacing.xl, // 20
   },
-  // The couldn't-load state draws a hairline under the header (774:3711)
+  // Hairline under the header — 774:3711 drew it only on the couldn't-load
+  // state; Justin 2026-09-04: it belongs on every Home header, same as Stories.
   headerRuled: {
     borderBottomWidth: 1,
     borderBottomColor: theme.border.default,
@@ -630,6 +640,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 40,
+    marginTop: theme.spacing.m, // 12 — sits off the header rule (Justin 2026-09-04)
     paddingLeft: theme.spacing.xl,
     paddingVertical: theme.spacing.xs,
     gap: theme.spacing.s,
@@ -729,15 +740,13 @@ const styles = StyleSheet.create({
   cardText: { ...theme.typography.body, color: theme.text.primary },
 
   // ── Floating CTA (731:1468) ───────────────────────────────────────────────
+  // 731:1468 draws an upward shadow behind this block; Justin 2026-09-04 asked
+  // for it flat, so the CTA sits on the page with no lift. The background stays
+  // (same token as the page) to keep the block opaque.
   floatingCta: {
     backgroundColor: theme.surface.default,
     paddingHorizontal: 20,
     paddingVertical: theme.spacing.l,
-    shadowColor: '#e3e3e3',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
   },
 
   // ── Sheets ────────────────────────────────────────────────────────────────

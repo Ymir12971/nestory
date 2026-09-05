@@ -688,11 +688,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.border.default,
   },
-  // 731:3340 — Manrope *Regular* 18/24, with "Story" in brand green
+  // 731:3340 draws this Manrope *Regular* 18/24; Justin 2026-09-04: too thin
+  // for a page title — Bold (typography.h2, same 18/24). "Story" stays brand green.
   headerTitle: {
-    fontFamily: 'Manrope_400Regular',
-    fontSize: 18,
-    lineHeight: 24,
+    ...theme.typography.h2,
     color: theme.text.primary,
   },
   headerTitleBrand: { color: theme.text.brand },
