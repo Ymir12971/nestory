@@ -8,8 +8,7 @@ import { theme, palette } from '@/shared/theme';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { Button } from '@/shared/components/Button';
 import { NavBar } from '@/shared/components/NavBar';
-import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
-import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
+import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { showToast } from '@/features/ui/toast';
 
 const MAX_PHOTOS = MOMENT_CONSTRAINTS.maxPhotos;
@@ -63,12 +62,10 @@ function EditForm({ moment }: { moment: Moment }) {
   const updateAsset     = useUpdateAsset(moment.id);
   const deleteAsset     = useDeleteAsset();
   const pickFromLibrary = usePhotoPicker({ multiple: true });
-  const takePhoto       = usePhotoCamera();
 
   const [noteText, setNoteText]               = useState(moment.textNote ?? '');
   const [removedFileIds, setRemovedFileIds]   = useState<Set<string>>(new Set());
   const [newPhotos, setNewPhotos]             = useState<PickedPhoto[]>([]);
-  const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
   const [deleting, setDeleting]   = useState(false);
@@ -92,18 +89,10 @@ function EditForm({ moment }: { moment: Moment }) {
     });
   };
 
-  const handleOpenAddPhoto = () => {
+  // The "+" goes straight to the album — no source sheet, the product doesn't
+  // take photos (Justin 2026-09-04).
+  const handleOpenAddPhoto = async () => {
     if (totalPhotos >= MAX_PHOTOS) return;
-    setPhotoSourceVisible(true);
-  };
-
-  const handleTakePhoto = async () => {
-    setPhotoSourceVisible(false);
-    addPickedPhotos(await takePhoto());
-  };
-
-  const handleChooseFromLibrary = async () => {
-    setPhotoSourceVisible(false);
     addPickedPhotos(await pickFromLibrary({ selectionLimit: MAX_PHOTOS - totalPhotos }));
   };
 
@@ -228,7 +217,7 @@ function EditForm({ moment }: { moment: Moment }) {
             </View>
           ))}
           {totalPhotos < MAX_PHOTOS && (
-            <Pressable style={styles.photoAdd} onPress={handleOpenAddPhoto}>
+            <Pressable style={styles.photoAdd} onPress={() => void handleOpenAddPhoto()}>
               <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
             </Pressable>
           )}
@@ -290,12 +279,6 @@ function EditForm({ moment }: { moment: Moment }) {
         </View>
       </BottomSheet>
 
-      <PhotoSourceSheet
-        visible={photoSourceVisible}
-        onTakePhoto={() => void handleTakePhoto()}
-        onChooseLibrary={() => void handleChooseFromLibrary()}
-        onDismiss={() => setPhotoSourceVisible(false)}
-      />
     </>
   );
 }

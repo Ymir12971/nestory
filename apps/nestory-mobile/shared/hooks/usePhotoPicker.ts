@@ -35,6 +35,10 @@ function toPickedPhotos(assets: ImagePicker.ImagePickerAsset[]): PickedPhoto[] {
  * Returns a launcher function that requests media-library permission then opens
  * the image picker. Single-photo mode by default; pass `multiple: true` for
  * multi-select (used in H-02 / H-04 photo strips).
+ *
+ * This is the only way a photo enters the product — the camera counterpart
+ * (`usePhotoCamera`) and the source sheet that offered the choice were removed
+ * 2026-09-04: every "+" opens the album directly.
  */
 export function usePhotoPicker(options?: { multiple?: boolean }) {
   const multiple = options?.multiple ?? false;
@@ -58,25 +62,3 @@ export function usePhotoPicker(options?: { multiple?: boolean }) {
   return launch;
 }
 
-/**
- * Returns a launcher function that requests camera permission then opens the
- * native camera to capture a single photo (used alongside `usePhotoPicker` in
- * the H-02 / H-04 "add photo" source sheet).
- */
-export function usePhotoCamera() {
-  const launch = async (): Promise<PickedPhoto[]> => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') return [];
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.85,
-    });
-
-    if (result.canceled) return [];
-    return toPickedPhotos(result.assets);
-  };
-
-  return launch;
-}

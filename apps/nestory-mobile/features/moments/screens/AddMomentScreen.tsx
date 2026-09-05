@@ -7,9 +7,8 @@ import { MOMENT_CONSTRAINTS } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { Button } from '@/shared/components/Button';
 import { NavBar } from '@/shared/components/NavBar';
-import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
 import { DateTimePickerSheet } from '@/shared/components/DateTimePickerSheet';
-import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
+import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { uploadPhoto, useChildren, useCreateAsset } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { showToast } from '@/features/ui/toast';
@@ -27,16 +26,14 @@ export function AddMomentScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const pickFromLibrary = usePhotoPicker({ multiple: true });
-  const takePhoto       = usePhotoCamera();
   const childrenQ = useChildren();
   const createAsset     = useCreateAsset();
-  // Entry mode from the Add Moment popup: note (keyboard fast path), camera
-  // (launch camera first), album (launch picker first). Undefined = plain open.
+  // Entry mode from the Add Moment popup: note (keyboard fast path) or album
+  // (launch picker first). Undefined = plain open.
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const [noteText, setNoteText]       = useState('');
   const [photos, setPhotos]           = useState<PickedPhoto[]>([]);
   const [capturedAt, setCapturedAt]   = useState(() => new Date());
-  const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
   const [dateSheetVisible, setDateSheetVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -100,14 +97,13 @@ export function AddMomentScreen() {
     }
   };
 
-  // camera / album entry modes launch their picker once on mount ('note' is
-  // handled by autoFocus on the text input).
+  // The album entry mode launches the picker once on mount ('note' is handled
+  // by autoFocus on the text input).
   const modeLaunched = useRef(false);
   useEffect(() => {
     if (modeLaunched.current) return;
     modeLaunched.current = true;
-    if (mode === 'camera') void takePhoto().then(addPickedPhotos);
-    else if (mode === 'album') {
+    if (mode === 'album') {
       void pickFromLibrary({ selectionLimit: MAX_PHOTOS }).then(addPickedPhotos);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,18 +121,10 @@ export function AddMomentScreen() {
     });
   };
 
-  const handleOpenAddPhoto = () => {
+  // The "+" goes straight to the album — no source sheet, the product doesn't
+  // take photos (Justin 2026-09-04).
+  const handleOpenAddPhoto = async () => {
     if (photos.length >= MAX_PHOTOS) return;
-    setPhotoSourceVisible(true);
-  };
-
-  const handleTakePhoto = async () => {
-    setPhotoSourceVisible(false);
-    addPickedPhotos(await takePhoto());
-  };
-
-  const handleChooseFromLibrary = async () => {
-    setPhotoSourceVisible(false);
     addPickedPhotos(await pickFromLibrary({ selectionLimit: MAX_PHOTOS - photos.length }));
   };
 
@@ -195,7 +183,7 @@ export function AddMomentScreen() {
             </View>
           ))}
           {photos.length < MAX_PHOTOS && (
-            <Pressable style={styles.photoAdd} onPress={handleOpenAddPhoto}>
+            <Pressable style={styles.photoAdd} onPress={() => void handleOpenAddPhoto()}>
               <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
             </Pressable>
           )}
@@ -216,13 +204,6 @@ export function AddMomentScreen() {
 
         {saveError && <Text style={styles.errorText}>{saveError}</Text>}
       </ScrollView>
-
-      <PhotoSourceSheet
-        visible={photoSourceVisible}
-        onTakePhoto={() => void handleTakePhoto()}
-        onChooseLibrary={() => void handleChooseFromLibrary()}
-        onDismiss={() => setPhotoSourceVisible(false)}
-      />
 
       <DateTimePickerSheet
         visible={dateSheetVisible}

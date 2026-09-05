@@ -11,8 +11,7 @@ import { NavBar } from '@/shared/components/NavBar';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { useMe, useSubmitFeedback, uploadPhoto } from '@/api';
-import { usePhotoCamera, usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
-import { PhotoSourceSheet } from '@/shared/components/PhotoSourceSheet';
+import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { showToast } from '@/features/ui/toast';
 
 // ST-feedback (2026-07 redesign): the 10% off idea program. Text OR photos
@@ -33,13 +32,11 @@ export function FeedbackScreen() {
   const meQ = useMe();
   const submit = useSubmitFeedback();
   const pickFromLibrary = usePhotoPicker({ multiple: true });
-  const takePhoto = usePhotoCamera();
 
   const [feedbackText, setFeedbackText] = useState('');
   const [email, setEmail]               = useState('');
   const [photos, setPhotos]             = useState<PickedPhoto[]>([]);
   const [howItWorksVisible, setHowItWorksVisible] = useState(false);
-  const [photoSourceVisible, setPhotoSourceVisible] = useState(false);
   const [thanksVisible, setThanksVisible] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -67,6 +64,14 @@ export function FeedbackScreen() {
       }
       return [...prev, ...accepted];
     });
+  };
+
+  // The "+" goes straight to the album — no source sheet, the product doesn't
+  // take photos (Justin 2026-09-04).
+  const handleAddPhotos = async () => {
+    const room = FEEDBACK_CONSTRAINTS.maxPhotos - photos.length;
+    if (room <= 0) return;
+    addPickedPhotos(await pickFromLibrary({ selectionLimit: room }));
   };
 
   // Either text or photos activates Send (FEEDBACK_CONSTRAINTS — unlike Add Moment).
@@ -154,7 +159,7 @@ export function FeedbackScreen() {
                 </View>
               ))}
               {photos.length < FEEDBACK_CONSTRAINTS.maxPhotos && (
-                <Pressable style={styles.photoAdd} onPress={() => setPhotoSourceVisible(true)}>
+                <Pressable style={styles.photoAdd} onPress={() => void handleAddPhotos()}>
                   <RemixIcon name="add-large-line" size={36} color={theme.text.hint} />
                 </Pressable>
               )}
@@ -228,16 +233,6 @@ export function FeedbackScreen() {
           />
         </View>
       </BottomSheet>
-
-      <PhotoSourceSheet
-        visible={photoSourceVisible}
-        onTakePhoto={() => { setPhotoSourceVisible(false); void takePhoto().then(addPickedPhotos); }}
-        onChooseLibrary={() => {
-          setPhotoSourceVisible(false);
-          void pickFromLibrary({ selectionLimit: FEEDBACK_CONSTRAINTS.maxPhotos - photos.length }).then(addPickedPhotos);
-        }}
-        onDismiss={() => setPhotoSourceVisible(false)}
-      />
     </SafeAreaView>
   );
 }

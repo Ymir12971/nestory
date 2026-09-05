@@ -19,12 +19,13 @@ export const MOMENT_CONSTRAINTS = {
 
 /**
  * Entry options shown in the Add Moment popup, in display order.
- * Justin 2026-07-15: 3 options (annotation listed 2, frame name implied 3 — 3 wins).
+ * Justin 2026-07-15 added a third, "Take a photo"; Justin 2026-09-04 removed it
+ * again — the product takes no photos at all now, every photo comes from the
+ * album. Back to the two the Figma annotation listed.
  */
-export type AddMomentEntryOption = 'note' | 'camera' | 'album';
+export type AddMomentEntryOption = 'note' | 'album';
 export const ADD_MOMENT_ENTRY_OPTIONS: readonly AddMomentEntryOption[] = [
   'note',    // "Just a Note" — text-only fast path
-  'camera',  // "Take a photo"
   'album',   // "Choose from Album"
 ] as const;
 

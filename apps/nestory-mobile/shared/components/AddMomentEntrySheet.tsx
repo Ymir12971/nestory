@@ -7,12 +7,12 @@ import { theme } from '@/shared/theme';
 // H-Add Memory Popup (Figma 742:2985): "Add Memory" title over a bordered list
 // card of 56pt rows, each with a leading glyph and a trailing chevron.
 //
-// The design and its annotation only draw TWO rows — "Just a note" and "Choose
-// from album". The third ("Take a photo") is Justin's 2026-07-15 decision and is
-// config-driven via ADD_MOMENT_ENTRY_OPTIONS, so it stays.
+// Two rows, as the design and its annotation draw them — "Just a note" and
+// "Choose from album". A third, "Take a photo", was added 2026-07-15 and
+// dropped again 2026-09-04 (the product no longer takes photos at all).
+// Order comes from ADD_MOMENT_ENTRY_OPTIONS.
 const OPTION_META: Record<AddMomentEntryOption, { icon: string; label: string }> = {
   note: { icon: 't-box-line', label: 'Just a note' },
-  camera: { icon: 'camera-line', label: 'Take a photo' },
   album: { icon: 'multi-image-line', label: 'Choose from album' },
 };
 

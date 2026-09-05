@@ -36,7 +36,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Nestory accesses your photos so you can add them to your child's memories.",
-          "cameraPermission": "Nestory uses your camera so you can take a photo to add to your child's memories."
+          "cameraPermission": false
         }
       ],
       [
