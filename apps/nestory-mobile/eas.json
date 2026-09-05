@@ -51,7 +51,7 @@
       "ios": {
         "appleId": "REPLACE_APPLE_ID_EMAIL",
         "ascAppId": "REPLACE_ASC_APP_ID",
-        "appleTeamId": "REPLACE_APPLE_TEAM_ID"
+        "appleTeamId": "9X867724SK"
       },
       "android": {
         "serviceAccountKeyPath": "../../secrets/play-service-account.json",
@@ -62,7 +62,7 @@
       "ios": {
         "appleId": "REPLACE_APPLE_ID_EMAIL",
         "ascAppId": "REPLACE_ASC_APP_ID",
-        "appleTeamId": "REPLACE_APPLE_TEAM_ID"
+        "appleTeamId": "9X867724SK"
       },
       "android": {
         "serviceAccountKeyPath": "../../secrets/play-service-account.json",
