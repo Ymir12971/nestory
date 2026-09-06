@@ -4,10 +4,10 @@
 // RESEND_API_KEY / MAIL_FROM 任一未配置 → 每次发送都是一个不做事的空操作，
 // 本地开发和任何没配 key 的部署行为跟接入前完全一致（同 Sentry / push 的处理）。
 //
-// 发信域名用的是子域名 mail.blakard.com，这是刻意的：blakard.com 的 SPF 由
-// GoDaddy 的 SPF 服务托管、MX 指向 Google Workspace，发信记录全部放在子域名上，
-// 这两样一个字都不用动；万一投递信誉出问题，烧掉的也是子域名，不会连累团队
-// 日常收发信的那个域名。
+// 发信域名是 blakard.com（根域名）。Resend 的三条记录早在这次接入之前就配好了
+// ——DKIM 在 resend._domainkey.blakard.com，SPF 和退信 MX 在 send.blakard.com。
+// 注意 Resend 把 SPF 放在 send. 这个子域名上，不碰根域名那条由 GoDaddy 托管的
+// SPF，所以跟 Google Workspace 的收发信互不影响。2026-09-05 实发验证通过。
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const TIMEOUT_MS = 10_000;
