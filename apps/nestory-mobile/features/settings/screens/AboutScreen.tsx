@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import * as Application from 'expo-application';
+import * as Updates from 'expo-updates';
 import { NavBar } from '@/shared/components/NavBar';
 import { theme } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
@@ -15,6 +16,19 @@ const APP_VERSION =
   Application.nativeApplicationVersion && Application.nativeBuildVersion
     ? `${Application.nativeApplicationVersion} (Build ${Application.nativeBuildVersion})`
     : '0.0.1 (dev)';
+
+// Which JS bundle is actually running. The binary's version alone can't tell
+// you that once OTA is in play — two devices on the same build can be on
+// different bundles. "Bundled" = the JS that shipped inside the APK/AAB; an id
+// = an update fetched from EAS. Ask a tester what this line says and you know
+// exactly what they're looking at.
+//
+// Every field here is null in dev and on web, hence the fallbacks.
+function updateLabel(): string {
+  if (__DEV__) return 'dev';
+  if (Updates.isEmbeddedLaunch || !Updates.updateId) return 'Bundled';
+  return `Update ${Updates.updateId.slice(0, 8)}`;
+}
 
 export function AboutScreen() {
   const router = useRouter();
@@ -37,7 +51,9 @@ export function AboutScreen() {
             resizeMode="contain"
           />
           <Text style={styles.tagline}>Every little moment becomes a story</Text>
-          <Text style={styles.version}>Version {APP_VERSION}</Text>
+          <Text style={styles.version}>
+            Version {APP_VERSION} · {updateLabel()}
+          </Text>
         </View>
 
         {/* Legal links — point at in-app pages until public URLs are hosted */}
