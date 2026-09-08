@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.blakard.nestory",
-      "versionCode": 14,
+      "versionCode": 15,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/splash-icon.png",
         "backgroundColor": "#FBF6EC"
