@@ -50,7 +50,14 @@ export function usePhotoPicker(options?: { multiple?: boolean }) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: multiple,
-      allowsEditing: !multiple,
+      // No system crop step. On Android `allowsEditing` hands the pick off to
+      // the ROM's own crop Activity, whose confirm button reads 裁剪 / "Crop" —
+      // it looks like an editing tool, not "done", so users tapped a photo and
+      // found no way to accept it (2026-09-07). Skipping it costs nothing: the
+      // only single-select callers are the two child-avatar pickers, and that
+      // <Image> is a 128×128 circle on RN's default `cover`, so a non-square
+      // pick gets centre-cropped either way.
+      allowsEditing: false,
       quality: 0.85,
       ...(multiple && opts?.selectionLimit ? { selectionLimit: opts.selectionLimit } : {}),
     });
