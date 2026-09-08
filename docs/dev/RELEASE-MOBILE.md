@@ -19,7 +19,8 @@
 | EAS Project ID | `14a340fa-15e4-438d-ae66-75a366a1f510` | `app.json` → `extra.eas.projectId` |
 | 版本号来源 | `local`（写在 `app.json` 里，非 EAS 服务端托管） | `eas.json` → `cli.appVersionSource` |
 | 构建 Node | 22.11.0（锁定） | `eas.json` 各 profile |
-| OTA 热更新 | **没有**（未安装 `expo-updates`） | 见 §6 |
+| OTA 热更新 | **有**（`expo-updates`，channel 按 profile 分） | 见 §6 |
+| runtimeVersion 策略 | `appVersion` —— 等于 `version`，**改原生必须手动加版本号** | `app.json` → `runtimeVersion`，见 §6 |
 
 ### Build profile 一览
 
@@ -241,15 +242,49 @@ npx eas-cli build -p android --profile production --auto-submit-with-profile pro
 
 ---
 
-## 6 · 关于 OTA（目前没有）
+## 6 · OTA 热更新（2026-09-07 接入）
 
-`09_Nestory_环境与CI_v1.0.md` 第 3.3 节描述了 `preview` / `staging` / `production` 三条 EAS Update channel，
-**那是规划，尚未实现**——项目没有安装 `expo-updates`，`eas.json` 里也没有 `channel` 字段。
+装了 `expo-updates`，`eas.json` 各 profile 有自己的 channel：`development` / `preview` / `beta` /
+`production`。**纯 JS 的改动用 `eas update` 推送，不用重新出包、不用碰商店。**
 
-现状是：**任何改动，哪怕只改一行文案，都要重新构建并重新上传商店。**
+```bash
+eas update --channel preview --message "修一下首页间距"
+```
 
-若要补上 OTA：`npx expo install expo-updates` + 给各 profile 加 `channel` + 用 `eas update` 推送。
-好处是 JS 层改动可以绕过审核直接下发；原生依赖变化仍必须走完整构建。
+生效时机：App 启动时后台检查并下载，**下次启动才应用**。所以测试员看到的是"再打开一次就变了"。
+
+### ⚠️ runtimeVersion 用的是 `appVersion` 策略 —— 有一条必须守的纪律
+
+runtimeVersion **等于 `app.json` 里的 `version`**（当前 `0.0.1`）。OTA 只会下发给 runtimeVersion
+相同的包。所以：
+
+> **凡是动了原生的东西，必须手动把 `version` 加一位。**
+> 加/删原生依赖、改权限（如 `cameraPermission`）、升 Expo SDK、改 `expo-build-properties` —— 都算。
+
+不守这条的后果是真会崩：用了新原生模块的 JS bundle 落到没有该模块的旧包上，运行时直接挂。
+**只加 `versionCode` 不算原生改动**，不用动 `version`。
+
+### 为什么不用 `fingerprint` 策略
+
+`fingerprint` 会对原生工程做哈希，原生一变 runtimeVersion 自动变，本来是更安全的选择——
+但在这个 pnpm monorepo 里用不了，试过，构建直接失败：
+
+```
+Runtime version mismatch:
+- Runtime version calculated on local machine: ac135160...
+- Runtime version calculated on EAS:          b8554f65...
+```
+
+两边算不出同一个哈希，原因有二：本地 `node_modules` 里有一批传递依赖（`@babel/…`、
+`schema-utils/node_modules/ajv-formats` 之类）是 EAS 上全新 `pnpm install` 不会产生的；
+而 EAS 那边又会把它自己 prebuild 生成的 `android/` 目录算进去（`reasons: ["bareNativeDir"]`）。
+加 `EAS_SKIP_AUTO_FINGERPRINT=1` 让 EAS 单方面计算可以绕过，但容易忘，且 runtimeVersion
+会跟着 prebuild 产物变得不稳定。
+
+### 边界
+
+OTA **只能推 JS 和资源**。原生依赖、权限、SDK 版本的变化仍然必须走完整构建 + 商店上传。
+另外 2026-09-07 之前的所有包（versionCode ≤ 15 的 AAB）都不含 `expo-updates`，收不到任何更新。
 
 ---
 

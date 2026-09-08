@@ -7,6 +7,12 @@
     "userInterfaceStyle": "automatic",
     "scheme": "nestory",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://u.expo.dev/14a340fa-15e4-438d-ae66-75a366a1f510"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "icon": "./assets/images/icon.png",
     "splash": {
       "image": "./assets/images/splash-icon.png",

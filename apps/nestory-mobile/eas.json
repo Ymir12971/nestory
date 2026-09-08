@@ -6,6 +6,7 @@
   "build": {
     "development": {
       "node": "22.11.0",
+      "channel": "development",
       "developmentClient": true,
       "distribution": "internal",
       "android": {
@@ -19,6 +20,7 @@
     },
     "preview": {
       "node": "22.11.0",
+      "channel": "preview",
       "distribution": "internal",
       "android": {
         "buildType": "apk"
@@ -31,10 +33,12 @@
     },
     "beta": {
       "extends": "production",
+      "channel": "beta",
       "distribution": "store"
     },
     "production": {
       "node": "22.11.0",
+      "channel": "production",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
