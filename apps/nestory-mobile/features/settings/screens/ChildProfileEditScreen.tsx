@@ -214,7 +214,7 @@ function EditForm({ child }: { child: Child }) {
               {'To update date of birth, please '}
               <Text
                 style={styles.dobNoteLink}
-                onPress={() => Linking.openURL('mailto:support@nestory.app')}
+                onPress={() => Linking.openURL('mailto:support@nestory.love')}
               >
                 contact us
               </Text>

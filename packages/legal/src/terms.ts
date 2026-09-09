@@ -1,6 +1,6 @@
 import type { LegalDocument } from './types';
 
-const CONTACT_EMAIL = 'support@nestory.app';
+const CONTACT_EMAIL = 'support@nestory.love';
 
 /** Not counsel-reviewed. Replace before public launch. */
 export const TERMS_OF_SERVICE: LegalDocument = {
