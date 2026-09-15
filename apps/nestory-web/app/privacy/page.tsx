@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { PRIVACY_POLICY } from '@nestory/legal';
-import { LegalPage } from '../_components/LegalPage';
+import { TermlyEmbed } from '../_components/TermlyEmbed';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy · Nestory',
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  return <LegalPage doc={PRIVACY_POLICY} />;
+  return <TermlyEmbed policy={PRIVACY_POLICY} />;
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { TERMS_OF_SERVICE } from '@nestory/legal';
-import { LegalPage } from '../_components/LegalPage';
+import { TermlyEmbed } from '../_components/TermlyEmbed';
 
 export const metadata: Metadata = {
   title: 'Terms of Service · Nestory',
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
-  return <LegalPage doc={TERMS_OF_SERVICE} />;
+  return <TermlyEmbed policy={TERMS_OF_SERVICE} />;
 }
