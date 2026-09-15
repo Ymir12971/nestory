@@ -304,7 +304,6 @@ export const GALLERY_CASES: GalleryCase[] = [
   { id: 'profile-edit-premium', module: 'Settings', label: 'Child Profile Edit (premium)', nodeId: '769:2306', route: `/settings/profiles/${FX_CHILD_ID}`, prepare: (qc) => { base(qc, { sub: fxSubPremium }); forceData(qc, queryKeys.child(FX_CHILD_ID), fxChild); } },
   { id: 'feedback', module: 'Settings', label: 'Feedback', nodeId: '768:4295', route: '/settings/feedback', prepare: (qc) => base(qc) },
   { id: 'about', module: 'Settings', label: 'About', nodeId: '770:2583', route: '/settings/about', prepare: (qc) => base(qc) },
-  { id: 'privacy-settings', module: 'Settings', label: 'Data & Privacy', nodeId: '770:2563', route: '/settings/privacy', prepare: (qc) => base(qc) },
 
   // ── Onboarding ────────────────────────────────────────────────────────────
   { id: 'welcome', order: 3, module: 'Onboarding', label: 'Welcome-1 / Welcome-2', nodeId: '739:1085', route: '/onboarding/welcome' },

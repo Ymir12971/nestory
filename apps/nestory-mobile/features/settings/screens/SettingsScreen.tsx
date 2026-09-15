@@ -336,8 +336,6 @@ export function SettingsScreen() {
           <Card>
             <NavRow label="Account" onPress={() => router.push('/settings/account')} />
             <Divider />
-            <NavRow label="Data & Privacy" onPress={() => router.push('/settings/privacy')} />
-            <Divider />
             <NavRow label="About Nestory" onPress={() => router.push('/settings/about')} />
           </Card>
         </View>
