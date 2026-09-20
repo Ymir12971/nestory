@@ -10,6 +10,16 @@ export type PurchaseCycle = 'yearly' | 'monthly';
 export type PurchaseResult = { status: 'purchased' | 'cancelled' };
 export type RestoreResult = { status: 'restored' | 'nothing_to_restore' };
 
+/** One plan's price as the store reports it, already in the buyer's currency. */
+export interface PlanPrice {
+  /** Formatted for display, currency sign included — e.g. "US$99.99", "￥12,000". */
+  priceString: string;
+  /** The same amount as a number, used to work out the yearly saving. */
+  price: number;
+}
+
+export type PlanPrices = Record<PurchaseCycle, PlanPrice | null>;
+
 /** True only where RevenueCat is configured (native build + API key present). */
 export function isPurchasesAvailable(): boolean {
   return false;
@@ -25,6 +35,10 @@ export async function identifyPurchaseUser(_userId: string): Promise<void> {
 
 export async function logOutPurchaseUser(): Promise<void> {
   // no-op on web
+}
+
+export async function fetchPlanPrices(): Promise<PlanPrices> {
+  return { yearly: null, monthly: null };
 }
 
 export async function purchasePlan(_cycle: PurchaseCycle): Promise<PurchaseResult> {

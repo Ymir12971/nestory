@@ -12,6 +12,7 @@ import { queryClient, queryKeys } from '@/api';
 import { purchasePlan, isPurchasesAvailable } from '@/features/billing/purchases';
 import { useChildren } from '@/api';
 import { track } from '@/shared/lib/analytics';
+import { usePlanPricing } from '@/features/billing/usePlanPricing';
 
 // O-Choose plan (Figma 739:1406 yearly / 758:1219 monthly). No trial — the
 // product has no free-trial concept (Handoff §3.1); CTA is a straight purchase.
@@ -30,6 +31,7 @@ const PREMIUM_BENEFITS = [
 const FREE_ITEMS = ['One child profile', 'Two Stories', 'Watermarked Sharing'];
 
 export function PlanScreen() {
+  const pricing = usePlanPricing();
   const router = useRouter();
   const goBack = useGoBack();
   const childrenQ = useChildren();
@@ -108,7 +110,7 @@ export function PlanScreen() {
               onPress={() => setPlan('yearly')}
             >
               <View style={styles.planTop}>
-                <Text style={styles.planPrice}>$100</Text>
+                <Text style={styles.planPrice}>{pricing.yearly}</Text>
                 <RemixIcon
                   name={plan === 'yearly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
                   size={20}
@@ -117,7 +119,9 @@ export function PlanScreen() {
               </View>
               <View style={styles.planMeta}>
                 <Text style={styles.planCaption}>Billed annually</Text>
-                <Text style={styles.planBadge}>~17% Off</Text>
+                {pricing.savingsPercent != null && (
+                  <Text style={styles.planBadge}>~{pricing.savingsPercent}% Off</Text>
+                )}
               </View>
             </Pressable>
 
@@ -130,7 +134,7 @@ export function PlanScreen() {
               onPress={() => setPlan('monthly')}
             >
               <View style={styles.planTop}>
-                <Text style={styles.planPrice}>$10</Text>
+                <Text style={styles.planPrice}>{pricing.monthly}</Text>
                 <RemixIcon
                   name={plan === 'monthly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
                   size={20}

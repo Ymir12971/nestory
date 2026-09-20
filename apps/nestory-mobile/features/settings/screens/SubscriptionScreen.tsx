@@ -12,6 +12,7 @@ import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { PremiumCrown } from '@/shared/components/PremiumCrown';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
+import { usePlanPricing } from '@/features/billing/usePlanPricing';
 import { NavBar } from '@/shared/components/NavBar';
 import {
   purchasePlan,
@@ -57,6 +58,7 @@ const PREMIUM_BENEFITS = [
 
 function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnType<typeof useRouter> }) {
   const [cycle, setCycle] = useState<PlanCycle>('yearly');
+  const pricing = usePlanPricing();
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -161,7 +163,7 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
                 onPress={() => setCycle('yearly')}
               >
                 <View style={styles.planCardHeader}>
-                  <Text style={styles.planCardPrice}>$100</Text>
+                  <Text style={styles.planCardPrice}>{pricing.yearly}</Text>
                   <RemixIcon
                     name={cycle === 'yearly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
                     size={20}
@@ -170,7 +172,9 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
                 </View>
                 <View style={styles.planCardMeta}>
                   <Text style={styles.planCardCaption}>Billed annually</Text>
-                  <Text style={styles.planCardBadge}>~17% Off</Text>
+                  {pricing.savingsPercent != null && (
+                    <Text style={styles.planCardBadge}>~{pricing.savingsPercent}% Off</Text>
+                  )}
                 </View>
               </Pressable>
 
@@ -183,7 +187,7 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
                 onPress={() => setCycle('monthly')}
               >
                 <View style={styles.planCardHeader}>
-                  <Text style={styles.planCardPrice}>$10</Text>
+                  <Text style={styles.planCardPrice}>{pricing.monthly}</Text>
                   <RemixIcon
                     name={cycle === 'monthly' ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}
                     size={20}
@@ -229,6 +233,7 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
 // ---------- ST-02B Premium Plan ----------
 
 function PremiumPlanContent({ sub }: { sub: Subscription }) {
+  const pricing = usePlanPricing();
   const cycleLabel = sub.billingCycle === 'monthly' ? 'Monthly' : 'Yearly';
   const renewsLabel = sub.expiresAt
     ? `Renews ${formatExpiry(sub.expiresAt)}`
@@ -236,7 +241,10 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
   // 764:3857 — Plan / Price / Next billing
   const billingRows: { key: string; value: string }[] = [
     { key: 'Plan', value: cycleLabel },
-    { key: 'Price', value: sub.billingCycle === 'monthly' ? '$10 / month' : '$100 / year' },
+    // Current offering price, not what this subscriber was charged — close
+    // enough for a summary row, and it can't drift from the store the way a
+    // literal did.
+    { key: 'Price', value: sub.billingCycle === 'monthly' ? `${pricing.monthly} / month` : `${pricing.yearly} / year` },
     ...(sub.expiresAt
       ? [{ key: 'Next billing', value: formatExpiry(sub.expiresAt) }]
       : []),

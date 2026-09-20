@@ -5,7 +5,7 @@
 import { Linking, Platform } from 'react-native';
 import Purchases, { LOG_LEVEL, type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
 import { config } from '@/shared/config';
-import type { PurchaseCycle, PurchaseResult, RestoreResult } from './purchases';
+import type { PlanPrice, PlanPrices, PurchaseCycle, PurchaseResult, RestoreResult } from './purchases';
 
 let _configured = false;
 
@@ -42,6 +42,26 @@ export async function logOutPurchaseUser(): Promise<void> {
   } catch {
     // RC throws if the user is already anonymous — safe to ignore.
   }
+}
+
+/**
+ * Read both plans' prices from the current offering. The store is the only
+ * source of truth for price — it is already localised to the buyer's currency,
+ * and it stays right when we change pricing without shipping a build.
+ *
+ * Returns nulls rather than throwing when RevenueCat isn't configured or no
+ * offering is set up yet; callers render a placeholder instead of a number
+ * that might not match what the user is actually charged.
+ */
+export async function fetchPlanPrices(): Promise<PlanPrices> {
+  if (!isPurchasesAvailable()) return { yearly: null, monthly: null };
+  await initPurchases();
+
+  const current = (await Purchases.getOfferings()).current;
+  const read = (pkg: PurchasesPackage | null | undefined): PlanPrice | null =>
+    pkg ? { priceString: pkg.product.priceString, price: pkg.product.price } : null;
+
+  return { yearly: read(current?.annual), monthly: read(current?.monthly) };
 }
 
 export async function purchasePlan(cycle: PurchaseCycle): Promise<PurchaseResult> {

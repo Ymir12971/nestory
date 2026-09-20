@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { SheetModal } from '@/shared/components/SheetModal';
 import { theme } from '@/shared/theme';
 import { track } from '@/shared/lib/analytics';
+import { usePlanPricing } from '@/features/billing/usePlanPricing';
 
 // global-Paywall (Figma 775:1819) — the single paywall for the whole app.
 // The old contextual A/B/C/D variants are gone (2026-07 redesign, 模型 X 废弃);
@@ -30,6 +31,7 @@ interface PaywallModalProps {
 
 export function PaywallModal({ visible, onSubscribe, onDismiss, source }: PaywallModalProps) {
   const [cycle, setCycle] = useState<PaywallCycle>('year');
+  const pricing = usePlanPricing();
 
   useEffect(() => {
     if (visible) track('paywall_viewed', { source: source ?? 'unknown' });
@@ -71,14 +73,14 @@ export function PaywallModal({ visible, onSubscribe, onDismiss, source }: Paywal
           <View style={styles.planRow}>
             <PlanOption
               selected={cycle === 'year'}
-              price="$100"
+              price={pricing.yearly}
               caption="Billed annually"
-              badge="~17% Off"
+              badge={pricing.savingsPercent != null ? `~${pricing.savingsPercent}% Off` : undefined}
               onPress={() => setCycle('year')}
             />
             <PlanOption
               selected={cycle === 'month'}
-              price="$10"
+              price={pricing.monthly}
               caption="Billed monthly"
               onPress={() => setCycle('month')}
             />

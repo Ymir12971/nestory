@@ -7,6 +7,7 @@ import { Button } from '@/shared/components/Button';
 import { PremiumCrown } from '@/shared/components/PremiumCrown';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { usePlanPricing } from './usePlanPricing';
 
 // global-Welcome to premium (Figma 771:3311). Shown after ANY successful
 // subscribe or renew — first time or not — then "I'm all set" returns the user
@@ -28,6 +29,7 @@ function nextBillingLabel(cycle: 'year' | 'month'): string {
 }
 
 export function WelcomeToPremiumScreen() {
+  const pricing = usePlanPricing();
   const goBack = useGoBack();
   const router = useRouter();
   const { cycle: cycleParam, from } = useLocalSearchParams<{ cycle?: string; from?: string }>();
@@ -68,7 +70,10 @@ export function WelcomeToPremiumScreen() {
         {/* billingDetailCard 771:3324 */}
         <View style={styles.detailsCard}>
           <DetailRow label="Plan" value={cycle === 'year' ? 'Yearly' : 'Monthly'} />
-          <DetailRow label="Price" value={cycle === 'year' ? '$100 / year' : '$10 / month'} />
+          <DetailRow
+            label="Price"
+            value={cycle === 'year' ? `${pricing.yearly} / year` : `${pricing.monthly} / month`}
+          />
           <DetailRow label="Next billing" value={nextBillingLabel(cycle)} />
           <Text style={styles.autoRenew}>Auto-renews until canceled. Manage in Settings.</Text>
         </View>
