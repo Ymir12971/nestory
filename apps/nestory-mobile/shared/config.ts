@@ -34,7 +34,7 @@ const revenueCatKey =
 export const config = {
   // Non-dev builds (EAS preview/production) hit the deployed Railway API + Vercel web.
   apiBaseUrl: dev ? `http://${devHost}:3001` : 'https://nestoryapi-production.up.railway.app',
-  webBaseUrl: dev ? `http://${devHost}:3000` : 'https://nestory-web-lilac.vercel.app',
+  webBaseUrl: dev ? `http://${devHost}:3000` : 'https://app.nestory.love',
   // EXPO_PUBLIC_* envs are inlined at build time. Both default to '' so the
   // Supabase client can be constructed lazily and produce a clear error if missing.
   supabaseUrl:     process.env.EXPO_PUBLIC_SUPABASE_URL     ?? '',
