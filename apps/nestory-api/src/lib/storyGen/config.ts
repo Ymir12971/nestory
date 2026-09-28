@@ -128,7 +128,11 @@ const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const defaults: StoryGenConfig = {
   pipeline: 'single-shot-v2',
 
-  minMomentsToGenerate: 5,
+  // 降到 3（原 5）：5 的门槛意味着素材少的月份 v3 直接不生成，story 落到
+  // failed，而 dispatcher 每天都会重试 failed 的 story，于是天天被拒一次。
+  // v2 至少还会写一篇「这个月很安静」。先用 3 验证 v3 在薄素材下的产出，
+  // 不理想再往回调。
+  minMomentsToGenerate: 3,
 
   themeCountCaps: [
     { upToMoments: 10,       maxThemes: 2 },
