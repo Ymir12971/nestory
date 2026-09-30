@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nestory",
     "slug": "nestory",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "nestory",
@@ -49,13 +49,15 @@
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
           }
         }
       ],
       "expo-localization",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
