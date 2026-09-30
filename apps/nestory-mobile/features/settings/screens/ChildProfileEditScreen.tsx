@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
@@ -167,7 +167,9 @@ function EditForm({ child }: { child: Child }) {
   };
 
   return (
-    <>
+    // Edge-to-edge (forced since SDK 54) means adjustResize no longer shrinks
+    // the window for the keyboard; this keeps Save Changes above it instead.
+    <KeyboardAvoidingView style={styles.kav} behavior="padding">
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.body}
@@ -291,7 +293,7 @@ function EditForm({ child }: { child: Child }) {
           onPress={handleSave}
         />
       </View>
-    </>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -334,6 +336,7 @@ const styles = StyleSheet.create({
     color: theme.text.brand,
   },
 
+  kav: { flex: 1 },
   scroll: { flex: 1 },
   body: {
     paddingTop: theme.spacing.l,

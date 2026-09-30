@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
@@ -109,10 +109,9 @@ export function FeedbackScreen() {
         <Text style={styles.pageTitle}>Share feedback, Earn 10% off.</Text>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/* 'padding' on Android too: edge-to-edge (forced since SDK 54) means
+          adjustResize no longer shrinks the window for the keyboard. */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.body}

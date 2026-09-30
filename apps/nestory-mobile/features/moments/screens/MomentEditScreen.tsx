@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -178,6 +178,10 @@ function EditForm({ moment }: { moment: Moment }) {
         }
       />
 
+      {/* Edge-to-edge (forced since SDK 54) means adjustResize no longer
+          shrinks the window for the keyboard; this keeps the body and footer
+          above it instead. */}
+      <KeyboardAvoidingView style={styles.kav} behavior="padding">
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -246,6 +250,7 @@ function EditForm({ moment }: { moment: Moment }) {
           onPress={() => setDeleteConfirmVisible(true)}
         />
       </View>
+      </KeyboardAvoidingView>
 
       {/* H-04 / Sheet · Delete Memory Confirm (annotation copy) */}
       <BottomSheet
@@ -308,6 +313,7 @@ const styles = StyleSheet.create({
   },
 
   // body 743:4825
+  kav: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: theme.spacing.xl, // 20

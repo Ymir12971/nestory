@@ -145,9 +145,11 @@ export function SignInScreen() {
       style={styles.gradient}
     >
       <View style={styles.container}>
+       {/* 'padding' on Android too: edge-to-edge (forced since SDK 54) means
+           adjustResize no longer shrinks the window for the keyboard. */}
        <KeyboardAvoidingView
          style={styles.kav}
-         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+         behavior="padding"
        >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
