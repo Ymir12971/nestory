@@ -22,6 +22,7 @@ import {
 } from '@/features/billing/purchases';
 import { track } from '@/shared/lib/analytics';
 import { showToast } from '@/features/ui/toast';
+import { isOpenEndedExpiry } from '@/shared/lib/subscription';
 
 // ---------- Types ----------
 
@@ -245,7 +246,7 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
     // enough for a summary row, and it can't drift from the store the way a
     // literal did.
     { key: 'Price', value: sub.billingCycle === 'monthly' ? `${pricing.monthly} / month` : `${pricing.yearly} / year` },
-    ...(sub.expiresAt
+    ...(sub.expiresAt && !isOpenEndedExpiry(sub.expiresAt)
       ? [{ key: 'Next billing', value: formatExpiry(sub.expiresAt) }]
       : []),
   ];

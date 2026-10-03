@@ -13,6 +13,7 @@ import { Toggle } from '@/shared/components/Toggle';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { useMe, useSubscription, useChildren, useUpdateMe } from '@/api';
 import { formatAge } from '@/shared/lib/formatAge';
+import { isOpenEndedExpiry } from '@/shared/lib/subscription';
 
 const GENDER_LABEL: Record<string, string> = { girl: 'Girl', boy: 'Boy' };
 
@@ -39,7 +40,9 @@ function getSubEntry(
     ? new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '—';
   if (sub === 'premium_active' || sub === 'trial_active') {
-    return { label: 'Premium', subtitle: `Renews ${dateStr}`, badge: 'Active', badgeVariant: 'active' };
+    // A granted Premium has no renewal date worth showing.
+    const subtitle = isOpenEndedExpiry(expiresAt) ? '' : `Renews ${dateStr}`;
+    return { label: 'Premium', subtitle, badge: 'Active', badgeVariant: 'active' };
   }
   if (sub === 'trial_ended' || sub === 'premium_ended') {
     return { label: 'Premium', subtitle: `Expired ${dateStr}`, badge: 'Renew', badgeVariant: 'renew' };
@@ -284,7 +287,7 @@ export function SettingsScreen() {
             <View style={styles.row}>
               <View style={styles.rowCol}>
                 <Text style={styles.rowLabel}>{subEntry.label}</Text>
-                <Text style={styles.rowSubtitle}>{subEntry.subtitle}</Text>
+                {!!subEntry.subtitle && <Text style={styles.rowSubtitle}>{subEntry.subtitle}</Text>}
               </View>
               <Button
                 label={subEntry.badge}
