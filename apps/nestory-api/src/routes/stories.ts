@@ -8,8 +8,10 @@ import type {
   StoryDetail,
   StoryStatusPoll,
   StoryDocument,
+  AnyStoryDocument,
   GenerationMeta,
 } from '@nestory/types';
+import { isStoryDocumentV3 } from '@nestory/types';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
 import { parseBody, parseParams, parseQuery, uuidParam } from '../lib/validation';
@@ -34,6 +36,16 @@ const generateNowSchema = z.object({
 });
 
 // ---------- Helpers ----------
+
+/**
+ * The list card's cover. v2 keeps it in `meta.coverImageUrl`; v3 has no such
+ * field — its cover photo lives on the cover section, and is null for Cover-B
+ * (the card then shows its placeholder).
+ */
+function coverImageUrlOf(doc: AnyStoryDocument | null | undefined): string | null {
+  if (!doc) return null;
+  return (isStoryDocumentV3(doc) ? doc.cover.coverPhotoUrl : doc.meta.coverImageUrl) || null;
+}
 
 function deriveListState(
   status: StoryStatus,
@@ -149,7 +161,7 @@ export async function storiesRoutes(app: FastifyInstance) {
       storyId:       isCurGenerated ? curStory!.id : null,
       title:         isCurGenerated ? (curStoryDoc?.meta.title ?? null) : null,
       excerpt:       isCurGenerated ? (curStoryDoc?.shareMeta?.ogDescription ?? null) : null,
-      coverImageUrl: isCurGenerated ? (curStoryDoc?.meta.coverImageUrl ?? null) : null,
+      coverImageUrl: isCurGenerated ? coverImageUrlOf(curStoryDoc) : null,
     };
 
     // 历史月份（最多回溯到 child 出生所在月）
@@ -195,7 +207,7 @@ export async function storiesRoutes(app: FastifyInstance) {
         monthKey:         s.monthKey,
         status:           s.status as StoryStatus,
         listItemState:    'historical_generated',
-        coverImageUrl:    doc?.meta.coverImageUrl ?? null,
+        coverImageUrl:    coverImageUrlOf(doc),
         title:            doc?.meta.title ?? null,
         excerpt:          doc?.shareMeta?.ogDescription ?? null,
         isLastFreeStory:  s.isLastFreeStory,
