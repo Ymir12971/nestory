@@ -7,6 +7,8 @@ export type StoryWebViewProps = {
   onLoadStart?: () => void;
   onLoadEnd?:   () => void;
   onError?:     () => void;
+  onClose?:     () => void;
+  onShare?:     () => void;
 };
 
 export function StoryWebView({ uri, style, onLoadEnd, onError }: StoryWebViewProps) {

@@ -28,6 +28,7 @@ export function StoryRendererV3({
   const next = useCallback(() => setPage(p => Math.min(p + 1, pages.length - 1)), [pages.length]);
   const prev = useCallback(() => setPage(p => Math.max(p - 1, 0)), []);
   const close = useCallback(() => {
+    if (postToApp('close')) return;
     if (typeof window !== 'undefined') window.history.back();
   }, []);
 
@@ -131,9 +132,32 @@ function OpeningPage({ doc }: { doc: StoryDocumentV3 }) {
   );
 }
 
+/**
+ * Inside the app this page runs in a WebView with no history to go back to,
+ * so close/share are handed to the native screen. Returns false in a browser.
+ */
+function postToApp(type: 'close' | 'share'): boolean {
+  if (typeof window === 'undefined') return false;
+  const bridge = (window as { ReactNativeWebView?: { postMessage(msg: string): void } }).ReactNativeWebView;
+  if (!bridge) return false;
+  bridge.postMessage(JSON.stringify({ type }));
+  return true;
+}
+
+/** This page's URL without `?t=` — that is the viewer's access token. */
+function shareableUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const url = new URL(window.location.href);
+  url.searchParams.delete('t');
+  return url.toString();
+}
+
 function ClosingPage({ doc, onBack }: { doc: StoryDocumentV3; onBack: () => void }) {
   const share = async () => {
-    const url = typeof window !== 'undefined' ? window.location.href : '';
+    // In the app the native screen owns sharing: it mints the public
+    // /share/<token> link. This page's own URL is not shareable there.
+    if (postToApp('share')) return;
+    const url = shareableUrl();
     if (navigator.share) {
       try { await navigator.share({ title: doc.shareMeta.ogTitle, url }); } catch { /* cancelled */ }
     } else {

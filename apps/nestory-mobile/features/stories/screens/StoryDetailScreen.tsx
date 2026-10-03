@@ -129,6 +129,8 @@ export function StoryDetailScreen() {
             style={styles.webview}
             onLoadStart={() => setWebviewState('loading')}
             onLoadEnd={() => setWebviewState('loaded')}
+            onClose={goBack}
+            onShare={handleShare}
             onError={() => {
               setWebviewState('error');
               showToast({ type: 'error', message: "Couldn't load this Story. Pull down to retry." });
