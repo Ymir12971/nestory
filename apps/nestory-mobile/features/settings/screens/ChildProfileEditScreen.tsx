@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Child, ChildGender, ChildPatch } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { Button } from '@/shared/components/Button';
+import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 import { NavBar } from '@/shared/components/NavBar';
 import { useChild, useSubscription, useUpdateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
@@ -169,7 +170,7 @@ function EditForm({ child }: { child: Child }) {
   return (
     // Edge-to-edge (forced since SDK 54) means adjustResize no longer shrinks
     // the window for the keyboard; this keeps Save Changes above it instead.
-    <KeyboardAvoidingView style={styles.kav} behavior="padding">
+    <KeyboardAvoider style={styles.kav}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.body}
@@ -293,7 +294,7 @@ function EditForm({ child }: { child: Child }) {
           onPress={handleSave}
         />
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAvoider>
   );
 }
 

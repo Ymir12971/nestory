@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -8,6 +8,7 @@ import { theme, palette } from '@/shared/theme';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { Button } from '@/shared/components/Button';
 import { NavBar } from '@/shared/components/NavBar';
+import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { showToast } from '@/features/ui/toast';
 
@@ -181,7 +182,7 @@ function EditForm({ moment }: { moment: Moment }) {
       {/* Edge-to-edge (forced since SDK 54) means adjustResize no longer
           shrinks the window for the keyboard; this keeps the body and footer
           above it instead. */}
-      <KeyboardAvoidingView style={styles.kav} behavior="padding">
+      <KeyboardAvoider style={styles.kav}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -250,7 +251,7 @@ function EditForm({ moment }: { moment: Moment }) {
           onPress={() => setDeleteConfirmVisible(true)}
         />
       </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
 
       {/* H-04 / Sheet · Delete Memory Confirm (annotation copy) */}
       <BottomSheet

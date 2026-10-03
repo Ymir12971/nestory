@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
@@ -7,6 +7,7 @@ import { FEEDBACK_CONSTRAINTS } from '@nestory/types';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
+import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 import { NavBar } from '@/shared/components/NavBar';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
@@ -109,9 +110,9 @@ export function FeedbackScreen() {
         <Text style={styles.pageTitle}>Share feedback, Earn 10% off.</Text>
       </View>
 
-      {/* 'padding' on Android too: edge-to-edge (forced since SDK 54) means
-          adjustResize no longer shrinks the window for the keyboard. */}
-      <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      {/* Edge-to-edge (forced since SDK 54) means adjustResize no longer
+          shrinks the window for the keyboard. */}
+      <KeyboardAvoider style={styles.flex}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.body}
@@ -174,7 +175,7 @@ export function FeedbackScreen() {
             onPress={() => setThanksVisible(true)}
           />
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
 
       {/* Bottom Sheet · How the 10% off works (ST-feedback annotation) */}
       <BottomSheet visible={howItWorksVisible} onRequestClose={() => setHowItWorksVisible(false)}>

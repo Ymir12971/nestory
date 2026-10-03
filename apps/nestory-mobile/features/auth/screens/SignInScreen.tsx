@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
@@ -7,6 +7,7 @@ import * as AuthSession from 'expo-auth-session';
 import RemixIcon from 'react-native-remix-icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
+import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 import { setDevSession, useSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient, isSupabaseAuthAvailable } from '@/features/auth/supabaseClient';
 import { identify, track } from '@/shared/lib/analytics';
@@ -158,12 +159,9 @@ export function SignInScreen() {
       style={styles.gradient}
     >
       <View style={styles.container}>
-       {/* 'padding' on Android too: edge-to-edge (forced since SDK 54) means
-           adjustResize no longer shrinks the window for the keyboard. */}
-       <KeyboardAvoidingView
-         style={styles.kav}
-         behavior="padding"
-       >
+       {/* Edge-to-edge (forced since SDK 54) means adjustResize no longer
+           shrinks the window for the keyboard. */}
+       <KeyboardAvoider style={styles.kav}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -279,7 +277,7 @@ export function SignInScreen() {
           </Text>
         </View>
         </ScrollView>
-       </KeyboardAvoidingView>
+       </KeyboardAvoider>
       </View>
     </LinearGradient>
   );
