@@ -10,6 +10,7 @@ import { theme, palette } from '@/shared/theme';
 import { setDevSession, useSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient, isSupabaseAuthAvailable } from '@/features/auth/supabaseClient';
 import { identify, track } from '@/shared/lib/analytics';
+import { listChildren, queryClient, queryKeys } from '@/api';
 
 // Demo userId for the dev escape hatch (Supabase envs not configured); matches
 // the seed user in apps/nestory-api/prisma/seed.ts.
@@ -26,13 +27,18 @@ export function SignInScreen() {
   const [password, setPassword] = useState('');
   const [emailPending, setEmailPending] = useState(false);
   const supabaseReady = isSupabaseAuthAvailable();
-  const busy = pendingProvider != null || emailPending;
+  const [routing, setRouting] = useState(false);
+  const busy = pendingProvider != null || emailPending || routing;
 
-  // On web, signInWithOAuth navigates the whole page away to the provider and
-  // back, landing on this screen again with the Supabase session already
-  // restored — no explicit navigation runs in that flow. Redirect once a real
-  // session appears. Dev sessions carry a null accessToken and are navigated
-  // by handleDevSignIn, so they don't trigger this.
+  // Every real sign-in (email, native OAuth, and web OAuth — which navigates
+  // the whole page away and lands back here with the session already restored)
+  // is routed from here once the session appears. Dev sessions carry a null
+  // accessToken and are navigated by handleDevSignIn, so they don't trigger this.
+  //
+  // Only an account with no child goes through onboarding. A returning user
+  // sent there sees an empty profile form — it reads as lost data, and filling
+  // it in creates a duplicate child. If the lookup fails, fall back to
+  // onboarding rather than strand the user on this screen.
   //
   // `?preview=1` holds the screen still: while signed in this frame is
   // otherwise impossible to look at, because the redirect fires on mount. Dev
@@ -40,9 +46,17 @@ export function SignInScreen() {
   const previewHold = __DEV__ && preview === '1';
   useEffect(() => {
     if (previewHold) return;
-    if (session?.accessToken) {
-      router.replace('/onboarding/privacy-claim');
-    }
+    if (!session?.accessToken) return;
+    let cancelled = false;
+    setRouting(true);
+    queryClient
+      .fetchQuery({ queryKey: queryKeys.children, queryFn: listChildren, staleTime: 0 })
+      .then((children) => children.length > 0, () => false)
+      .then((hasChild) => {
+        if (cancelled) return;
+        router.replace(hasChild ? '/' : '/onboarding/privacy-claim');
+      });
+    return () => { cancelled = true; setRouting(false); };
   }, [previewHold, session?.accessToken, router]);
 
   const blurFocus = () => {
@@ -103,7 +117,6 @@ export function SignInScreen() {
       if (exchErr) throw exchErr;
       if (exch?.session?.user?.id) identify(exch.session.user.id);
       track('signup_success', { method: provider });
-      router.replace('/onboarding/privacy-claim');
     } catch (e: any) {
       setError(e?.message ?? 'Sign-in failed. Please try again.');
     } finally {
