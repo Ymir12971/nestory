@@ -6,10 +6,19 @@ import { SheetModal } from '@/shared/components/SheetModal';
 import { theme } from '@/shared/theme';
 import { track } from '@/shared/lib/analytics';
 import { usePlanPricing } from '@/features/billing/usePlanPricing';
+import { isPurchasesAvailable, purchasePlan } from '@/features/billing/purchases';
+import { showToast } from '@/features/ui/toast';
+import { queryClient, queryKeys } from '@/api';
 
 // global-Paywall (Figma 775:1819) — the single paywall for the whole app.
 // The old contextual A/B/C/D variants are gone (2026-07 redesign, 模型 X 废弃);
 // every "View Premium benefits" entry point opens this same sheet.
+//
+// The sheet runs the purchase itself. Every caller used to pass an
+// `onSubscribe` that only closed it, so "Upgrade to Premium" bought nothing —
+// and for a lapsed subscriber, whose Settings card opens this sheet instead of
+// the plan page, there was no way back to Premium anywhere in the app.
+// `onSubscribe` now fires after the store confirms the purchase.
 
 export type PaywallCycle = 'year' | 'month';
 
@@ -32,9 +41,39 @@ interface PaywallModalProps {
 export function PaywallModal({ visible, onSubscribe, onDismiss, source }: PaywallModalProps) {
   const [cycle, setCycle] = useState<PaywallCycle>('year');
   const pricing = usePlanPricing();
+  const [purchasing, setPurchasing] = useState(false);
+  // Shown in the sheet rather than as a toast: toasts render under a Modal.
+  const [error, setError] = useState<string | null>(null);
+
+  const handleUpgrade = async () => {
+    if (purchasing) return;
+    setError(null);
+    if (!isPurchasesAvailable()) {
+      setError('In-app purchases require the mobile app.');
+      return;
+    }
+    const plan = cycle === 'year' ? 'yearly' : 'monthly';
+    setPurchasing(true);
+    try {
+      const res = await purchasePlan(plan);
+      if (res.status === 'purchased') {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        track('subscribe_success', { cycle: plan, source: source ?? 'paywall' });
+        onSubscribe(cycle);
+        showToast({ type: 'success', message: 'Welcome to Premium!' });
+      }
+      // 'cancelled' → stay on the sheet, let the user choose again.
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      setError(`Purchase failed: ${msg}`);
+    } finally {
+      setPurchasing(false);
+    }
+  };
 
   useEffect(() => {
     if (visible) track('paywall_viewed', { source: source ?? 'unknown' });
+    if (!visible) setError(null);
   }, [visible, source]);
 
   return (
@@ -90,10 +129,12 @@ export function PaywallModal({ visible, onSubscribe, onDismiss, source }: Paywal
 
       {/* cta 775:1856 */}
       <View style={styles.cta}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
         <Button
-          label="Upgrade to Premium"
+          label={purchasing ? 'Processing…' : 'Upgrade to Premium'}
           type="premium"
-          onPress={() => onSubscribe(cycle)}
+          disabled={purchasing}
+          onPress={() => void handleUpgrade()}
         />
         <Button label="Back" type="text" style={styles.dismissBtn} onPress={onDismiss} />
       </View>
@@ -257,4 +298,9 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   dismissBtn: { height: 44 },
+  errorText: {
+    ...theme.typography.caption,
+    color: theme.text.error,
+    textAlign: 'center',
+  },
 });
