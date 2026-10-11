@@ -73,8 +73,8 @@ Hard rules:
 - Every selected moment belongs to exactly one chapter and one unit.
 - Dropped (deduped) moments must be listed explicitly so downstream steps skip them.
 - Skip any moment that is clearly NOT about the child (list it in
-  skipped_moment_ids); if fewer than 5 usable moments remain, return
-  generate=false with a reason.
+  skipped_moment_ids); if fewer usable moments remain than the minimum you are
+  given, return generate=false with a reason.
 - You do NOT choose photos — downstream code does. Use photo COUNT only as a
   hint of how rich a moment is.`;
 
@@ -91,6 +91,9 @@ function buildUserPrompt(input: P1Input, cfg: StoryGenConfig): string {
     `Month: ${input.monthDisplay} (${input.monthKey})`,
     `Total moments this month: ${input.moments.length}`,
     `Theme-count cap for this volume: max ${cap} themes (fewer is fine if the month genuinely has fewer).`,
+    // The system prompt used to say "fewer than 5" outright, which kept
+    // declining 3-4 moment months after minMomentsToGenerate dropped to 3.
+    `Minimum usable moments to generate a Story: ${cfg.minMomentsToGenerate}.`,
     '',
     'Here are all moments for this month (JSON array):',
     JSON.stringify(moments),

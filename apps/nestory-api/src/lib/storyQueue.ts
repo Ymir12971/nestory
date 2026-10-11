@@ -357,9 +357,11 @@ async function processGenerateJob(
 
     log(`[story-worker] generated story=${updated.id} duration_ms=${meta.generationDurationMs}`);
   } catch (err) {
+    // Overwrite generationMeta too: left alone it keeps the previous attempt's
+    // `declined`, and the list would report this crash as that old decline.
     await prisma.story.update({
       where: { childId_monthKey: { childId, monthKey } },
-      data:  { status: 'failed' },
+      data:  { status: 'failed', generationMeta: { error: String((err as Error)?.message ?? err).slice(0, 500) } as object },
     });
     throw err;
   }
