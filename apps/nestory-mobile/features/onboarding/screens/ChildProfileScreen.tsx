@@ -16,6 +16,7 @@ import type { ChildCreate, ChildGender } from '@nestory/types';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { Button } from '@/shared/components/Button';
 import { NavBar } from '@/shared/components/NavBar';
+import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 import { Tag } from '@/shared/components/Tag';
 import { theme, palette } from '@/shared/theme';
 import { useCreateChild, uploadPhoto } from '@/api';
@@ -282,9 +283,18 @@ export function ChildProfileScreen() {
           segments track the onboarding phase, not the step within this form. */}
       <NavBar onBack={onBack} progress={{ total: 3, active: 1 }} />
 
+      {/* Edge-to-edge (forced since SDK 54) means adjustResize no longer
+          shrinks the window for the keyboard; without this Continue sat
+          behind it on every step. */}
+      <KeyboardAvoider style={styles.kav}>
+
       {/* ── Step 0: Basic info — photo + name + birthday ─────────────────── */}
       {step === 0 && (
-        <>
+        <ScrollView
+          style={styles.scrollBody}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.titleBlock}>
             <Text style={styles.heading}>Tell us about your little one</Text>
             <Text style={styles.subheading}>
@@ -337,7 +347,7 @@ export function ChildProfileScreen() {
             </Pressable>
           </View>
           </View>
-        </>
+        </ScrollView>
       )}
 
       {/* ── Step 1: Details (all optional) ───────────────────────────────── */}
@@ -482,10 +492,6 @@ export function ChildProfileScreen() {
         </ScrollView>
       )}
 
-      {/* Steps 1/2 use a ScrollView (flex:1); step 0 uses a static body, so add
-          a flex spacer to push the CTA to the bottom. */}
-      {step === 0 && <View style={styles.spacer} />}
-
       {/* CTA ──────────────────────────────────────────────────────────────── */}
       {/* Basic info pads the CTA block 16 from the body; the later two use 12 */}
       <View style={[styles.cta, step !== 0 && styles.ctaTight]}>
@@ -513,6 +519,8 @@ export function ChildProfileScreen() {
           </Pressable>
         )}
       </View>
+
+      </KeyboardAvoider>
 
       {/* Birthday picker sheet */}
       <BottomSheet
@@ -694,7 +702,7 @@ const styles = StyleSheet.create({
   },
   tagRoomyLabel: { ...theme.typography.body },
 
-  spacer: { flex: 1, minHeight: 1 },
+  kav: { flex: 1 },
   cta: {
     paddingHorizontal: theme.spacing.xl,
     paddingBottom: theme.spacing.safeBtm,
