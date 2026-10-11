@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
-import { useChildren } from '@/api';
+import { useChildren, useSubscription } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
 function formatBirthDate(birthDate: string): string {
@@ -18,6 +18,12 @@ export function ChildProfileListScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const childrenQ = useChildren();
+  const subQ = useSubscription();
+  // Only once we know: a Premium subscriber shouldn't see the note flash by.
+  const onFreePlan =
+    subQ.data != null &&
+    subQ.data.subscriptionStatus !== 'premium_active' &&
+    subQ.data.subscriptionStatus !== 'trial_active';
 
   const renderBody = () => {
     if (childrenQ.isLoading) {
@@ -62,12 +68,14 @@ export function ChildProfileListScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Warning notify — Free plan multi-profile restriction */}
-        <View style={styles.notify}>
-          <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
-          <Text style={styles.notifyText}>
-            Free plan supports one active profile. You can add more, but switching requires Premium.
-          </Text>
-        </View>
+        {onFreePlan && (
+          <View style={styles.notify}>
+            <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
+            <Text style={styles.notifyText}>
+              Free plan supports one active profile. You can add more, but switching requires Premium.
+            </Text>
+          </View>
+        )}
 
         {/* Profile cards */}
         {profiles.map((profile) => (
