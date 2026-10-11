@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
-import type { Child, SubscriptionStatus } from '@nestory/types';
+import type { Child, SubscriptionContractStatus, SubscriptionStatus } from '@nestory/types';
 import { palette, theme } from '@/shared/theme';
 import { Button } from '@/shared/components/Button';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -14,6 +14,7 @@ import { PaywallModal } from '@/shared/components/PaywallModal';
 import { useMe, useSubscription, useChildren, useUpdateMe } from '@/api';
 import { formatAge } from '@/shared/lib/formatAge';
 import { isOpenEndedExpiry } from '@/shared/lib/subscription';
+import { useRefreshSubscriptionOnFocus } from '@/shared/hooks/useRefreshSubscriptionOnFocus';
 
 const GENDER_LABEL: Record<string, string> = { girl: 'Girl', boy: 'Boy' };
 
@@ -30,6 +31,7 @@ function getSubEntry(
   sub: SubscriptionStatus,
   expiresAt: string | null,
   quotaRemaining: number | null,
+  contract: SubscriptionContractStatus,
 ): {
   label: string;
   subtitle: string;
@@ -40,8 +42,14 @@ function getSubEntry(
     ? new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '—';
   if (sub === 'premium_active' || sub === 'trial_active') {
-    // A granted Premium has no renewal date worth showing.
-    const subtitle = isOpenEndedExpiry(expiresAt) ? '' : `Renews ${dateStr}`;
+    // A granted Premium has no renewal date worth showing; a cancelled one
+    // runs out on that date instead of renewing; after a failed charge the
+    // date is the one that just failed, so point at the problem instead.
+    const subtitle =
+      isOpenEndedExpiry(expiresAt)   ? '' :
+      contract === 'billing_issue'   ? 'Payment needs attention' :
+      contract === 'cancelled'       ? `Ends ${dateStr}` :
+                                       `Renews ${dateStr}`;
     return { label: 'Premium', subtitle, badge: 'Active', badgeVariant: 'active' };
   }
   if (sub === 'trial_ended' || sub === 'premium_ended') {
@@ -129,6 +137,16 @@ export function SettingsScreen() {
   const meQ        = useMe();
   const subQ       = useSubscription();
   const childrenQ  = useChildren();
+  useRefreshSubscriptionOnFocus();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([meQ.refetch(), subQ.refetch(), childrenQ.refetch()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Both toggles persist to the user row (push delivery checks them server-side).
   // Story Notifications additionally can't be on without OS permission.
@@ -182,7 +200,9 @@ export function SettingsScreen() {
   const childrenList = childrenQ.data;
   const activeChild  = childrenList?.find(c => c.isActive) ?? childrenList?.[0];
 
-  const subEntry = getSubEntry(sub.subscriptionStatus, sub.expiresAt, sub.storyQuotaRemaining);
+  const subEntry = getSubEntry(
+    sub.subscriptionStatus, sub.expiresAt, sub.storyQuotaRemaining, sub.status,
+  );
 
   const handleSubEntryPress = () => {
     if (sub.subscriptionStatus === 'trial_ended' || sub.subscriptionStatus === 'premium_ended') {
@@ -203,6 +223,7 @@ export function SettingsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
       >
         {/* Promo card 768:4588 — blue gradient with a coin tile, no section label */}
         <Pressable

@@ -289,7 +289,7 @@ model Subscription {
   // 决策 2：5 态枚举（never_paid / trial_active / premium_active / trial_ended / premium_ended）
   subscriptionStatus String    @default("never_paid") @map("subscription_status") @db.VarChar(20)
   planType           String    @default("free") @map("plan_type") @db.VarChar(10) // 'free' | 'premium'
-  status             String    @default("active") @db.VarChar(20) // RevenueCat: 'active' | 'cancelled' | 'expired'
+  status             String    @default("active") @db.VarChar(20) // RevenueCat: 'active' | 'cancelled' | 'billing_issue' | 'expired'
   billingCycle       String?   @map("billing_cycle") @db.VarChar(10) // 'yearly' | 'monthly'
   storyQuota         Int       @default(2) @map("story_quota")
   expiresAt          DateTime? @map("expires_at") @db.Timestamptz(6)

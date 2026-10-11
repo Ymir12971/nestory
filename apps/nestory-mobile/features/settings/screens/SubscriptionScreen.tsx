@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
@@ -23,6 +23,8 @@ import {
 import { track } from '@/shared/lib/analytics';
 import { showToast } from '@/features/ui/toast';
 import { isOpenEndedExpiry } from '@/shared/lib/subscription';
+import { useRefreshSubscriptionOnFocus } from '@/shared/hooks/useRefreshSubscriptionOnFocus';
+import { PlanCancelledScreen } from './PlanCancelledScreen';
 
 // ---------- Types ----------
 
@@ -233,8 +235,14 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
 
 // ---------- ST-02B Premium Plan ----------
 
+const STORE_NAME = Platform.OS === 'ios' ? 'the App Store' : 'Google Play';
+
 function PremiumPlanContent({ sub }: { sub: Subscription }) {
   const pricing = usePlanPricing();
+  const granted = isOpenEndedExpiry(sub.expiresAt);
+  // A renewal charge failed and the store is retrying. `expiresAt` is the date
+  // that just failed, so it isn't a "next billing" date any more.
+  const billingIssue = sub.status === 'billing_issue';
   const cycleLabel = sub.billingCycle === 'monthly' ? 'Monthly' : 'Yearly';
   const renewsLabel = sub.expiresAt
     ? `Renews ${formatExpiry(sub.expiresAt)}`
@@ -246,7 +254,7 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
     // enough for a summary row, and it can't drift from the store the way a
     // literal did.
     { key: 'Price', value: sub.billingCycle === 'monthly' ? `${pricing.monthly} / month` : `${pricing.yearly} / year` },
-    ...(sub.expiresAt && !isOpenEndedExpiry(sub.expiresAt)
+    ...(sub.expiresAt && !billingIssue
       ? [{ key: 'Next billing', value: formatExpiry(sub.expiresAt) }]
       : []),
   ];
@@ -305,16 +313,33 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
           <Text style={styles.premiumCurrentName}>Premium Plan</Text>
         </LinearGradient>
 
-        {/* billingDetailCard 764:3857 — plain rows (no dividers) + a centred note */}
-        <View style={styles.billingCard}>
-          {billingRows.map((row, i) => (
-            <View key={i} style={styles.billingRow}>
-              <Text style={styles.billingKey}>{row.key}</Text>
-              <Text style={styles.billingValue}>{row.value}</Text>
-            </View>
-          ))}
-          <Text style={styles.billingNote}>Auto-renews until canceled. Manage in Settings.</Text>
-        </View>
+        {/* Not in the design: says what happened and what to do about it in
+            plain words — no store error codes, and no "cancelled", which the
+            user didn't do. */}
+        {billingIssue && (
+          <View style={styles.billingIssueCard}>
+            <Text style={styles.billingIssueTitle}>We couldn't process your payment</Text>
+            <Text style={styles.billingIssueBody}>
+              Your Premium is still active for now. Please update your payment method in{' '}
+              {STORE_NAME} to keep it going.
+            </Text>
+            <Button label="Update payment method" onPress={() => void openManageSubscriptions()} />
+          </View>
+        )}
+
+        {/* billingDetailCard 764:3857 — plain rows (no dividers) + a centred note.
+            Not for a granted Premium: there is no cycle, price or renewal. */}
+        {!granted && (
+          <View style={styles.billingCard}>
+            {billingRows.map((row, i) => (
+              <View key={i} style={styles.billingRow}>
+                <Text style={styles.billingKey}>{row.key}</Text>
+                <Text style={styles.billingValue}>{row.value}</Text>
+              </View>
+            ))}
+            <Text style={styles.billingNote}>Auto-renews until canceled. Manage in Settings.</Text>
+          </View>
+        )}
 
         {/* includedCard 764:3867 */}
         <View style={styles.includedCard}>
@@ -328,15 +353,18 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
         </View>
       </ScrollView>
 
-      {/* cta 764:3890 — DS Destructive, full width */}
-      <View style={styles.ctaPremium}>
-        <Button
-          label="Cancel Subscription"
-          type="destructive"
-          style={styles.cancelBtn}
-          onPress={() => setCancelStep(1)}
-        />
-      </View>
+      {/* cta 764:3890 — DS Destructive, full width. Nothing to cancel in the
+          store when the Premium was granted. */}
+      {!granted && (
+        <View style={styles.ctaPremium}>
+          <Button
+            label="Cancel Subscription"
+            type="destructive"
+            style={styles.cancelBtn}
+            onPress={() => setCancelStep(1)}
+          />
+        </View>
+      )}
 
       {/* ST-02 / Sheet · Cancel Step 1 — loss list */}
       <BottomSheet visible={cancelStep === 1} onRequestClose={() => setCancelStep(0)}>
@@ -419,10 +447,15 @@ export function SubscriptionScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const subQ = useSubscription();
+  useRefreshSubscriptionOnFocus();
 
   const isPremium =
     subQ.data?.subscriptionStatus === 'premium_active' ||
     subQ.data?.subscriptionStatus === 'trial_active';
+
+  // Cancelled in the store but still inside the paid period: the plan page
+  // below would go on promising a next billing date and offering to cancel.
+  if (isPremium && subQ.data?.status === 'cancelled') return <PlanCancelledScreen />;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -633,6 +666,16 @@ const styles = StyleSheet.create({
     color: theme.text.secondary,
     textAlign: 'center',
   },
+  billingIssueCard: {
+    backgroundColor: theme.surface.warningSubtle,
+    borderWidth: 1,
+    borderColor: theme.border.warning,
+    borderRadius: theme.radius.l,
+    padding: theme.spacing.l,
+    gap: theme.spacing.m,
+  },
+  billingIssueTitle: { ...theme.typography.h3, color: theme.text.primary },
+  billingIssueBody:  { ...theme.typography.body, color: theme.text.primary },
 
   billingCard: {
     backgroundColor: theme.surface.card,

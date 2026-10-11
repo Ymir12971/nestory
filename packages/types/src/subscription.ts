@@ -12,7 +12,13 @@ export type SubscriptionStatus =
 export type PlanType = 'free' | 'premium';
 
 // RevenueCat contract status
-export type SubscriptionContractStatus = 'active' | 'cancelled' | 'expired';
+/**
+ * `cancelled` — the user turned renewal off; rights run to `expiresAt`.
+ * `billing_issue` — a renewal charge failed and the store is retrying; rights
+ * run through the grace period. Kept apart from `cancelled` because the user
+ * did not leave and may still be charged, so "you cancelled" copy is wrong.
+ */
+export type SubscriptionContractStatus = 'active' | 'cancelled' | 'billing_issue' | 'expired';
 
 export type BillingCycle = 'yearly' | 'monthly';
 

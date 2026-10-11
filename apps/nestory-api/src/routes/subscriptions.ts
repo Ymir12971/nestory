@@ -8,6 +8,7 @@ import type {
 } from '@nestory/types';
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
+import { audit } from '../lib/audit';
 import {
   deriveSubscriptionFromSubscriber,
   deriveSubscriptionUpdate,
@@ -134,6 +135,35 @@ export async function subscriptionsRoutes(app: FastifyInstance) {
       where: { userId: event.app_user_id },
       data:  { ...update, lastEventId: event.id, lastEventAt: eventTs },
     });
+    // The row only keeps where the subscription stands now. Why it got there —
+    // the user cancelled, a charge failed, support refunded it — is in the
+    // store's own reason fields, and this is the only place they are kept.
+    audit({
+      userId:     event.app_user_id,
+      actorType:  'webhook',
+      action:     'subscription_change',
+      resource:   'subscription',
+      resourceId: event.id,
+      metadata: {
+        type:             event.type,
+        cancelReason:     event.cancel_reason ?? null,
+        expirationReason: event.expiration_reason ?? null,
+        productId:        event.product_id ?? null,
+        periodType:       event.period_type ?? null,
+        store:            event.store ?? null,
+        environment:      event.environment ?? null,
+        eventAt:          eventTs.toISOString(),
+        expiresAt:        event.expiration_at_ms ? new Date(event.expiration_at_ms).toISOString() : null,
+        gracePeriodEndsAt: event.grace_period_expiration_at_ms
+          ? new Date(event.grace_period_expiration_at_ms).toISOString()
+          : null,
+        from: { subscriptionStatus: sub.subscriptionStatus, status: sub.status },
+        to: {
+          subscriptionStatus: (update.subscriptionStatus as string | undefined) ?? sub.subscriptionStatus,
+          status:             (update.status as string | undefined) ?? sub.status,
+        },
+      },
+    });
     return { received: true, applied: true, type: event.type };
   });
 
@@ -172,6 +202,21 @@ export async function subscriptionsRoutes(app: FastifyInstance) {
 
     await prisma.subscription.update({ where: { userId: req.userId }, data: update });
     req.log.info({ userId: req.userId, update }, 'Subscription reconciled from RC');
+    audit({
+      userId:    req.userId,
+      actorType: 'user',
+      action:    'subscription_change',
+      resource:  'subscription',
+      metadata: {
+        type: 'REFRESH_FROM_STORE',
+        from: { subscriptionStatus: sub.subscriptionStatus, status: sub.status },
+        to: {
+          subscriptionStatus: (update.subscriptionStatus as string | undefined) ?? sub.subscriptionStatus,
+          status:             (update.status as string | undefined) ?? sub.status,
+        },
+      },
+      req,
+    });
     return { data: { applied: true } };
   });
 

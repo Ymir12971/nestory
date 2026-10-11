@@ -19,6 +19,9 @@ export interface RCEvent {
   product_id?:         string;       // e.g. "nestory_premium_yearly"
   period_type?:        'NORMAL' | 'TRIAL' | 'INTRO' | 'PROMOTIONAL';
   expiration_at_ms?:   number;
+  cancel_reason?:      string;       // CANCELLATION only: UNSUBSCRIBE | BILLING_ERROR | ...
+  expiration_reason?:  string;       // EXPIRATION only: same vocabulary as cancel_reason
+  grace_period_expiration_at_ms?: number; // BILLING_ISSUE only
   environment?:        'SANDBOX' | 'PRODUCTION';
   store?:              string;       // "PLAY_STORE" | "APP_STORE" | ...
 }
@@ -60,8 +63,12 @@ export function verifyWebhookAuth(req: FastifyRequest): boolean {
  *   - CANCELLATION → user clicked cancel but rights remain until expiry; only
  *     flip the contract `status` to 'cancelled'.
  *   - EXPIRATION → drop to free; remember whether they came from trial or paid.
- *   - BILLING_ISSUE → treat like CANCELLATION for now (RC will follow up with
- *     EXPIRATION after grace period); revisit if we add a grace-period UI.
+ *   - BILLING_ISSUE, and the CANCELLATION RC sends with cancel_reason
+ *     BILLING_ERROR → 'billing_issue': a charge failed, the user didn't leave.
+ *     Rights remain through the grace period and RC follows up with
+ *     EXPIRATION. Not folded into 'cancelled' — the client shows "Premium has
+ *     been cancelled, you won't be charged again" for that, which is false
+ *     while the store is still retrying the charge.
  */
 export function deriveSubscriptionUpdate(
   event: RCEvent,
@@ -85,8 +92,10 @@ export function deriveSubscriptionUpdate(
       };
 
     case 'CANCELLATION':
+      return { status: event.cancel_reason === 'BILLING_ERROR' ? 'billing_issue' : 'cancelled' };
+
     case 'BILLING_ISSUE':
-      return { status: 'cancelled' };
+      return { status: 'billing_issue' };
 
     case 'EXPIRATION': {
       const ended =
@@ -187,14 +196,17 @@ export function deriveSubscriptionFromSubscriber(
     const detail    = productId ? subscriber.subscriptions?.[productId] : undefined;
     const isTrial   = detail?.period_type === 'trial' || detail?.period_type === 'intro';
     const cycle     = inferBillingCycle(productId);
-    // Cancelled-but-still-entitled: rights run to the end of the paid period,
-    // which is exactly what the CANCELLATION event branch encodes.
-    const cancelled = !!(detail?.unsubscribe_detected_at || detail?.billing_issues_detected_at);
+    // Still entitled but not renewing cleanly — the same two states the
+    // CANCELLATION / BILLING_ISSUE event branches encode.
+    const status =
+      detail?.unsubscribe_detected_at    ? 'cancelled' :
+      detail?.billing_issues_detected_at ? 'billing_issue' :
+                                           'active';
 
     return {
       subscriptionStatus: isTrial ? 'trial_active' : 'premium_active',
       planType:           'premium',
-      status:             cancelled ? 'cancelled' : 'active',
+      status,
       ...(cycle ? { billingCycle: cycle } : {}),
       ...(active.expires_date ? { expiresAt: new Date(active.expires_date) } : {}),
     };

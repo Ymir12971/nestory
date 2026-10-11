@@ -1,15 +1,16 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter } from 'expo-router';
 import { Button } from '@/shared/components/Button';
 import { theme } from '@/shared/theme';
 import { useSubscription } from '@/api';
+import { useGoBack } from '@/shared/hooks/useGoBack';
 
 // ST-Plan cancelled (Figma 771:3205). Shown once the platform cancellation has
 // actually landed (RevenueCat webhook flips the status) — 方案A: the app never
-// pretends an in-app cancel completed. Not auto-navigated yet; routable at
-// /settings/plan-cancelled for when status-change detection lands (WorkPlan §6).
+// pretends an in-app cancel completed. SubscriptionScreen renders this in place
+// of the plan page while the status is `cancelled`; also routable on its own at
+// /settings/plan-cancelled.
 //
 // Left-aligned title over a two-paragraph note, then the "still yours until
 // then" benefit card — not a centred success screen with a check badge.
@@ -31,7 +32,7 @@ function formatCycleEnd(iso: string | null): string {
 }
 
 export function PlanCancelledScreen() {
-  const router = useRouter();
+  const goBack = useGoBack('/settings');
   const subQ = useSubscription();
 
   return (
@@ -63,7 +64,7 @@ export function PlanCancelledScreen() {
 
       {/* buttonBlock 771:3304 */}
       <View style={styles.cta}>
-        <Button label="Back to Settings" onPress={() => router.replace('/settings')} />
+        <Button label="Back to Settings" onPress={goBack} />
       </View>
     </SafeAreaView>
   );
