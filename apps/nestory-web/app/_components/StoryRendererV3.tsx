@@ -56,7 +56,11 @@ export function StoryRendererV3({
             style={{ width: `${((page + 1) / pages.length) * 100}%` }}
           />
         </div>
-        <button className={styles.closeBtn} onClick={close} aria-label="Close">✕</button>
+        {/* A visitor who opened a shared link has no screen behind this one —
+            ✕ and "Back to Home" only mean something inside the app. */}
+        {!external && (
+          <button className={styles.closeBtn} onClick={close} aria-label="Close">✕</button>
+        )}
       </div>
 
       {/* §9.3 水印 —— 生成时锁定,免费版永久带,只在外部分享页出现。
@@ -71,7 +75,7 @@ export function StoryRendererV3({
         {current === 'cover'   && <CoverPage doc={doc} />}
         {current === 'opening' && <OpeningPage doc={doc} />}
         {typeof current === 'number' && <ChapterPage chapter={doc.body[current]!} />}
-        {current === 'closing' && <ClosingPage doc={doc} onBack={close} />}
+        {current === 'closing' && <ClosingPage doc={doc} onBack={external ? null : close} />}
       </div>
 
       {/* 底部翻页按钮(§6.1:毛玻璃,箭头;Opening 的下一页带 label) */}
@@ -152,7 +156,7 @@ function shareableUrl(): string {
   return url.toString();
 }
 
-function ClosingPage({ doc, onBack }: { doc: StoryDocumentV3; onBack: () => void }) {
+function ClosingPage({ doc, onBack }: { doc: StoryDocumentV3; onBack: (() => void) | null }) {
   const share = async () => {
     // In the app the native screen owns sharing: it mints the public
     // /share/<token> link. This page's own URL is not shareable there.
@@ -172,7 +176,7 @@ function ClosingPage({ doc, onBack }: { doc: StoryDocumentV3; onBack: () => void
         {doc.closing.stats.moments} moments · {doc.closing.stats.photos} photos
       </p>
       <button className={styles.shareBtn} onClick={share}>Share this Story</button>
-      <button className={styles.backBtn} onClick={onBack}>Back to Home</button>
+      {onBack && <button className={styles.backBtn} onClick={onBack}>Back to Home</button>}
     </section>
   );
 }
