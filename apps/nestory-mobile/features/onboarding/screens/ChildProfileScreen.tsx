@@ -313,7 +313,7 @@ export function ChildProfileScreen() {
                 </View>
               )}
             </Pressable>
-            <Text style={styles.photoLabel}>Tap to add a photo</Text>
+            <Text style={styles.photoLabel}>{avatarPhoto ? 'Tap to change' : 'Tap to add a photo'}</Text>
           </View>
 
           <View style={styles.fieldGroup}>

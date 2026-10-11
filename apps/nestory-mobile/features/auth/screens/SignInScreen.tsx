@@ -192,6 +192,9 @@ export function SignInScreen() {
 
         {/* Buttons */}
         <View style={styles.buttonGroup}>
+          {/* Above the buttons, not below them: the form ends at the bottom
+              edge of the screen, where the message landed under the gesture bar. */}
+          {error && <Text style={styles.errorText}>{error}</Text>}
           <Pressable
             style={({ pressed }) => [styles.socialButton, (pressed || busy) && styles.pressed]}
             onPress={handleApplePress}
@@ -254,7 +257,6 @@ export function SignInScreen() {
             </Text>
           </Pressable>
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
         </View>
 
         {/* Footer */}

@@ -118,12 +118,20 @@ export async function apiFetch<T>(
     headers.Authorization = `Bearer ${await getAuthToken()}`;
   }
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
+    });
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    // fetch only rejects when no response came back at all (offline, DNS, …),
+    // and its message — "Network request failed" — is what screens show inline.
+    throw new Error("Can't reach Nestory right now. Check your connection and try again.");
+  }
 
   // 204 No Content
   if (res.status === 204) return undefined as T;
