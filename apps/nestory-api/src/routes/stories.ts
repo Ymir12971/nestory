@@ -47,6 +47,19 @@ function coverImageUrlOf(doc: AnyStoryDocument | null | undefined): string | nul
   return (isStoryDocumentV3(doc) ? doc.cover.coverPhotoUrl : doc.meta.coverImageUrl) || null;
 }
 
+function generationFailureOf(
+  story: { status: string; generationMeta: unknown; updatedAt: Date } | undefined,
+): CurrentMonthStatus['generationFailure'] {
+  if (story?.status !== 'failed') return null;
+  const declined = (story.generationMeta as { declined?: string } | null)?.declined;
+  if (declined === 'FREE_QUOTA_EXHAUSTED') return null;
+  const reason =
+    declined === 'E01_INSUFFICIENT_MOMENTS' ? 'insufficient_moments' :
+    declined === 'P1_DECLINED'              ? 'declined' :
+                                              'error';
+  return { reason, at: story.updatedAt.toISOString() };
+}
+
 function deriveListState(
   status: StoryStatus,
   isCurrentMonth: boolean,
@@ -162,6 +175,7 @@ export async function storiesRoutes(app: FastifyInstance) {
       title:         isCurGenerated ? (curStoryDoc?.meta.title ?? null) : null,
       excerpt:       isCurGenerated ? (curStoryDoc?.shareMeta?.ogDescription ?? null) : null,
       coverImageUrl: isCurGenerated ? coverImageUrlOf(curStoryDoc) : null,
+      generationFailure: generationFailureOf(curStory),
     };
 
     // 历史月份（最多回溯到 child 出生所在月）

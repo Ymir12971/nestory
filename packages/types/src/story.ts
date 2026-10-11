@@ -72,6 +72,18 @@ export interface CurrentMonthStatus {
   /** Same source as StoryListItem.excerpt. */
   excerpt: string | null;
   coverImageUrl: string | null;
+  /**
+   * The last attempt at this month's Story, when it failed. A failed attempt
+   * leaves `listItemState` at `current_collecting`, so without this the client
+   * has nothing to tell the user after "Generate Now" comes back empty. `at`
+   * changes with every attempt — compare it, don't just test for presence: the
+   * row stays failed until the next try. Quota exhaustion is not reported here;
+   * it has its own `current_quota_exhausted` state.
+   */
+  generationFailure: {
+    reason: 'insufficient_moments' | 'declined' | 'error';
+    at: string;
+  } | null;
 }
 
 // Story watermark (stored in document, frozen at generation time per R-02)

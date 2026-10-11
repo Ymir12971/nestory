@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RemixIcon from 'react-native-remix-icon';
@@ -10,9 +10,16 @@ import { GlobalOffIcon } from '@/shared/components/GlobalOffIcon';
 import { SheetModal } from '@/shared/components/SheetModal';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
-import { useAssetMonths, useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
+import { queryClient, queryKeys, useAssetMonths, useChildren, useStories, useSubscription, useGenerateStoryNow } from '@/api';
 import { showToast } from '@/features/ui/toast';
 import { track } from '@/shared/lib/analytics';
+
+const GENERATION_WAIT_MS = 3 * 60_000;
+const GENERATION_FAILURE_COPY: Record<NonNullable<CurrentMonthStatus['generationFailure']>['reason'], string> = {
+  insufficient_moments: "There aren't enough moments for this month's Story yet. Add a few more and try again.",
+  declined: "We couldn't make a Story from this month's moments yet. Add a few more and try again.",
+  error: 'Something went wrong while creating your Story. Please try again.',
+};
 
 // ---------- Helpers ----------
 
@@ -292,6 +299,45 @@ export function StoriesScreen() {
     __DEV__ && regen ? regen : null,
   );
 
+  // A current-month "Generate Now" whose outcome hasn't shown up yet. A failed
+  // attempt puts the month straight back on `current_collecting`, so the only
+  // sign of it is a `generationFailure` newer than the one that was already
+  // there — remember that one and watch for a different `at`.
+  const [awaiting, setAwaiting] = useState<{ prevFailureAt: string | null; since: number } | null>(null);
+  const currentMonth = storiesQ.data?.currentMonth;
+  useEffect(() => {
+    if (!awaiting) return;
+    if (currentMonth?.listItemState === 'current_generated') {
+      setAwaiting(null);
+      // A free Story just spent quota; Settings reads the count from here.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+      return;
+    }
+    const failure = currentMonth?.generationFailure;
+    if (failure && failure.at !== awaiting.prevFailureAt) {
+      setAwaiting(null);
+      showToast({
+        type: failure.reason === 'error' ? 'error' : 'warning',
+        message: GENERATION_FAILURE_COPY[failure.reason],
+        duration: 5000,
+      });
+      return;
+    }
+    if (
+      currentMonth?.listItemState === 'current_quota_exhausted' ||
+      Date.now() - awaiting.since > GENERATION_WAIT_MS
+    ) {
+      setAwaiting(null);
+      return;
+    }
+    // The list only polls itself while it reports in-progress; an attempt that
+    // fails fast, or that the worker hasn't picked up yet, never gets there.
+    const timer = setTimeout(() => void storiesQ.refetch(), 4000);
+    return () => clearTimeout(timer);
+    // dataUpdatedAt/errorUpdatedAt: an unchanged refetch keeps the same
+    // `currentMonth` object, and the next poll still has to be scheduled.
+  }, [awaiting, currentMonth, storiesQ.dataUpdatedAt, storiesQ.errorUpdatedAt]);
+
   const handleGenerateNow = async (monthKey?: string) => {
     if (!activeChildId || generateNow.isPending) return;
     try {
@@ -299,6 +345,9 @@ export function StoriesScreen() {
         childId: activeChildId,
         ...(monthKey ? { monthKey } : {}),
       });
+      if (!monthKey) {
+        setAwaiting({ prevFailureAt: currentMonth?.generationFailure?.at ?? null, since: Date.now() });
+      }
       showToast({
         type: 'info',
         message: res.status === 'already_in_progress'
@@ -477,7 +526,7 @@ export function StoriesScreen() {
                   childName={childName}
                   onAddMoment={() => setAddEntryVisible(true)}
                   onGenerateNow={() => void handleGenerateNow()}
-                  generating={generateNow.isPending}
+                  generating={generateNow.isPending || awaiting != null}
                 />
               )}
               {current?.listItemState === 'current_in_progress' && (

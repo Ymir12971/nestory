@@ -152,6 +152,7 @@ export function fxCurrentMonth(over: Partial<CurrentMonthStatus> = {}): CurrentM
     title: null,
     excerpt: null,
     coverImageUrl: null,
+    generationFailure: null,
     ...over,
   };
 }
