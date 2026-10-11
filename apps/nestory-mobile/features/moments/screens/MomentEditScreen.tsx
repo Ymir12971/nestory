@@ -69,6 +69,7 @@ function EditForm({ moment }: { moment: Moment }) {
   const [newPhotos, setNewPhotos]             = useState<PickedPhoto[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
+  const [uploadedCount, setUploadedCount] = useState(0);
   const [deleting, setDeleting]   = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
@@ -126,10 +127,16 @@ function EditForm({ moment }: { moment: Moment }) {
       return;
     }
     setSaveError(null);
+    setUploadedCount(0);
     setSaving(true);
     try {
       const uploaded = newPhotos.length > 0
-        ? await Promise.all(newPhotos.map(p => uploadPhoto(p, 'memories')))
+        ? await Promise.all(newPhotos.map(p =>
+            uploadPhoto(p, 'memories').then(meta => {
+              setUploadedCount(n => n + 1);
+              return meta;
+            }),
+          ))
         : [];
 
       await updateAsset.mutateAsync({
@@ -171,7 +178,11 @@ function EditForm({ moment }: { moment: Moment }) {
         onBack={goBack}
         right={
           <Button
-            label={saving ? 'Saving…' : 'Save'}
+            label={
+              !saving ? 'Save' :
+              newPhotos.length > 1 ? `Saving ${uploadedCount}/${newPhotos.length}` :
+              'Saving…'
+            }
             type="small"
             disabled={saving || deleting}
             onPress={handleSave}

@@ -37,6 +37,9 @@ export function AddMomentScreen() {
   const [dateSheetVisible, setDateSheetVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Photos upload in parallel; several large ones take the better part of a
+  // minute, which a bare "Saving…" doesn't distinguish from a hang.
+  const [uploadedCount, setUploadedCount] = useState(0);
 
   // Redesign save rule: text is the ONLY activation condition — photos alone
   // can't save, text alone can (MOMENT_CONSTRAINTS.textRequiredToSave).
@@ -66,11 +69,15 @@ export function AddMomentScreen() {
       return;
     }
     setSaveError(null);
+    setUploadedCount(0);
     setSaving(true);
     try {
       const uploaded = await Promise.all(
         photos.map((p, i) =>
-          uploadPhoto(p, 'memories').then(meta => ({ ...meta, displayOrder: i })),
+          uploadPhoto(p, 'memories').then(meta => {
+            setUploadedCount(n => n + 1);
+            return { ...meta, displayOrder: i };
+          }),
         ),
       );
 
@@ -140,7 +147,11 @@ export function AddMomentScreen() {
         onBack={goBack}
         right={
           <Button
-            label={saving ? 'Saving…' : 'Save'}
+            label={
+              !saving ? 'Save' :
+              photos.length > 1 ? `Saving ${uploadedCount}/${photos.length}` :
+              'Saving…'
+            }
             type="small"
             disabled={!canSave}
             onPress={handleSave}
