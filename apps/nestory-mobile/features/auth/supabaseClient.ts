@@ -24,6 +24,12 @@ export function getSupabaseClient(): SupabaseClient | null {
       // OAuth callbacks come back through expo-auth-session, not through the
       // hash fragment that Supabase looks for on its own.
       detectSessionInUrl: Platform.OS === 'web',
+      // Native sign-in reads `?code=` off the redirect and exchanges it, which
+      // only exists in the PKCE flow. The client's default is implicit — tokens
+      // in the URL fragment, which the router drops — so without this a native
+      // Google sign-in came back with nothing to exchange and never completed.
+      // Web keeps the implicit flow that detectSessionInUrl handles.
+      flowType: Platform.OS === 'web' ? 'implicit' : 'pkce',
     },
   });
 

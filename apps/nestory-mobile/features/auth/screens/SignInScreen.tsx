@@ -12,7 +12,7 @@ import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 import { setDevSession, useSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient, isSupabaseAuthAvailable } from '@/features/auth/supabaseClient';
 import { identify, track } from '@/shared/lib/analytics';
-import { listChildren, queryClient, queryKeys } from '@/api';
+import { completeOAuthSignIn, noteOAuthStarted, oauthCodeFromUrl, routeAfterSignIn } from '@/features/auth/oauth';
 
 // Demo userId for the dev escape hatch (Supabase envs not configured); matches
 // the seed user in apps/nestory-api/prisma/seed.ts.
@@ -32,15 +32,11 @@ export function SignInScreen() {
   const [routing, setRouting] = useState(false);
   const busy = pendingProvider != null || emailPending || routing;
 
-  // Every real sign-in (email, native OAuth, and web OAuth — which navigates
-  // the whole page away and lands back here with the session already restored)
-  // is routed from here once the session appears. Dev sessions carry a null
-  // accessToken and are navigated by handleDevSignIn, so they don't trigger this.
-  //
-  // Only an account with no child goes through onboarding. A returning user
-  // sent there sees an empty profile form — it reads as lost data, and filling
-  // it in creates a duplicate child. If the lookup fails, fall back to
-  // onboarding rather than strand the user on this screen.
+  // A real sign-in that completes while this screen is up (email, and web
+  // OAuth — which navigates the whole page away and lands back here with the
+  // session already restored) is routed from here once the session appears.
+  // Dev sessions carry a null accessToken and are navigated by handleDevSignIn,
+  // so they don't trigger this. Where the user goes is routeAfterSignIn's call.
   //
   // `?preview=1` holds the screen still: while signed in this frame is
   // otherwise impossible to look at, because the redirect fires on mount. Dev
@@ -49,17 +45,11 @@ export function SignInScreen() {
   useEffect(() => {
     if (previewHold) return;
     if (!session?.accessToken) return;
-    let cancelled = false;
+    let mounted = true;
     setRouting(true);
-    queryClient
-      .fetchQuery({ queryKey: queryKeys.children, queryFn: listChildren, staleTime: 0 })
-      .then((children) => children.length > 0, () => false)
-      .then((hasChild) => {
-        if (cancelled) return;
-        router.replace(hasChild ? '/' : '/onboarding/privacy-claim');
-      });
-    return () => { cancelled = true; setRouting(false); };
-  }, [previewHold, session?.accessToken, router]);
+    void routeAfterSignIn().finally(() => { if (mounted) setRouting(false); });
+    return () => { mounted = false; };
+  }, [previewHold, session?.accessToken]);
 
   const blurFocus = () => {
     // Avoids React Navigation aria-hidden warning when a Pressable keeps focus.
@@ -104,21 +94,23 @@ export function SignInScreen() {
 
       // Native: open the URL Supabase returned and wait for the deep-link back.
       if (!data?.url) throw new Error('Supabase returned no auth URL');
+      noteOAuthStarted(provider);
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       if (result.type === 'cancel' || result.type === 'dismiss') {
-        // User closed the browser — silent, no error needed.
+        // The user closed the browser — or, on Android, the redirect brought
+        // the app forward before this call saw its URL. There the helper races
+        // the app-resume event against the link event and resume usually wins,
+        // so a finished sign-in reports "dismiss" too. The redirect still
+        // arrives as a deep link to "/", and app/index.tsx completes it.
         return;
       }
       if (result.type !== 'success' || !result.url) {
         throw new Error(`OAuth browser session ended unexpectedly (${result.type}). Check that the redirect URL is allowlisted in Supabase Dashboard.`);
       }
-      // PKCE: extract the ?code= from the deep link and exchange it for a session.
-      const code = new URL(result.url).searchParams.get('code');
+      // PKCE: the redirect carries ?code=, exchanged for a session.
+      const code = oauthCodeFromUrl(result.url);
       if (!code) throw new Error('Missing OAuth code in callback URL');
-      const { data: exch, error: exchErr } = await sb.auth.exchangeCodeForSession(code);
-      if (exchErr) throw exchErr;
-      if (exch?.session?.user?.id) identify(exch.session.user.id);
-      track('signup_success', { method: provider });
+      await completeOAuthSignIn(code);
     } catch (e: any) {
       setError(e?.message ?? 'Sign-in failed. Please try again.');
     } finally {
