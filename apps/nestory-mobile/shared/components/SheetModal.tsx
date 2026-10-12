@@ -6,10 +6,10 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 
 /**
  * The animated shell every bottom sheet in the app sits in.
@@ -24,6 +24,10 @@ import {
  * hand-rolled before, so a sheet taller than the window still overflows at the
  * TOP and keeps its CTA on screen. Callers keep their own sheet styling and
  * pass it in — this owns the Modal, the scrim and the transform, nothing else.
+ *
+ * The overlay is a KeyboardAvoider so a sheet with a field in it rides up with
+ * the keyboard. A Modal is its own window and nothing resizes it: the Delete
+ * Account sheet's "DELETE" field and both of its buttons sat under the keyboard.
  */
 const OPEN_MS = 240;
 const CLOSE_MS = 180;
@@ -73,7 +77,7 @@ export function SheetModal({
 
   return (
     <Modal visible={mounted} transparent animationType="none" onRequestClose={onRequestClose}>
-      <View style={s.overlay}>
+      <KeyboardAvoider style={s.overlay}>
         <Pressable style={[s.scrim, { backgroundColor: scrimColor }]} onPress={onRequestClose} />
         <Animated.View
           style={[sheetStyle, { transform: [{ translateY }] }]}
@@ -81,7 +85,7 @@ export function SheetModal({
         >
           {children}
         </Animated.View>
-      </View>
+      </KeyboardAvoider>
     </Modal>
   );
 }
