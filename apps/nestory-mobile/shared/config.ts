@@ -40,4 +40,11 @@ export const config = {
   supabaseUrl:     process.env.EXPO_PUBLIC_SUPABASE_URL     ?? '',
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
   revenueCatKey,
+  // "Continue with Apple" on Android. Off until the Apple provider is enabled
+  // in Supabase (Services ID + key in the Apple developer console): on Android
+  // the button goes through Supabase's web OAuth, and without the provider it
+  // opened a raw "provider is not enabled" error page. Set to true and ship an
+  // OTA once that is configured. iOS always shows the button — the App Store
+  // requires it wherever Google sign-in is offered — and ignores this flag.
+  appleSignInOnAndroid: false,
 } as const;

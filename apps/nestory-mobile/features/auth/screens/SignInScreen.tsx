@@ -7,6 +7,7 @@ import * as AuthSession from 'expo-auth-session';
 import RemixIcon from 'react-native-remix-icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
+import { config } from '@/shared/config';
 import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 import { setDevSession, useSession } from '@/features/auth/hooks/useSession';
 import { getSupabaseClient, isSupabaseAuthAvailable } from '@/features/auth/supabaseClient';
@@ -125,6 +126,7 @@ export function SignInScreen() {
     }
   };
 
+  const showApple = Platform.OS !== 'android' || config.appleSignInOnAndroid;
   const handleApplePress  = () => (supabaseReady ? handleOAuthSignIn('apple')  : handleDevSignIn());
   const handleGooglePress = () => (supabaseReady ? handleOAuthSignIn('google') : handleDevSignIn());
 
@@ -195,16 +197,18 @@ export function SignInScreen() {
           {/* Above the buttons, not below them: the form ends at the bottom
               edge of the screen, where the message landed under the gesture bar. */}
           {error && <Text style={styles.errorText}>{error}</Text>}
-          <Pressable
-            style={({ pressed }) => [styles.socialButton, (pressed || busy) && styles.pressed]}
-            onPress={handleApplePress}
-            disabled={busy}
-          >
-            <RemixIcon name="apple-fill" size={24} color={theme.text.brand} />
-            <Text style={styles.socialButtonLabel}>
-              {pendingProvider === 'apple' ? 'Signing in…' : 'Continue with Apple'}
-            </Text>
-          </Pressable>
+          {showApple && (
+            <Pressable
+              style={({ pressed }) => [styles.socialButton, (pressed || busy) && styles.pressed]}
+              onPress={handleApplePress}
+              disabled={busy}
+            >
+              <RemixIcon name="apple-fill" size={24} color={theme.text.brand} />
+              <Text style={styles.socialButtonLabel}>
+                {pendingProvider === 'apple' ? 'Signing in…' : 'Continue with Apple'}
+              </Text>
+            </Pressable>
+          )}
 
           <Pressable
             style={({ pressed }) => [styles.socialButton, (pressed || busy) && styles.pressed]}
