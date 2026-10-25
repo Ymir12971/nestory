@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchPlanPrices, type PlanPrices } from './purchases';
+import { fetchPlanPrices, isPurchasesAvailable, type PlanPrices } from './purchases';
 
 /**
  * Shown wherever a price belongs but the store hasn't given us one — on web, in
@@ -22,6 +22,13 @@ export interface PlanPricing {
 const UNKNOWN: PlanPrices = { yearly: null, monthly: null };
 
 /**
+ * Waits before asking again when a fetch comes back without both prices. A
+ * slow or flaky connection (the store or RevenueCat not answering yet) left
+ * the page on dashes until it was reopened; nothing tried again.
+ */
+const RETRY_DELAYS_MS = [2_000, 6_000];
+
+/**
  * Plan prices for the paywall surfaces. Every screen calls this rather than
  * printing a literal; RevenueCat's SDK caches offerings, so the repeat calls
  * cost nothing.
@@ -32,11 +39,25 @@ export function usePlanPricing(): PlanPricing {
 
   useEffect(() => {
     let cancelled = false;
-    fetchPlanPrices()
-      .then((next) => { if (!cancelled) setPrices(next); })
-      .catch(() => { if (!cancelled) setPrices(UNKNOWN); })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const load = (attempt: number) => {
+      fetchPlanPrices()
+        .catch(() => UNKNOWN)
+        .then((next) => {
+          if (cancelled) return;
+          setPrices(next);
+          setIsLoading(false);
+          const missing = !next.yearly || !next.monthly;
+          if (missing && isPurchasesAvailable() && attempt < RETRY_DELAYS_MS.length) {
+            retry = setTimeout(() => load(attempt + 1), RETRY_DELAYS_MS[attempt]);
+          }
+        });
+    };
+    load(0);
+    return () => {
+      cancelled = true;
+      if (retry) clearTimeout(retry);
+    };
   }, []);
 
   const { yearly, monthly } = prices;
