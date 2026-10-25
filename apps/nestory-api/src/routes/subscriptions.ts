@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type {
   Subscription,
   SubscriptionStatus,
@@ -9,6 +10,7 @@ import type {
 import { prisma, whereNotDeleted } from '../lib/prisma';
 import { ApiError, Errors } from '../lib/errors';
 import { audit } from '../lib/audit';
+import { parseBody } from '../lib/validation';
 import {
   deriveSubscriptionFromSubscriber,
   deriveSubscriptionUpdate,
@@ -18,6 +20,13 @@ import {
 } from '../lib/revenueCat';
 
 const HIGHLIGHT_LIMIT_FREE = 10;
+
+const purchaseFailedBody = z.object({
+  action:   z.enum(['purchase', 'restore']),
+  failure:  z.string().max(30),   // the app's category, e.g. 'not_allowed'
+  reason:   z.string().max(1000), // the store's own words, via RevenueCat
+  platform: z.enum(['ios', 'android']).optional(),
+});
 
 /**
  * Free 用户的 Premium 权益描述（ST-02B 展示用）
@@ -218,6 +227,32 @@ export async function subscriptionsRoutes(app: FastifyInstance) {
       req,
     });
     return { data: { applied: true } };
+  });
+
+  // POST /subscriptions/purchase-failed — the app's report of a purchase or
+  // restore the store refused. The user is shown a plain-language line; the
+  // store's own reason (e.g. RevenueCat's "The device or user is not allowed
+  // to make the purchase") is kept here, in audit_log beside the webhook's
+  // subscription_change rows, so "I couldn't pay" can be traced to a cause.
+  // A log only — nothing reads it back:
+  //
+  //   select created_at, user_id, metadata from audit_log
+  //   where action = 'purchase_failed' order by created_at desc;
+  app.post('/purchase-failed', {
+    config: {
+      rateLimit: { max: 20, timeWindow: '1 minute' },
+    },
+  }, async (req, reply) => {
+    const body = parseBody(purchaseFailedBody, req);
+    audit({
+      userId:    req.userId,
+      actorType: 'user',
+      action:    'purchase_failed',
+      resource:  'subscription',
+      metadata:  body,
+      req,
+    });
+    return reply.code(204).send();
   });
 
   // GET /subscriptions/paywall-config — A/B/C/D 配置（前端 PaywallModal 已硬编码 headlines/benefits，
