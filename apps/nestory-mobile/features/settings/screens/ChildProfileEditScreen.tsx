@@ -12,7 +12,7 @@ import { NavBar } from '@/shared/components/NavBar';
 import { useChild, useSubscription, useUpdateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { useGoBack } from '@/shared/hooks/useGoBack';
-import { decimalOnly, WEIGHT_MAX } from '@/shared/lib/numericInput';
+import { convertWeight, decimalOnly, WEIGHT_MAX } from '@/shared/lib/numericInput';
 
 type UnitSystem = 'metric' | 'imperial';
 
@@ -272,12 +272,8 @@ function EditForm({ child }: { child: Child }) {
             system={weightSystem}
             onToggle={() =>
               setWeightSystem((u) => {
-                // Toggling changes the unit, not the number (height converts,
-                // weight does not) — re-check against the new ceiling.
                 const next = u === 'metric' ? 'imperial' : 'metric';
-                setWeight((w) =>
-                  decimalOnly(w, 2, next === 'metric' ? WEIGHT_MAX.kg : WEIGHT_MAX.lb),
-                );
+                setWeight((w) => convertWeight(w, next === 'metric' ? 'kg' : 'lb'));
                 return next;
               })
             }

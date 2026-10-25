@@ -12,24 +12,38 @@ import { theme } from '@/shared/theme';
 const ITEM_H = 44;
 const VISIBLE = 5;
 
-/** Drum-roll wheel column (month/day/year, hour/minute, etc. — used by O-03b Birthday and H-02 Date & Time). */
+/**
+ * Drum-roll wheel column (month/day/year, hour/minute, etc. — used by O-03b
+ * Birthday and H-02 Date & Time).
+ *
+ * `flex` sets the column's share of the row: the month column needs more than
+ * an equal third, where the 28px selected row cut "September" to "Septem".
+ */
 export function WheelColumn({
   items,
   selectedIndex,
   onChange,
+  flex = 1,
 }: {
   items: string[];
   selectedIndex: number;
   onChange: (idx: number) => void;
+  flex?: number;
 }) {
   const ref = useRef<ScrollView>(null);
   // Idle-based snap: works on both native (momentum) and web (mouse wheel),
   // since `onMomentumScrollEnd` doesn't fire for desktop browser scroll events.
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Jump to the initial position on mount, then follow the parent whenever it
+  // moves the selection itself — the day wheel is pulled back from 31 to 30
+  // when the month changes to November. After the user's own snap this lands
+  // where the wheel already is.
+  const mountedRef = useRef(false);
   useEffect(() => {
-    ref.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
-  }, []); // scroll to initial position on mount only
+    ref.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: mountedRef.current });
+    mountedRef.current = true;
+  }, [selectedIndex]);
 
   useEffect(() => () => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -49,7 +63,7 @@ export function WheelColumn({
   );
 
   return (
-    <View style={styles.col}>
+    <View style={[styles.col, { flex }]}>
       <ScrollView
         ref={ref}
         style={styles.scroll}
@@ -65,6 +79,8 @@ export function WheelColumn({
           return (
             <View key={item} style={styles.item}>
               <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
                 style={
                   dist === 0
                     ? styles.selected
@@ -89,7 +105,7 @@ const styles = StyleSheet.create({
   col: { flex: 1, height: ITEM_H * VISIBLE },
   scroll: { flex: 1 },
   content: { paddingVertical: ITEM_H * 2 },
-  item: { height: ITEM_H, alignItems: 'center', justifyContent: 'center' },
+  item: { height: ITEM_H, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   selected: { ...theme.typography.h1, color: theme.text.primary },
   adjacent: { ...theme.typography.body, color: theme.text.secondary },
   outer: { ...theme.typography.body, color: theme.text.hint },

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  BackHandler,
   Image,
   View,
   Text,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import RemixIcon from 'react-native-remix-icon';
 import type { ChildCreate, ChildGender } from '@nestory/types';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
@@ -23,7 +24,8 @@ import { useCreateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { WheelColumn } from '@/shared/components/WheelColumn';
 import { useGoBack } from '@/shared/hooks/useGoBack';
-import { decimalOnly, WEIGHT_MAX } from '@/shared/lib/numericInput';
+import { convertWeight, decimalOnly, WEIGHT_MAX } from '@/shared/lib/numericInput';
+import { MONTHS, dayLabels, daysInMonth, pickerYears } from '@/shared/lib/calendar';
 
 // 2026-07 redesign (O-Child basic info → O-Child more Details → O-Relationship):
 //   step 0 basic    — avatar + name + birthday, ALL required; Continue → confirm sheet
@@ -110,13 +112,8 @@ const unitStyles = StyleSheet.create({
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
 const THIS_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 10 }, (_, i) => String(THIS_YEAR - 9 + i));
+const YEARS = pickerYears(THIS_YEAR);
 
 type Step = 0 | 1 | 2;
 type Gender = 'Girl' | 'Boy' | 'Prefer not to say' | null;
@@ -185,6 +182,12 @@ export function ChildProfileScreen() {
   );
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Covers the avatar upload as well as the create call. Keyed off the create
+  // mutation alone, Continue showed nothing for the 2-3s the upload took, and a
+  // second tap in that window saved the child twice. The ref is the guard (two
+  // taps can land before a re-render); the state drives the label.
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [birthdayConfirmVisible, setBirthdayConfirmVisible] = useState(preview && sheet === 'birthday');
 
   const onBack = () => {
@@ -192,10 +195,41 @@ export function ChildProfileScreen() {
     else setStep((s) => (s - 1) as Step);
   };
 
-  const formattedBirthday = `${MONTHS[monthIdx]} ${DAYS[dayIdx]}, ${YEARS[yearIdx]}`;
+  // The three steps are this screen's own state, not routes, so Android's back
+  // key/gesture closed the whole form from step 2 and dropped what was typed —
+  // adding a second child meant starting over. Past step 1 it now steps back,
+  // like the arrow above; iOS's edge swipe, which would do the same, is off.
+  useFocusEffect(
+    useCallback(() => {
+      if (step === 0) return;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (!savingRef.current) setStep((s) => (s - 1) as Step);
+        return true;
+      });
+      return () => sub.remove();
+    }, [step]),
+  );
+  const navigation = useNavigation();
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: step === 0 });
+  }, [navigation, step]);
 
-  const selectedBirthday = () =>
-    new Date(Number(YEARS[yearIdx]), monthIdx, Number(DAYS[dayIdx] ?? '1'));
+  // The day wheel lists only the month's real days; a shorter month pulls the
+  // day back to its last one. With 1-31 always on offer, November 31 sailed
+  // through the confirm sheet and failed on the server two steps later.
+  const days = dayLabels(Number(YEARS[yearIdx]), monthIdx);
+  const pickMonth = (m: number) => {
+    setMonthIdx(m);
+    setDayIdx((d) => Math.min(d, daysInMonth(Number(YEARS[yearIdx]), m) - 1));
+  };
+  const pickYear = (y: number) => {
+    setYearIdx(y);
+    setDayIdx((d) => Math.min(d, daysInMonth(Number(YEARS[y]), monthIdx) - 1));
+  };
+
+  const formattedBirthday = `${MONTHS[monthIdx]} ${dayIdx + 1}, ${YEARS[yearIdx]}`;
+
+  const selectedBirthday = () => new Date(Number(YEARS[yearIdx]), monthIdx, dayIdx + 1);
 
   // Basic step gate: avatar + name + birthday all required (annotation: 三项必填).
   const basicComplete = !!avatarPhoto && name.trim().length > 0 && birthdayTouched;
@@ -207,7 +241,7 @@ export function ChildProfileScreen() {
 
   const buildBody = (avatarUrl?: string): ChildCreate => {
     const month = String(monthIdx + 1).padStart(2, '0');
-    const day   = (DAYS[dayIdx] ?? '1').padStart(2, '0');
+    const day   = String(dayIdx + 1).padStart(2, '0');
     const year  = YEARS[yearIdx];
 
     const weightNum = parseFloat(weight);
@@ -233,7 +267,9 @@ export function ChildProfileScreen() {
   };
 
   const saveAndGoChildren = async () => {
-    if (createChild.isPending) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     setSaveError(null);
     try {
       const avatarUrl = avatarPhoto
@@ -246,6 +282,9 @@ export function ChildProfileScreen() {
       router.replace(fromSettings ? '/settings/profiles' : '/onboarding/children');
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to save profile. Please try again.');
+      // Stays set on success: the screen is on its way out.
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -408,13 +447,8 @@ export function ChildProfileScreen() {
                 system={weightSystem}
                 onToggle={() =>
                   setWeightSystem((u) => {
-                    // The toggle changes the unit, not the number (unlike
-                    // height, which converts) — so re-check the value against
-                    // the new ceiling, or 200 lb would survive as 200 kg.
                     const next = u === 'metric' ? 'imperial' : 'metric';
-                    setWeight((w) =>
-                      decimalOnly(w, 2, next === 'metric' ? WEIGHT_MAX.kg : WEIGHT_MAX.lb),
-                    );
+                    setWeight((w) => convertWeight(w, next === 'metric' ? 'kg' : 'lb'));
                     return next;
                   })
                 }
@@ -497,13 +531,14 @@ export function ChildProfileScreen() {
       <View style={[styles.cta, step !== 0 && styles.ctaTight]}>
         {saveError && <Text style={styles.errorText}>{saveError}</Text>}
         <Button
-          label={createChild.isPending ? 'Saving…' : 'Continue'}
+          label={saving ? 'Saving…' : 'Continue'}
           onPress={onContinue}
           disabled={ctaDisabled}
         />
         {step === 1 && (
           <Pressable
             style={styles.skipBtn}
+            disabled={saving}
             onPress={() => {
               // Skip = discard this page's inputs entirely (annotation: 全部当空内容).
               // reset() clears cm/ft/inches together — clearing just the field
@@ -529,11 +564,11 @@ export function ChildProfileScreen() {
       >
         <View style={sheetSection.body}>
           <View style={styles.datePicker}>
-            <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={setMonthIdx} />
+            <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={pickMonth} flex={1.8} />
             <View style={styles.colDivider} />
-            <WheelColumn items={DAYS} selectedIndex={dayIdx} onChange={setDayIdx} />
+            <WheelColumn items={days} selectedIndex={dayIdx} onChange={setDayIdx} />
             <View style={styles.colDivider} />
-            <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={setYearIdx} />
+            <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={pickYear} flex={1.2} />
           </View>
         </View>
         <View style={sheetSection.cta}>

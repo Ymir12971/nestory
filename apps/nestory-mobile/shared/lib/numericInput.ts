@@ -50,12 +50,26 @@ export function decimalOnly(value: string, places = 2, max?: number): string {
 }
 
 /**
- * Bounds for the child profile fields. The birthday picker only offers the
- * last ten years, so these describe a child aged 0-10 with generous headroom:
- * 7'11" is about 241cm. Inches stops at 11 because twelve of them is a foot —
- * that one is arithmetic, not a product call.
+ * Bounds for the child profile fields. The birthday picker offers the last
+ * eighteen years (PICKER_YEAR_SPAN), so these describe a child up to 17 with
+ * generous headroom: 7'11" is about 241cm. Inches stops at 11 because twelve
+ * of them is a foot — that one is arithmetic, not a product call.
  */
 export const HEIGHT_MAX = { cm: 250, ft: 7, inches: 11 } as const;
 
-/** Same reasoning for weight: a child aged 0-10, with room to spare. */
-export const WEIGHT_MAX = { kg: 100, lb: 220 } as const;
+/** Same reasoning for weight. Both ceilings are the same weight (150 kg ≈ 331 lb), so a conversion never trips one. */
+export const WEIGHT_MAX = { kg: 150, lb: 331 } as const;
+
+const LB_PER_KG = 2.20462;
+
+/**
+ * The weight field's text re-expressed in the other unit, rounded to the two
+ * places the column holds — the unit toggle converts, as height's does. Blank
+ * or not-yet-a-number text is left alone.
+ */
+export function convertWeight(value: string, to: 'kg' | 'lb'): string {
+  const n = parseFloat(value);
+  if (!Number.isFinite(n) || n <= 0) return value;
+  const converted = to === 'lb' ? n * LB_PER_KG : n / LB_PER_KG;
+  return String(Math.min(Math.round(converted * 100) / 100, WEIGHT_MAX[to]));
+}

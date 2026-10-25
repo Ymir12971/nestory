@@ -3,19 +3,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { theme } from '@/shared/theme';
 import { SheetModal } from '@/shared/components/SheetModal';
 import { WheelColumn } from '@/shared/components/WheelColumn';
+import { MONTHS, dayLabels, daysInMonth, pickerYears } from '@/shared/lib/calendar';
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1));
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 const MERIDIEM = ['AM', 'PM'];
-
-function yearsUpTo(year: number, span = 6): string[] {
-  return Array.from({ length: span }, (_, i) => String(year - span + 1 + i));
-}
 
 interface DateTimePickerSheetProps {
   visible:   boolean;
@@ -27,7 +19,7 @@ interface DateTimePickerSheetProps {
 /** Bottom sheet for picking the Moment's capture date & time (H-02). */
 export function DateTimePickerSheet({ visible, value, onConfirm, onDismiss }: DateTimePickerSheetProps) {
   const now = new Date();
-  const YEARS = yearsUpTo(now.getFullYear());
+  const YEARS = pickerYears(now.getFullYear());
 
   const [monthIdx, setMonthIdx]     = useState(value.getMonth());
   const [dayIdx, setDayIdx]         = useState(value.getDate() - 1);
@@ -46,6 +38,19 @@ export function DateTimePickerSheet({ visible, value, onConfirm, onDismiss }: Da
     setMinuteIdx(value.getMinutes());
     setMeridiemIdx(value.getHours() >= 12 ? 1 : 0);
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The day wheel only lists the month's real days. Moving to a shorter month
+  // pulls the day back to its last one — November 31 used to roll over to
+  // December 1, which this year is in the future and got saved as "now".
+  const days = dayLabels(Number(YEARS[yearIdx]), monthIdx);
+  const pickMonth = (m: number) => {
+    setMonthIdx(m);
+    setDayIdx((d) => Math.min(d, daysInMonth(Number(YEARS[yearIdx]), m) - 1));
+  };
+  const pickYear = (y: number) => {
+    setYearIdx(y);
+    setDayIdx((d) => Math.min(d, daysInMonth(Number(YEARS[y]), monthIdx) - 1));
+  };
 
   const handleConfirm = () => {
     let hour24 = hourIdx + 1; // 1-12
@@ -73,11 +78,11 @@ export function DateTimePickerSheet({ visible, value, onConfirm, onDismiss }: Da
       </View>
 
       <View style={styles.wheelRow}>
-        <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={setMonthIdx} />
+        <WheelColumn items={MONTHS} selectedIndex={monthIdx} onChange={pickMonth} flex={1.8} />
         <View style={styles.colDivider} />
-        <WheelColumn items={DAYS} selectedIndex={dayIdx} onChange={setDayIdx} />
+        <WheelColumn items={days} selectedIndex={dayIdx} onChange={setDayIdx} />
         <View style={styles.colDivider} />
-        <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={setYearIdx} />
+        <WheelColumn items={YEARS} selectedIndex={yearIdx} onChange={pickYear} flex={1.2} />
       </View>
 
       <View style={styles.wheelRow}>
