@@ -17,6 +17,7 @@ export type AnalyticsEvent =
   | 'subscribe_success'       // { cycle: 'monthly' | 'yearly'; source: string }
   | 'subscription_cancelled'  // { reason?: string; otherText?: string }
   | 'subscription_restored'   // {} — Guideline 3.1.1 restore that actually found a purchase
+  | 'purchase_failed'         // { action: 'purchase' | 'restore'; failure: string; reason: string }
   | 'story_regenerated';      // { monthKey: string }
 
 const KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY ?? '';

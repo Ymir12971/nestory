@@ -10,6 +10,7 @@ import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { queryClient, queryKeys } from '@/api';
 import { purchasePlan, isPurchasesAvailable } from '@/features/billing/purchases';
+import { purchaseErrorMessage } from '@/features/billing/purchaseErrors';
 import { useChildren } from '@/api';
 import { track } from '@/shared/lib/analytics';
 import { usePlanPricing } from '@/features/billing/usePlanPricing';
@@ -65,8 +66,7 @@ export function PlanScreen() {
       // 'cancelled' → stay on screen, let the user choose again.
     } catch (e) {
       // Payment failure → toast, stay here (annotation: 支付失败 toast 提示).
-      const msg = e instanceof Error ? e.message : 'Please try again.';
-      showToast({ type: 'error', message: `Purchase failed: ${msg}` });
+      showToast({ type: 'error', message: purchaseErrorMessage(e), duration: 5000 });
     } finally {
       setPurchasing(false);
     }

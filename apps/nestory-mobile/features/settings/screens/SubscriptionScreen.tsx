@@ -20,6 +20,7 @@ import {
   openManageSubscriptions,
   isPurchasesAvailable,
 } from '@/features/billing/purchases';
+import { purchaseErrorMessage } from '@/features/billing/purchaseErrors';
 import { track } from '@/shared/lib/analytics';
 import { showToast } from '@/features/ui/toast';
 import { isOpenEndedExpiry } from '@/shared/lib/subscription';
@@ -80,8 +81,7 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
         showToast({ type: 'success', message: 'Welcome to Premium!' });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Please try again.';
-      showToast({ type: 'error', message: `Purchase failed: ${msg}` });
+      showToast({ type: 'error', message: purchaseErrorMessage(e), duration: 5000 });
     } finally {
       setPurchasing(false);
     }
@@ -116,8 +116,11 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
         message: 'No active subscription found for this store account.',
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Please try again.';
-      showToast({ type: 'error', message: `Restore failed: ${msg}` });
+      showToast({
+        type: 'error',
+        message: purchaseErrorMessage(e, "Couldn't restore your purchases. Please try again."),
+        duration: 5000,
+      });
     } finally {
       setRestoring(false);
     }

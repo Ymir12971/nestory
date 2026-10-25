@@ -3,9 +3,18 @@
 // web stub in purchases.ts (the TypeScript source of truth).
 
 import { Linking, Platform } from 'react-native';
-import Purchases, { LOG_LEVEL, type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
+import Purchases, {
+  LOG_LEVEL,
+  PURCHASES_ERROR_CODE,
+  type CustomerInfo,
+  type PurchasesError,
+  type PurchasesPackage,
+} from 'react-native-purchases';
+import { reportPurchaseFailure } from '@/api/subscriptions';
 import { config } from '@/shared/config';
+import { track } from '@/shared/lib/analytics';
 import type { PlanPrice, PlanPrices, PurchaseCycle, PurchaseResult, RestoreResult } from './purchases';
+import { PurchaseError, type PurchaseFailure } from './purchaseErrors';
 
 let _configured = false;
 
@@ -64,19 +73,56 @@ export async function fetchPlanPrices(): Promise<PlanPrices> {
   return { yearly: read(current?.annual), monthly: read(current?.monthly) };
 }
 
+const FAILURE_BY_CODE: Partial<Record<PURCHASES_ERROR_CODE, PurchaseFailure>> = {
+  [PURCHASES_ERROR_CODE.PURCHASE_NOT_ALLOWED_ERROR]:               'not_allowed',
+  [PURCHASES_ERROR_CODE.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR]: 'unavailable',
+  [PURCHASES_ERROR_CODE.CONFIGURATION_ERROR]:                      'unavailable',
+  [PURCHASES_ERROR_CODE.NETWORK_ERROR]:                            'network',
+  [PURCHASES_ERROR_CODE.OFFLINE_CONNECTION_ERROR]:                 'network',
+  [PURCHASES_ERROR_CODE.PRODUCT_REQUEST_TIMED_OUT_ERROR]:          'network',
+  [PURCHASES_ERROR_CODE.STORE_PROBLEM_ERROR]:                      'store',
+  [PURCHASES_ERROR_CODE.PRODUCT_ALREADY_PURCHASED_ERROR]:          'already_owned',
+  [PURCHASES_ERROR_CODE.RECEIPT_ALREADY_IN_USE_ERROR]:             'other_account',
+  [PURCHASES_ERROR_CODE.RECEIPT_IN_USE_BY_OTHER_SUBSCRIBER_ERROR]: 'other_account',
+  [PURCHASES_ERROR_CODE.PAYMENT_PENDING_ERROR]:                    'pending',
+};
+
+/**
+ * The one place a store failure is turned into what the user reads. The
+ * store's own reason goes to the server's audit_log (and the device log)
+ * instead of the screen.
+ */
+function failed(action: 'purchase' | 'restore', failure: PurchaseFailure, reason: string): PurchaseError {
+  console.warn(`[billing] ${action} failed (${failure}): ${reason}`);
+  track('purchase_failed', { action, failure, reason });
+  reportPurchaseFailure({ action, failure, reason, platform: Platform.OS === 'ios' ? 'ios' : 'android' });
+  return new PurchaseError(failure, reason);
+}
+
+function fromStoreError(action: 'purchase' | 'restore', e: unknown): PurchaseError {
+  const err = (e ?? {}) as Partial<PurchasesError>;
+  const reason =
+    [err.userInfo?.readableErrorCode ?? err.code, err.message, err.underlyingErrorMessage]
+      .filter(Boolean)
+      .join(' · ') || String(e);
+  return failed(action, (err.code && FAILURE_BY_CODE[err.code]) || 'unknown', reason);
+}
+
 export async function purchasePlan(cycle: PurchaseCycle): Promise<PurchaseResult> {
   if (!isPurchasesAvailable()) {
     throw new Error('In-app purchases are not available on this platform.');
   }
   await initPurchases();
 
-  const offerings = await Purchases.getOfferings();
-  const current = offerings.current;
-  if (!current) throw new Error('No subscription offerings are configured yet.');
-
-  const pkg: PurchasesPackage | null =
-    cycle === 'yearly' ? current.annual : current.monthly;
-  if (!pkg) throw new Error(`The ${cycle} plan isn't available right now.`);
+  let pkg: PurchasesPackage | null;
+  try {
+    const current = (await Purchases.getOfferings()).current;
+    if (!current) throw failed('purchase', 'unavailable', 'no current offering');
+    pkg = cycle === 'yearly' ? current.annual : current.monthly;
+  } catch (e) {
+    throw e instanceof PurchaseError ? e : fromStoreError('purchase', e);
+  }
+  if (!pkg) throw failed('purchase', 'unavailable', `no ${cycle} package in the current offering`);
 
   try {
     await Purchases.purchasePackage(pkg);
@@ -85,7 +131,7 @@ export async function purchasePlan(cycle: PurchaseCycle): Promise<PurchaseResult
     if (e && typeof e === 'object' && (e as { userCancelled?: boolean }).userCancelled) {
       return { status: 'cancelled' };
     }
-    throw e;
+    throw fromStoreError('purchase', e);
   }
 }
 
@@ -106,7 +152,12 @@ export async function restorePurchases(): Promise<RestoreResult> {
   }
   await initPurchases();
 
-  const info: CustomerInfo = await Purchases.restorePurchases();
+  let info: CustomerInfo;
+  try {
+    info = await Purchases.restorePurchases();
+  } catch (e) {
+    throw fromStoreError('restore', e);
+  }
   const hasActive = Object.keys(info.entitlements.active).length > 0;
   return { status: hasActive ? 'restored' : 'nothing_to_restore' };
 }

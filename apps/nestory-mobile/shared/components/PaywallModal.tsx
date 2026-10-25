@@ -7,6 +7,7 @@ import { theme } from '@/shared/theme';
 import { track } from '@/shared/lib/analytics';
 import { usePlanPricing } from '@/features/billing/usePlanPricing';
 import { isPurchasesAvailable, purchasePlan } from '@/features/billing/purchases';
+import { purchaseErrorMessage } from '@/features/billing/purchaseErrors';
 import { showToast } from '@/features/ui/toast';
 import { queryClient, queryKeys } from '@/api';
 
@@ -64,8 +65,7 @@ export function PaywallModal({ visible, onSubscribe, onDismiss, source }: Paywal
       }
       // 'cancelled' → stay on the sheet, let the user choose again.
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Please try again.';
-      setError(`Purchase failed: ${msg}`);
+      setError(purchaseErrorMessage(e));
     } finally {
       setPurchasing(false);
     }
