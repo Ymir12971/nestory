@@ -39,12 +39,16 @@ const generateNowSchema = z.object({
 
 /**
  * The list card's cover. v2 keeps it in `meta.coverImageUrl`; v3 has no such
- * field — its cover photo lives on the cover section, and is null for Cover-B
- * (the card then shows its placeholder).
+ * field — its cover photo lives on the cover section. That is null for Cover-B,
+ * whose H5 opens on a gradient instead, but the card is a photo slot and showed
+ * an empty green block (Vicol 2026-10-26), so it takes the Story's first photo.
  */
 function coverImageUrlOf(doc: AnyStoryDocument | null | undefined): string | null {
   if (!doc) return null;
-  return (isStoryDocumentV3(doc) ? doc.cover.coverPhotoUrl : doc.meta.coverImageUrl) || null;
+  if (!isStoryDocumentV3(doc)) return doc.meta.coverImageUrl || null;
+  return doc.cover.coverPhotoUrl
+    || doc.body.flatMap(c => c.blocks).flatMap(b => b.photos)[0]?.url
+    || null;
 }
 
 function generationFailureOf(
