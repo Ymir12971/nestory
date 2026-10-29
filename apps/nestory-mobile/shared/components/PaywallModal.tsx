@@ -9,7 +9,7 @@ import { usePlanPricing } from '@/features/billing/usePlanPricing';
 import { isPurchasesAvailable, purchasePlan } from '@/features/billing/purchases';
 import { purchaseErrorMessage } from '@/features/billing/purchaseErrors';
 import { showToast } from '@/features/ui/toast';
-import { queryClient, queryKeys } from '@/api';
+import { syncSubscriptionAfterPurchase } from '@/api';
 
 // global-Paywall (Figma 775:1819) — the single paywall for the whole app.
 // The old contextual A/B/C/D variants are gone (2026-07 redesign, 模型 X 废弃);
@@ -58,7 +58,7 @@ export function PaywallModal({ visible, onSubscribe, onDismiss, source }: Paywal
     try {
       const res = await purchasePlan(plan);
       if (res.status === 'purchased') {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        await syncSubscriptionAfterPurchase();
         track('subscribe_success', { cycle: plan, source: source ?? 'paywall' });
         onSubscribe(cycle);
         showToast({ type: 'success', message: 'Welcome to Premium!' });

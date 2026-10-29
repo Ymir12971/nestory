@@ -6,7 +6,13 @@ import RemixIcon from 'react-native-remix-icon';
 import { useRouter } from 'expo-router';
 import type { Subscription } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
-import { useSubscription, refreshMySubscription, queryClient, queryKeys } from '@/api';
+import {
+  useSubscription,
+  refreshMySubscription,
+  syncSubscriptionAfterPurchase,
+  queryClient,
+  queryKeys,
+} from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { PremiumCrown } from '@/shared/components/PremiumCrown';
@@ -75,8 +81,7 @@ function FreePlanContent({ sub, router }: { sub: Subscription; router: ReturnTyp
     try {
       const res = await purchasePlan(cycle);
       if (res.status === 'purchased') {
-        // Refresh — once the webhook flips the row, this screen re-renders to Premium.
-        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        await syncSubscriptionAfterPurchase();
         track('subscribe_success', { cycle, source: 'settings' });
         showToast({ type: 'success', message: 'Welcome to Premium!' });
       }
@@ -664,10 +669,13 @@ const styles = StyleSheet.create({
   blobTopLeft: { left: -42, top: -49, width: 140, height: 140, backgroundColor: '#f8aa14' },
   blobRight: { left: 285, top: 82, width: 63, height: 63, backgroundColor: '#f9b21a' },
   blobTopRight: { left: 255, top: -11, width: 36, height: 36, backgroundColor: '#f9b21a' },
+  // Inset like the rows above it — it sat flush on the card's bottom edge.
   billingNote: {
     ...theme.typography.caption,
     color: theme.text.secondary,
     textAlign: 'center',
+    paddingHorizontal: theme.spacing.l,
+    paddingBottom: theme.spacing.l,
   },
   billingIssueCard: {
     backgroundColor: theme.surface.warningSubtle,

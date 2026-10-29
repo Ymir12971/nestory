@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Subscription } from '@nestory/types';
 import { apiFetch } from './client';
-import { queryKeys } from './queryClient';
+import { queryClient, queryKeys } from './queryClient';
 
 export async function getMySubscription(): Promise<Subscription> {
   const res = await apiFetch<{ data: Subscription }>('/subscriptions/me');
@@ -39,4 +39,26 @@ export async function refreshMySubscription(): Promise<{ applied: boolean }> {
     method: 'POST',
   });
   return res.data;
+}
+
+const PURCHASE_FOLLOW_UP_MS = [5_000, 15_000, 30_000];
+
+/**
+ * Bring the app's plan up to date once the store has confirmed a purchase.
+ *
+ * Our row is written by RevenueCat's webhook, which lands a few seconds after
+ * the store sheet closes. Re-reading /subscriptions/me straight away still
+ * answered Free, and screens that stay mounted — Home's profile switcher —
+ * went on offering "Upgrade to Premium" until something else refetched. So ask
+ * the server to pull the purchase from RevenueCat first; if that call fails,
+ * look again a few times while the webhook arrives.
+ */
+export async function syncSubscriptionAfterPurchase(): Promise<void> {
+  const reread = () => queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+  try {
+    await refreshMySubscription();
+  } catch {
+    PURCHASE_FOLLOW_UP_MS.forEach((ms) => setTimeout(() => void reread(), ms));
+  }
+  await reread();
 }

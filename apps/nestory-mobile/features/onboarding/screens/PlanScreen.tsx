@@ -8,7 +8,7 @@ import { Button } from '@/shared/components/Button';
 import { NavBar } from '@/shared/components/NavBar';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
-import { queryClient, queryKeys } from '@/api';
+import { syncSubscriptionAfterPurchase } from '@/api';
 import { purchasePlan, isPurchasesAvailable } from '@/features/billing/purchases';
 import { purchaseErrorMessage } from '@/features/billing/purchaseErrors';
 import { useChildren } from '@/api';
@@ -57,8 +57,7 @@ export function PlanScreen() {
     try {
       const res = await purchasePlan(plan);
       if (res.status === 'purchased') {
-        // Webhook updates the backend async; refresh so the app reflects premium.
-        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription });
+        await syncSubscriptionAfterPurchase();
         track('subscribe_success', { cycle: plan, source: 'onboarding' });
         track('onboarding_complete', { profileCount, plan: 'premium' });
         router.replace(`/welcome-premium?cycle=${cycle}&from=onboarding`);
