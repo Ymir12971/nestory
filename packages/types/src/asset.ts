@@ -40,6 +40,7 @@ export interface MomentCreate {
 // PATCH /assets/:id — multipart/form-data
 export interface MomentPatch {
   textNote?: string;
+  capturedAt?: string;      // ISO 8601; Premium only
   isHighlight?: boolean;
   // addPhotos: File[]       // append to asset_files, display_order continues
   // removeFileIds: string[] // asset_files.id list to delete

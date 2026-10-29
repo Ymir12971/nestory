@@ -32,6 +32,7 @@ const momentCreateSchema = z.object({
 // Highlight toggle 走 POST /highlights（配额校验），不在 PATCH 里处理
 const momentPatchSchema = z.object({
   textNote:        z.string().max(MOMENT_CONSTRAINTS.maxTextChars).optional(),
+  capturedAt:      z.string().datetime().optional(), // Premium only
   addFiles:        z.array(fileInputSchema).optional(),
   removeFileIds:   z.array(z.string().uuid()).optional(),
   reorderFileIds:  z.array(z.string().uuid()).optional(),
@@ -316,7 +317,8 @@ export async function assetsRoutes(app: FastifyInstance) {
     };
   });
 
-  // PATCH /assets/:id — 当月人人可编辑;过往月仅 Premium(2026-07 新规,旧 R-08 废止)
+  // PATCH /assets/:id — 当月人人可编辑;过往月仅 Premium(2026-07 新规,旧 R-08 废止)。
+  // 改日期(capturedAt)也仅 Premium(Vicol 2026-10-26)。
   app.patch('/:id', async (req) => {
     const { id } = parseParams(uuidParam, req);
     const body   = parseBody(momentPatchSchema, req);
@@ -328,7 +330,10 @@ export async function assetsRoutes(app: FastifyInstance) {
     if (!existing) throw Errors.notFound('Moment', id);
 
     const tz = await getUserTimezone(req.userId);
-    if (!isCurrentMonth(existing.capturedAt, tz)) {
+    const newCapturedAt = body.capturedAt !== undefined ? new Date(body.capturedAt) : null;
+    const dateChanged   = newCapturedAt !== null && newCapturedAt.getTime() !== existing.capturedAt.getTime();
+    const pastMonth     = !isCurrentMonth(existing.capturedAt, tz);
+    if (pastMonth || dateChanged) {
       const sub = await prisma.subscription.findUnique({
         where:  { userId: req.userId },
         select: { subscriptionStatus: true },
@@ -339,10 +344,18 @@ export async function assetsRoutes(app: FastifyInstance) {
       if (!isPremium) {
         throw new ApiError(
           'MOMENT_EDIT_RESTRICTED',
-          'Editing past-month moments requires Premium',
+          pastMonth ? 'Editing past-month moments requires Premium' : "Changing a moment's date requires Premium",
           403,
         );
       }
+    }
+    // 同 POST:captured_at 不能是未来 5 分钟以上
+    if (dateChanged && newCapturedAt.getTime() > Date.now() + 5 * 60 * 1000) {
+      throw new ApiError(
+        'INVALID_CAPTURED_AT_FUTURE',
+        'capturedAt cannot be more than 5 minutes in the future',
+        422,
+      );
     }
 
     // mutex: addFiles 与 reorderFileIds 互斥
@@ -363,6 +376,7 @@ export async function assetsRoutes(app: FastifyInstance) {
     const updated = await prisma.$transaction(async (tx) => {
       const data: any = {};
       if (body.textNote        !== undefined) data.textNote = body.textNote;
+      if (dateChanged)                         data.capturedAt = newCapturedAt;
 
       if (Object.keys(data).length > 0) {
         await tx.rawAsset.update({ where: { id }, data });
@@ -416,13 +430,17 @@ export async function assetsRoutes(app: FastifyInstance) {
     });
 
     await stampStoryMomentsChanged(updated.childId, updated.capturedAt, tz);
+    // 改日期跨了月:原来那个月的 Story 也少了这条 moment
+    if (toMonthKey(existing.capturedAt, tz) !== toMonthKey(updated.capturedAt, tz)) {
+      await stampStoryMomentsChanged(existing.childId, existing.capturedAt, tz);
+    }
     // 新增的照片同样走质量打标(已处理过的有 qualityTier,worker 幂等跳过)
     enqueuePhotoPreprocess(updated.files.map(f => f.id));
 
     return {
       data: serializeMoment({
         ...updated,
-        __isEditable: true,
+        __isEditable: isCurrentMonth(updated.capturedAt, tz),
       }),
     };
   });
