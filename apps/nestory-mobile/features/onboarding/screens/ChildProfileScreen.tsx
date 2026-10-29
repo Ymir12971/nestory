@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: theme.spacing.xl,
     paddingVertical: theme.spacing.l,
-    paddingBottom: 120,
+    paddingBottom: theme.spacing.safeBtm, // page bodies end 34 above the bottom (Vicol 2026-10-26)
     // title pb 16 + body pt 16 between the heading block and the fields
     gap: 32,
   },

@@ -669,7 +669,10 @@ const styles = StyleSheet.create({
   timeline: {
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.l,
-    paddingBottom: 196, // clears the floating CTA + tab bar (731:1467)
+    // The CTA block below is in the flow, not floating over the list, so the
+    // 196 that "cleared" it only left a long empty drag at the end (Vicol
+    // 2026-10-26: every page body ends 34 above its bottom edge).
+    paddingBottom: theme.spacing.safeBtm,
   },
   dayGroup: {
     flexDirection: 'row',
