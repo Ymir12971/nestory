@@ -86,7 +86,7 @@ export interface CurrentMonthStatus {
   } | null;
 }
 
-// Story watermark (stored in document, frozen at generation time per R-02)
+// Story watermark (stored in document at generation time; the share page also drops it while the owner is Premium, R-02)
 export interface StoryWatermark {
   enabled: boolean;
   text: string;  // e.g. "Made with Nestory"

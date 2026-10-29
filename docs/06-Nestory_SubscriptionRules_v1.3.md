@@ -74,7 +74,7 @@
 | #    | 规则域             | Never Paid                                        | Trial / Premium Active               | Ended（Trial Ended / Premium Ended）                                                                                                                  |
 | ---- | --------------- | ------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R-01 | Story 生成        | 配额模型，初始 2 份；每月底生成消耗 1 份；归零后不再生成                   | 每月生成，无限制                             | 配额 = 0，不重置，不生成                                                                                                                                      |
-| R-02 | Story 水印        | 带 Nestory 水印                                      | 无水印                                  | 已生成 Story 保持原状态（付费/Trial 期间无水印永久无水印；Free 期间带水印永久带水印）                                                                                                |
+| R-02 | Story 水印        | 带 Nestory 水印                                      | 无水印                                  | 付费/Trial 期间生成的永久无水印；Free 期间生成的，作者付费时分享无水印，否则带水印                                                                                                |
 | R-03 | 已生成 Story 访问    | ✅ 可阅读所有已生成 Story                                  | ✅ 可阅读                                | ✅ 可阅读所有已生成 Story（不锁定、不回收）                                                                                                                           |
 | R-04 | Highlights      | 上限 10 个；Locked 态预告 caption + 点 toggle → Paywall B | 无限制                                  | 同 Never Paid（count ≥ 10 不可新增）；已超 10 个的保留展示；Locked caption 文案切 Ended 版                                                                               |
 | R-05 | 孩子档案            | 1 个活跃档案；Profile Switcher 非活跃档案置灰（创建不限制）           | 无限制                                  | **所有档案保留且可切换**（不置灰，兑现"数据不伤害"）；底部 CTA 指向 Renew Premium → Paywall D                                                                                   |
@@ -148,13 +148,14 @@ Story 生成时根据用户身份决定是否添加水印。
 - `subscription_status in (trial_active, premium_active)` → 生成无水印 Story
 - `subscription_status == never_paid && story_quota > 0` → 生成带水印 Story
 - `subscription_status in (trial_ended, premium_ended)` → 不生成（详见 R-01）
-- Story 一旦生成，其水印状态**永久锁定**，不因后续身份变化而改变
+- Story 生成时写入的水印状态不再修改
+- 分享页展示时：生成时带水印 **且** 作者当前不是 `trial_active / premium_active` 才显示水印（2026-10-29 修订：付费用户的分享链接不应带水印）
 
 ### 用户体验
 
-- `Never Paid` 用户：S-02 Story Detail 内容带 Nestory 水印；分享链接同样带水印
-- `Trial/Premium Active` 用户：无水印
-- `Ended` 用户：付费/Trial 期间生成的 Story 永久无水印；Free 期间生成的 Story 永久带水印
+- `Never Paid` 用户：分享链接带 Nestory 水印（App 内阅读本来就不显示水印）
+- `Trial/Premium Active` 用户：所有 Story 的分享链接都无水印，包括 Free 期间生成的
+- `Ended` 用户：付费/Trial 期间生成的 Story 永久无水印；Free 期间生成的 Story 恢复带水印
 
 ---
 
@@ -566,7 +567,7 @@ Free 用户在以下入口尝试切换或添加孩子档案：
 | 规则                 | 前端拦截                                                                                                                                                                                                                                   | 后端拦截                                                                                         | 说明                                                                          |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | R-01 Story 生成      | —                                                                                                                                                                                                                                      | ✅ 生成任务判断                                                                                     | 纯后端逻辑，前端仅展示结果                                                               |
-| R-02 Story 水印      | —                                                                                                                                                                                                                                      | ✅ 生成时写入                                                                                      | 水印状态随 Story 持久化，不动态计算                                                       |
+| R-02 Story 水印      | —                                                                                                                                                                                                                                      | ✅ 生成时写入                                                                                      | 生成时状态随 Story 持久化；分享页再按作者当前身份去掉                                                       |
 | R-03 Story 访问      | —                                                                                                                                                                                                                                      | —                                                                                            | 无需校验，所有已生成 Story 均开放访问                                                      |
 | R-04               | ✅ Highlight 行 Locked 态渲染（toggle 视觉不置灰、无 lock 图标、caption 两版文案按 `{kind}` 运行时切）+ 点击 toggle 弹 Paywall B；HL-01 `topNotify · States` 4 scenario 按 `subscription_status` + `highlight_count` 切换显隐                                             | ✅ Save 时校验 + 删除接口                                                                            | 双重校验；v1.3 改为**Locked caption 预告式**（非静默拦截）；HL-02 Remove 操作需后端更新 count        |
 | R-05               | ✅ Profile Switcher 三变体切换（Free / Premium / Ended）；Ended 非活跃档案保持半透明但**可点击**；ST-03a `+ Add Child` 按钮所有订阅状态均可点击（不做 disabled）；ST-03a 顶部内置 Notify `Type=Warning` 在 Never Paid / Ended 下渲染；Profile Switcher Ended 用 `Notify Type=Info`（中性语境条） | ✅ 切换接口对 `Never Paid` 拒绝 `403 PROFILE_SWITCH_RESTRICTED`；`Ended` 放行                           | 前端控制 UI 状态 + 后端仅在 `Never Paid` 切换接口拒绝；`Ended` 切换不拦                          |

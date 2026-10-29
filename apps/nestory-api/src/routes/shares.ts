@@ -100,8 +100,23 @@ export async function sharesRoutes(app: FastifyInstance) {
     });
     if (!share) throw Errors.notFound('Share');
 
-    const doc = share.story.document as StoryDocument | null;
-    if (!doc) throw Errors.notFound('Story document');
+    const stored = share.story.document as StoryDocument | null;
+    if (!stored) throw Errors.notFound('Story document');
+
+    // 水印 = 生成时的状态 AND 作者现在不是 Premium（2026-10-29 用户定的 B 方案）：
+    // Free 期间生成的 Story，作者订阅后分享链接就不带水印，退订后回来；
+    // 付费期间生成的本来就是 false，永远不带。只改返回值，库里的 document 不动。
+    let doc = stored;
+    if (stored.watermark.enabled) {
+      const sub = await prisma.subscription.findUnique({
+        where:  { userId: share.story.userId },
+        select: { subscriptionStatus: true },
+      });
+      const isPremium =
+        sub?.subscriptionStatus === 'premium_active' ||
+        sub?.subscriptionStatus === 'trial_active';
+      if (isPremium) doc = { ...stored, watermark: { ...stored.watermark, enabled: false } } as StoryDocument;
+    }
 
     const data: PublicShare = {
       storyId:  share.storyId,
