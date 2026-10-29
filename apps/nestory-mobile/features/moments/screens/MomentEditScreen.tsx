@@ -7,6 +7,7 @@ import { MOMENT_CONSTRAINTS, type Moment, type MomentFile } from '@nestory/types
 import { theme, palette } from '@/shared/theme';
 import { BottomSheet, sheetSection } from '@/shared/components/BottomSheet';
 import { Button } from '@/shared/components/Button';
+import { DateTimePickerSheet } from '@/shared/components/DateTimePickerSheet';
 import { NavBar } from '@/shared/components/NavBar';
 import { KeyboardAvoider } from '@/shared/components/KeyboardAvoider';
 import { usePhotoPicker, type PickedPhoto } from '@/shared/hooks/usePhotoPicker';
@@ -17,12 +18,19 @@ import {
   uploadPhoto,
   useAsset,
   useDeleteAsset,
+  useSubscription,
   useUpdateAsset,
 } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function formatDate(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Same "Oct 25, 2026 · 2:10 PM" as Add Moment, for when the time can be changed. */
+function formatDateTime(d: Date): string {
+  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${formatDate(d)} · ${timePart}`;
 }
 
 export function MomentEditScreen() {
@@ -63,8 +71,17 @@ function EditForm({ moment }: { moment: Moment }) {
   const updateAsset     = useUpdateAsset(moment.id);
   const deleteAsset     = useDeleteAsset();
   const pickFromLibrary = usePhotoPicker({ multiple: true });
+  const subQ            = useSubscription();
+  // Premium can move a saved Moment to another date (Vicol 2026-10-26); on
+  // Free the date stays as it was saved.
+  const canEditDate =
+    subQ.data?.subscriptionStatus === 'premium_active' ||
+    subQ.data?.subscriptionStatus === 'trial_active';
 
   const [noteText, setNoteText]               = useState(moment.textNote ?? '');
+  const [capturedAt, setCapturedAt]           = useState(() => new Date(moment.capturedAt));
+  const [dateSheetVisible, setDateSheetVisible] = useState(false);
+  const dateChanged = capturedAt.getTime() !== new Date(moment.capturedAt).getTime();
   const [removedFileIds, setRemovedFileIds]   = useState<Set<string>>(new Set());
   const [newPhotos, setNewPhotos]             = useState<PickedPhoto[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -141,6 +158,7 @@ function EditForm({ moment }: { moment: Moment }) {
 
       await updateAsset.mutateAsync({
         textNote: noteText.trim(),
+        ...(dateChanged              ? { capturedAt:    capturedAt.toISOString() } : {}),
         ...(uploaded.length > 0      ? { addFiles:      uploaded } : {}),
         ...(removedFileIds.size > 0  ? { removeFileIds: [...removedFileIds] } : {}),
       });
@@ -242,15 +260,32 @@ function EditForm({ moment }: { moment: Moment }) {
         {/* detailsList 774:3685 — Memory Date only, matching the frame. Tags
             were removed from the product (Justin 2026-08-09). */}
         <View style={styles.detailsList}>
-          {/* Memory Date — read-only here; capture date is fixed at create */}
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Moment Date</Text>
-            <Text style={styles.detailValue}>{formatDate(moment.capturedAt)}</Text>
-          </View>
+          {canEditDate ? (
+            // Same row and picker as Add Moment
+            <Pressable style={styles.detailRow} onPress={() => setDateSheetVisible(true)}>
+              <Text style={styles.detailLabel}>Moment Date</Text>
+              <View style={styles.detailRight}>
+                <Text style={styles.detailValue}>{formatDateTime(capturedAt)}</Text>
+                <RemixIcon name="arrow-right-s-line" size={20} color={theme.text.hint} />
+              </View>
+            </Pressable>
+          ) : (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Moment Date</Text>
+              <Text style={styles.detailValue}>{formatDate(capturedAt)}</Text>
+            </View>
+          )}
         </View>
 
         {saveError && <Text style={styles.errorInline}>{saveError}</Text>}
       </ScrollView>
+
+      <DateTimePickerSheet
+        visible={dateSheetVisible}
+        value={capturedAt}
+        onConfirm={setCapturedAt}
+        onDismiss={() => setDateSheetVisible(false)}
+      />
 
       {/* cta 743:4885 — the footer only carries Delete Memory */}
       <View style={styles.cta}>

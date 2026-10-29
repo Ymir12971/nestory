@@ -24,6 +24,7 @@ export interface MomentCreateInput {
 
 export interface MomentPatchInput {
   textNote?:       string;
+  capturedAt?:     string; // Premium only — the server refuses it otherwise
   addFiles?:       AssetFileInput[];
   removeFileIds?:  string[];
   reorderFileIds?: string[];
