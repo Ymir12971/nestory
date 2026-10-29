@@ -14,11 +14,18 @@ import styles from './StoryRendererV3.module.css';
  *
  * `external` = 被分享者用浏览器打开(/share/[token])。App 内 WebView 传 false:
  * §9.1 明确 App 内不带水印,§9.3 的水印只作用于外部分享场景。
+ *
+ * `insets` = the app's status-bar and navigation-bar heights. In the app this
+ * page fills the whole screen with no native title bar above it (Vicol
+ * 2026-10-26), and Android's WebView reports no safe-area insets of its own,
+ * so the app passes them in the URL and the progress bar and page buttons
+ * keep clear of the system bars.
  */
 export function StoryRendererV3({
   doc,
   external = false,
-}: { doc: StoryDocumentV3; external?: boolean }) {
+  insets,
+}: { doc: StoryDocumentV3; external?: boolean; insets?: { top: number; bottom: number } }) {
   const pages = useMemo(
     () => ['cover' as const, 'opening' as const, ...doc.body.map((_, i) => i), 'closing' as const],
     [doc.body],
@@ -46,8 +53,15 @@ export function StoryRendererV3({
   const isFirst = page === 0;
   const isLast  = page === pages.length - 1;
 
+  const insetVars = insets
+    ? ({
+        '--app-inset-top':    `${insets.top}px`,
+        '--app-inset-bottom': `${insets.bottom}px`,
+      } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div className={styles.root} onClick={onZoneTap}>
+    <div className={styles.root} style={insetVars} onClick={onZoneTap}>
       {/* 顶部:进度条 + 关闭 */}
       <div className={styles.topBar}>
         <div className={styles.progressTrack}>
@@ -59,7 +73,7 @@ export function StoryRendererV3({
         {/* A visitor who opened a shared link has no screen behind this one —
             ✕ and "Back to Home" only mean something inside the app. */}
         {!external && (
-          <button className={styles.closeBtn} onClick={close} aria-label="Close">✕</button>
+          <button className={styles.closeBtn} onClick={close} aria-label="Close"><CloseIcon /></button>
         )}
       </div>
 
@@ -75,26 +89,85 @@ export function StoryRendererV3({
         {current === 'cover'   && <CoverPage doc={doc} />}
         {current === 'opening' && <OpeningPage doc={doc} />}
         {typeof current === 'number' && <ChapterPage chapter={doc.body[current]!} />}
-        {current === 'closing' && <ClosingPage doc={doc} onBack={external ? null : close} />}
+        {current === 'closing' && <ClosingPage doc={doc} external={external} />}
       </div>
 
-      {/* 底部翻页按钮(§6.1:毛玻璃,箭头;Opening 的下一页带 label) */}
+      {/* 底部翻页按钮 — DS Primary (Vicol 2026-10-26). The closing page already
+          has a Primary "Share this Story", so there the pair turns outlined
+          and "Back to Home" takes the right-hand slot, as in the H5 template. */}
       <div className={styles.navRow}>
         {!isFirst ? (
-          <button className={styles.navBtn} onClick={prev} aria-label="Previous">←</button>
+          <button
+            className={`${styles.navBtn} ${isLast ? styles.navBtnOutline : ''}`}
+            onClick={prev}
+            aria-label="Previous"
+          >
+            <Chevron dir="left" />
+          </button>
         ) : <span />}
 
         {!isLast ? (
-          <button
-            className={`${styles.navBtn} ${current === 'opening' ? styles.navBtnLabeled : ''}`}
-            onClick={next}
-            aria-label="Next"
-          >
-            {current === 'opening' ? 'Start Reading →' : '→'}
+          <button className={styles.navBtn} onClick={next} aria-label="Next">
+            {current === 'opening' && <span className={styles.navBtnLabel}>Start Reading</span>}
+            <Chevron dir="right" />
+          </button>
+        ) : !external ? (
+          <button className={`${styles.navBtn} ${styles.navBtnOutline}`} onClick={close}>
+            <HomeIcon />
+            <span className={styles.navBtnLabel}>Back to Home</span>
           </button>
         ) : <span />}
       </div>
     </div>
+  );
+}
+
+// ─── Icons (Remix Icon, same set as the app) ────────────────────────────────
+// Inline SVG rather than "←" / "→" glyphs: the two arrows came from different
+// fallback fonts and rendered at visibly different sizes.
+
+function Chevron({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d={dir === 'left'
+          ? 'M10.828 12l4.95 4.95-1.414 1.415L8 12l6.364-6.364 1.414 1.414z'
+          : 'M13.172 12l-4.95-4.95 1.414-1.414L16 12l-6.364 6.364-1.414-1.414z'}
+      />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg className={styles.iconSmall} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg className={styles.iconSmall} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M19 21H5a1 1 0 0 1-1-1v-9H1l10.327-9.388a1 1 0 0 1 1.346 0L23 11h-3v9a1 1 0 0 1-1 1zm-6-2h5V9.157l-6-5.454-6 5.454V19h5v-6h2v6z" />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M13 14h-2a8.999 8.999 0 0 0-7.968 4.81A10.136 10.136 0 0 1 3 18C3 12.477 7.477 8 13 8V3l10 8-10 8v-5z" />
+    </svg>
+  );
+}
+
+function Sparkle() {
+  return (
+    <svg className={styles.sparkle} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M10 3l1.6 5.4L17 10l-5.4 1.6L10 17l-1.6-5.4L3 10l5.4-1.6z" />
+      <path d="M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z" />
+    </svg>
   );
 }
 
@@ -116,14 +189,28 @@ function CoverPage({ doc }: { doc: StoryDocumentV3 }) {
       </section>
     );
   }
-  // Cover-B:柔和多彩虚化渐变(§5.1 产品特例)
+  // Cover-B:柔和多彩虚化渐变(§5.1 产品特例)。Centred month over a large
+  // year, as in the Story H5 Templates design (Vicol 2026-10-26).
+  const { monthName, year } = splitMonth(cover.month);
   return (
-    <section className={styles.coverB}>
-      <p className={styles.coverMonthB}>{cover.month}</p>
-      <h1 className={styles.coverNameB}>{cover.childName}</h1>
+    <section className={`${styles.coverB} ${styles.softBg}`}>
+      <p className={styles.coverMonthB}>{monthName}</p>
+      {year && <p className={styles.coverYearB}>{year}</p>}
+      <div className={styles.coverDivider}>
+        <span className={styles.coverRule} />
+        <Sparkle />
+        <span className={styles.coverRule} />
+      </div>
+      <h1 className={styles.coverNameB}>{cover.childName}&rsquo;s month</h1>
       <p className={styles.coverSubtitleB}>{cover.subtitle}</p>
     </section>
   );
+}
+
+/** "OCTOBER 2026" → { monthName: "OCTOBER", year: "2026" }. */
+function splitMonth(label: string): { monthName: string; year: string | null } {
+  const m = /^(.*\S)\s+(\d{4})$/.exec(label.trim());
+  return m ? { monthName: m[1]!, year: m[2]! } : { monthName: label, year: null };
 }
 
 function OpeningPage({ doc }: { doc: StoryDocumentV3 }) {
@@ -156,7 +243,14 @@ function shareableUrl(): string {
   return url.toString();
 }
 
-function ClosingPage({ doc, onBack }: { doc: StoryDocumentV3; onBack: (() => void) | null }) {
+function plural(n: number, word: string): string {
+  return n === 1 ? word : `${word}s`;
+}
+
+/** Closing page, laid out after the Story H5 Templates design (Vicol 2026-10-26). */
+function ClosingPage({ doc, external }: { doc: StoryDocumentV3; external: boolean }) {
+  const { moments, photos } = doc.closing.stats;
+  const name = doc.cover.childName;
   const share = async () => {
     // In the app the native screen owns sharing: it mints the public
     // /share/<token> link. This page's own URL is not shareable there.
@@ -169,14 +263,33 @@ function ClosingPage({ doc, onBack }: { doc: StoryDocumentV3; onBack: (() => voi
     }
   };
   return (
-    <section className={styles.closing}>
-      <p className={styles.closingBrand}>Nestory</p>
-      <h2 className={styles.closingHeadline}>{doc.closing.headline}</h2>
-      <p className={styles.closingStats}>
-        {doc.closing.stats.moments} moments · {doc.closing.stats.photos} photos
+    <section className={`${styles.closing} ${styles.softBg}`}>
+      <p className={styles.closingBrand}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className={styles.closingLogo} src="/logo.png" alt="" width={24} height={24} />
+        Nestory
       </p>
-      <button className={styles.shareBtn} onClick={share}>Share this Story</button>
-      {onBack && <button className={styles.backBtn} onClick={onBack}>Back to Home</button>}
+      <h2 className={styles.closingHeadline}>{doc.closing.headline}</h2>
+      <div className={styles.statRow}>
+        <div className={styles.statCard}>
+          <span className={styles.statValue}>{moments}</span>
+          <span className={styles.statLabel}>{plural(moments, 'moment')}</span>
+        </div>
+        <div className={styles.statCard}>
+          <span className={styles.statValue}>{photos}</span>
+          <span className={styles.statLabel}>{plural(photos, 'photo')}</span>
+        </div>
+      </div>
+      {/* Addressed to the parent, so not on the public page. */}
+      {!external && (
+        <p className={styles.closingInvite}>
+          Share {name}&rsquo;s month with family and friends — let them watch {name} grow.
+        </p>
+      )}
+      <button className={styles.shareBtn} onClick={share}>
+        <ShareIcon />
+        Share this Story
+      </button>
     </section>
   );
 }

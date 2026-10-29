@@ -6,7 +6,13 @@ import { isStoryDocumentV3 } from '@nestory/types';
 
 interface StoryPageProps {
   params:       Promise<{ id: string }>;
-  searchParams: Promise<{ t?: string }>;
+  /** `st` / `sb`: the app's status-bar and navigation-bar heights, in px. */
+  searchParams: Promise<{ t?: string; st?: string; sb?: string }>;
+}
+
+function insetPx(raw: string | undefined): number {
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 0), 200) : 0;
 }
 
 /**
@@ -24,7 +30,7 @@ export const metadata = {
 
 export default async function StoryPage({ params, searchParams }: StoryPageProps) {
   const { id } = await params;
-  const { t }  = await searchParams;
+  const { t, st, sb } = await searchParams;
 
   if (!t) {
     return (
@@ -45,5 +51,7 @@ export default async function StoryPage({ params, searchParams }: StoryPageProps
   }
 
   const doc = detail.document;
-  return isStoryDocumentV3(doc) ? <StoryRendererV3 doc={doc} /> : <StoryRenderer doc={doc} />;
+  return isStoryDocumentV3(doc)
+    ? <StoryRendererV3 doc={doc} insets={{ top: insetPx(st), bottom: insetPx(sb) }} />
+    : <StoryRenderer doc={doc} />;
 }

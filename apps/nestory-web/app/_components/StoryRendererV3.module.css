@@ -1,13 +1,22 @@
 /* StoryRendererV3 — StoryH5Design §5/§6. 基准 393px,DS: Inter 正文/Manrope 标题 */
 
 .root {
+  /* System-bar clearance. The app passes its own insets (see the component);
+     a browser that reports env() insets gets those instead. */
+  --inset-top:    max(var(--app-inset-top, 0px), env(safe-area-inset-top, 0px));
+  --inset-bottom: max(var(--app-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+  /* Page buttons sit 34px off the bottom edge (§6.1), or clear of the
+     navigation bar when that is taller. */
+  --nav-bottom:   max(34px, calc(var(--inset-bottom) + 16px));
+  --font-heading: var(--font-manrope), Manrope, Inter, sans-serif;
+
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
   background: #faf9f6;
   color: #1f2937;
-  font-family: Inter, -apple-system, sans-serif;
+  font-family: var(--font-inter), Inter, -apple-system, sans-serif;
   overflow: hidden;
   user-select: none;
 }
@@ -20,7 +29,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: max(12px, env(safe-area-inset-top)) 16px 8px;
+  padding: calc(var(--inset-top) + 12px) 16px 8px;
 }
 .progressTrack {
   flex: 1;
@@ -36,15 +45,20 @@
   transition: width 300ms ease-out;
 }
 .closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   border: none;
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(8px);
   width: 32px; height: 32px;
   border-radius: 16px;
-  font-size: 14px;
+  padding: 0;
   color: #1f2937;
   cursor: pointer;
 }
+.closeBtn:active { background: rgba(255, 255, 255, 0.95); }
 
 /* ── 页容器(300-400ms 淡入,§6.4)──────────────────── */
 .page {
@@ -57,27 +71,17 @@
   to   { opacity: 1; transform: none; }
 }
 
-/* ── 底部翻页(毛玻璃,34px 安全距,§6.1)────────────── */
-.navRow {
-  position: absolute;
-  left: 20px; right: 20px;
-  bottom: max(34px, env(safe-area-inset-bottom));
-  z-index: 10;
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none;
-}
 /* 水印:进度条正下方居中,层级同 topBar。 */
 .watermark {
   position: absolute;
   z-index: 10;
   left: 50%;
-  top: calc(max(12px, env(safe-area-inset-top)) + 34px);
+  top: calc(var(--inset-top) + 46px);
   transform: translateX(-50%);
   margin: 0;
   pointer-events: none;
   /* Cover 页是满幅照片,浅色页是 #faf9f6 —— 光靠颜色两边不可能都读得清,
-     所以跟翻页按钮同一套毛玻璃。 */
+     所以用一层毛玻璃。 */
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -88,23 +92,57 @@
   color: rgba(31, 41, 55, 0.6);
   white-space: nowrap;
 }
+
+/* ── 底部翻页 —— DS Primary / Secondary button ───────── */
+.navRow {
+  position: absolute;
+  left: 20px; right: 20px;
+  bottom: var(--nav-bottom);
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+/* DS Primary: primary/500 → 400 gradient, 2px primary/50 ring, white content. */
 .navBtn {
   pointer-events: auto;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(10px);
-  min-width: 48px; height: 48px;
-  padding: 0 16px;
-  border-radius: 24px;
-  font-size: 18px;
-  color: #1f2937;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 52px;
+  height: 40px;
+  padding: 0 14px;
+  border: 2px solid #edfbf2;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #23ab65, #3ec878);
+  color: #fff;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
 }
-.navBtnLabeled {
-  font-family: Manrope, Inter, sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  color: #23ab65;
+.navBtn:active { background: linear-gradient(90deg, #1d9457, #23ab65); }
+/* DS Secondary: white fill, 1px border/brand, brand content. */
+.navBtnOutline {
+  border: 1px solid #23ab65;
+  background: rgba(255, 255, 255, 0.85);
+  color: #177a48;
+}
+.navBtnOutline:active { background: #edfbf2; }
+.navBtnLabel { padding: 0 2px; }
+
+.icon      { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
+.iconSmall { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+
+/* 柔和多彩虚化渐变 —— Cover-B 与 Closing 共用(§5.1 特例) */
+.softBg {
+  background:
+    radial-gradient(60% 50% at 15% 20%, rgba(255, 127, 110, 0.35), transparent 70%),
+    radial-gradient(55% 45% at 85% 30%, rgba(255, 193, 69, 0.35), transparent 70%),
+    radial-gradient(60% 55% at 25% 85%, rgba(96, 165, 250, 0.30), transparent 70%),
+    radial-gradient(55% 50% at 80% 80%, rgba(35, 171, 101, 0.30), transparent 70%),
+    #faf9f6;
 }
 
 /* ── Cover-A 满版主图 ─────────────────────────────── */
@@ -117,50 +155,67 @@
 .coverAText {
   position: absolute;
   left: 24px; right: 24px;
-  bottom: calc(max(34px, env(safe-area-inset-bottom)) + 72px);
+  bottom: calc(var(--nav-bottom) + 72px);
   color: #fff;
 }
 .coverMonth {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-heading);
   font-size: 15px; font-weight: 600;
   letter-spacing: 0.14em;
   opacity: 0.85;
   margin: 0 0 6px;
 }
 .coverName {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-heading);
   font-size: 44px; font-weight: 700; line-height: 1.1;
   margin: 0 0 10px;
 }
 .coverSubtitle { font-size: 17px; line-height: 1.5; opacity: 0.92; margin: 0; }
 
-/* ── Cover-B 多彩虚化渐变(§5.1 特例)──────────────── */
+/* ── Cover-B:月份 / 大号年份 / 分隔 / 名字 / 副标题,居中 ── */
 .coverB {
   height: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   padding: 0 28px;
-  background:
-    radial-gradient(60% 50% at 15% 20%, rgba(255, 127, 110, 0.35), transparent 70%),
-    radial-gradient(55% 45% at 85% 30%, rgba(255, 193, 69, 0.35), transparent 70%),
-    radial-gradient(60% 55% at 25% 85%, rgba(96, 165, 250, 0.30), transparent 70%),
-    radial-gradient(55% 50% at 80% 80%, rgba(35, 171, 101, 0.30), transparent 70%),
-    #faf9f6;
+  text-align: center;
 }
 .coverMonthB {
-  font-family: Manrope, sans-serif;
-  font-size: 40px; font-weight: 800; line-height: 1.15;
-  letter-spacing: 0.04em;
-  margin: 0 0 12px;
+  font-family: var(--font-heading);
+  font-size: 15px; font-weight: 700;
+  letter-spacing: 0.24em;
+  color: #177a48;
+  margin: 0 0 4px;
 }
+.coverYearB {
+  font-family: var(--font-heading);
+  font-size: 72px; font-weight: 800; line-height: 1;
+  letter-spacing: -0.02em;
+  color: #1a1a1a;
+  margin: 0;
+}
+.coverDivider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0;
+}
+.coverRule { width: 40px; height: 1px; background: rgba(35, 171, 101, 0.35); }
+.sparkle { width: 16px; height: 16px; fill: #23ab65; }
 .coverNameB {
-  font-family: Manrope, sans-serif;
-  font-size: 26px; font-weight: 700;
+  font-family: var(--font-heading);
+  font-size: 26px; font-weight: 700; line-height: 1.25;
+  color: #1a1a1a;
   margin: 0 0 10px;
-  color: #23ab65;
 }
-.coverSubtitleB { font-size: 17px; line-height: 1.5; color: #4b5563; margin: 0; }
+.coverSubtitleB {
+  max-width: 280px;
+  font-size: 15px; line-height: 1.5;
+  color: #6b7280;
+  margin: 0;
+}
 
 /* ── Opening(中央竖排,左对齐,§5.1)───────────────── */
 .opening {
@@ -177,13 +232,27 @@
 .chapter {
   height: 100%;
   overflow-y: auto;
-  padding: 72px 20px 120px;
+  padding: calc(var(--inset-top) + 64px) 20px calc(var(--nav-bottom) + 72px);
   -webkit-overflow-scrolling: touch;
-  /* 底部渐隐提示(不放箭头) */
-  mask-image: linear-gradient(to bottom, black 92%, transparent 100%);
+  /* Fades out under the progress bar at the top (the title used to scroll
+     straight through it) and at the bottom as a "more below" cue. */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent calc(var(--inset-top) + 40px),
+    black calc(var(--inset-top) + 64px),
+    black 92%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent calc(var(--inset-top) + 40px),
+    black calc(var(--inset-top) + 64px),
+    black 92%,
+    transparent 100%
+  );
 }
 .chapterTitle {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-heading);
   font-size: 28px; font-weight: 700; line-height: 1.25;
   margin: 0 0 20px;
 }
@@ -221,45 +290,75 @@
 .duoRow .blockImg { flex: 1; min-width: 0; }
 .duoStack { display: flex; flex-direction: column; gap: 8px; }
 
-/* ── Closing(§5.1)────────────────────────────────── */
+/* ── Closing —— logo / 标语 / 两张统计卡 / 分享 ─────── */
 .closing {
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 0 28px;
+  padding: 0 24px;
   text-align: center;
 }
 .closingBrand {
-  font-family: Manrope, sans-serif;
-  font-size: 18px; font-weight: 800;
-  letter-spacing: 0.06em;
-  color: #23ab65;
-  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-heading);
+  font-size: 20px; font-weight: 800;
+  color: #1a1a1a;
+  margin: 0 0 16px;
 }
+.closingLogo { width: 24px; height: 24px; }
 .closingHeadline {
-  font-family: Manrope, sans-serif;
-  font-size: 26px; font-weight: 700; line-height: 1.35;
-  margin: 0;
+  max-width: 320px;
+  font-family: var(--font-heading);
+  font-size: 24px; font-weight: 700; line-height: 1.35;
+  margin: 0 0 20px;
 }
-.closingStats { font-size: 15px; color: #6b7280; margin: 0 0 8px; }
+.statRow {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 0 20px;
+}
+.statCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+.statValue {
+  font-family: var(--font-heading);
+  font-size: 28px; font-weight: 800; line-height: 1.15;
+  color: #177a48;
+}
+.statLabel { font-size: 12px; color: #6b7280; }
+.closingInvite {
+  max-width: 320px;
+  font-size: 14px; line-height: 1.5;
+  color: #6b7280;
+  margin: 0 0 16px;
+}
 .shareBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%; max-width: 320px;
   height: 52px;
-  border: none; border-radius: 26px;
+  border: 2px solid #edfbf2;
+  border-radius: 26px;
   background: linear-gradient(90deg, #23ab65, #3ec878);
   color: #fff;
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-heading);
   font-size: 16px; font-weight: 700;
   cursor: pointer;
 }
-.backBtn {
-  border: none; background: none;
-  font-family: Manrope, sans-serif;
-  font-size: 15px; font-weight: 600;
-  color: #23ab65;
-  cursor: pointer;
-  padding: 10px;
-}
+.shareBtn:active { background: linear-gradient(90deg, #1d9457, #23ab65); }

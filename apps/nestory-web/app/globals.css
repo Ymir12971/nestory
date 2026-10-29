@@ -1,0 +1,5 @@
+/* Android's WebView paints a translucent blue box over anything tapped. The
+   Story pages give their own pressed states, so turn it off everywhere. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
