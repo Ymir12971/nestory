@@ -10,7 +10,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemixIcon from 'react-native-remix-icon';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { isStoryDocumentV3 } from '@nestory/types';
 import { theme, palette } from '@/shared/theme';
 import { config } from '@/shared/config';
 import { useStory, getAuthToken, useCreateShare } from '@/api';
@@ -27,7 +28,6 @@ function formatMonth(monthKey: string): string {
 }
 
 export function StoryDetailScreen() {
-  const router = useRouter();
   const goBack = useGoBack();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,20 +40,33 @@ export function StoryDetailScreen() {
   // authenticate against the API server-side. We resolve it asynchronously
   // because Supabase's getSession is a promise; the WebView stays in
   // `loading` until the URL is ready.
+  //
+  // st/sb are the system-bar heights: the paged Story runs edge to edge and
+  // Android's WebView doesn't report safe-area insets to the page.
   const [webUrl, setWebUrl] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     getAuthToken().then((tok) => {
       if (cancelled || !id) return;
-      setWebUrl(`${config.webBaseUrl}/story/${id}?t=${encodeURIComponent(tok)}`);
+      setWebUrl(
+        `${config.webBaseUrl}/story/${id}?t=${encodeURIComponent(tok)}` +
+          `&st=${Math.round(insets.top)}&sb=${Math.round(insets.bottom)}`,
+      );
     }).catch(() => {
       if (!cancelled) setWebviewState('error');
     });
     return () => { cancelled = true; };
+    // Insets are read once, with the token; a change mid-read isn't worth a reload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const monthKey  = storyQ.data?.monthKey;
   const navTitle  = monthKey ? formatMonth(monthKey) : 'Story';
+  // The paged (v3) Story is a full-screen reader with its own progress bar,
+  // ✕ and closing-page Share button, so it gets no title bar and no bottom
+  // Share bar here (Vicol 2026-10-26). The older long-scroll (v2) page has
+  // none of those controls and keeps both.
+  const legacy = !!storyQ.data && !isStoryDocumentV3(storyQ.data.document);
 
   // story_opened — once per screen visit, when the story has actually loaded.
   const openedTracked = useRef(false);
@@ -100,26 +113,28 @@ export function StoryDetailScreen() {
     <View style={styles.root}>
       {/* NavBar Type=full (48:759) — back + title + share icon in the right
           slot. The cover and title inside the page are the WebView's own. */}
-      <View style={{ height: insets.top, backgroundColor: theme.surface.default }} />
-      <NavBar
-        title={navTitle}
-        onBack={goBack}
-        right={
-          <Pressable
-            hitSlop={8}
-            onPress={handleShare}
-            disabled={sharing}
-            accessibilityRole="button"
-            accessibilityLabel="Share this story"
-          >
-            <RemixIcon
-              name="share-line"
-              size={24}
-              color={sharing ? theme.text.disabled : theme.text.primary}
-            />
-          </Pressable>
-        }
-      />
+      {legacy && <View style={{ height: insets.top, backgroundColor: theme.surface.default }} />}
+      {legacy && (
+        <NavBar
+          title={navTitle}
+          onBack={goBack}
+          right={
+            <Pressable
+              hitSlop={8}
+              onPress={handleShare}
+              disabled={sharing}
+              accessibilityRole="button"
+              accessibilityLabel="Share this story"
+            >
+              <RemixIcon
+                name="share-line"
+                size={24}
+                color={sharing ? theme.text.disabled : theme.text.primary}
+              />
+            </Pressable>
+          }
+        />
+      )}
 
       {/* ── WebView body ─────────────────────────────────────── */}
       <View style={styles.webviewWrap}>
@@ -156,27 +171,43 @@ export function StoryDetailScreen() {
             </Text>
           </View>
         )}
+
+        {/* Without a title bar, the page's own ✕ is the only way out — and it
+            isn't there until the page has loaded. */}
+        {!legacy && webviewState !== 'loaded' && (
+          <Pressable
+            style={[styles.overlayClose, { top: insets.top + theme.spacing.m }]}
+            hitSlop={8}
+            onPress={goBack}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <RemixIcon name="close-line" size={20} color={theme.text.primary} />
+          </Pressable>
+        )}
       </View>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <View style={[styles.cta, { paddingBottom: insets.bottom + theme.spacing.m }]}>
-        <Pressable
-          style={({ pressed }) => [styles.shareButtonWrap, (pressed || sharing) && { opacity: 0.85 }]}
-          onPress={handleShare}
-          disabled={sharing}
-        >
-          <LinearGradient
-            colors={[palette.primary[500], palette.primary[400]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.shareButton}
+      {legacy && (
+        <View style={[styles.cta, { paddingBottom: insets.bottom + theme.spacing.m }]}>
+          <Pressable
+            style={({ pressed }) => [styles.shareButtonWrap, (pressed || sharing) && { opacity: 0.85 }]}
+            onPress={handleShare}
+            disabled={sharing}
           >
-            <Text style={styles.shareButtonLabel}>
-              {sharing ? 'Preparing link…' : 'Share this story'}
-            </Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
+            <LinearGradient
+              colors={[palette.primary[500], palette.primary[400]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.shareButton}
+            >
+              <Text style={styles.shareButtonLabel}>
+                {sharing ? 'Preparing link…' : 'Share this story'}
+              </Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -216,6 +247,17 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.text.secondary,
     textAlign: 'center',
+  },
+  // Same spot and size as the page's own ✕
+  overlayClose: {
+    position: 'absolute',
+    right: theme.spacing.l,
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.surface.card,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // CTA
