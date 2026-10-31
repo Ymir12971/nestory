@@ -230,25 +230,31 @@
 
 /* ── Body 章(可滚动,§6.2)────────────────────────── */
 .chapter {
+  /* border-box: with content-box the padding made the box 190-odd px taller
+     than the screen, so the bottom fade sat off-screen and a long chapter's
+     last lines could never scroll into view. */
+  box-sizing: border-box;
   height: 100%;
   overflow-y: auto;
-  padding: calc(var(--inset-top) + 64px) 20px calc(var(--nav-bottom) + 72px);
+  /* Bottom padding keeps the last line above the bottom fade once scrolled to the end. */
+  padding: calc(var(--inset-top) + 64px) 20px calc(var(--nav-bottom) + 96px);
   -webkit-overflow-scrolling: touch;
   /* Fades out under the progress bar at the top (the title used to scroll
-     straight through it) and at the bottom as a "more below" cue. */
+     straight through it) and above the page buttons at the bottom (text ran
+     under them; the 40px is the button height). */
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent calc(var(--inset-top) + 40px),
     black calc(var(--inset-top) + 64px),
-    black 92%,
-    transparent 100%
+    black calc(100% - var(--nav-bottom) - 88px),
+    transparent calc(100% - var(--nav-bottom) - 40px)
   );
   mask-image: linear-gradient(
     to bottom,
     transparent calc(var(--inset-top) + 40px),
     black calc(var(--inset-top) + 64px),
-    black 92%,
-    transparent 100%
+    black calc(100% - var(--nav-bottom) - 88px),
+    transparent calc(100% - var(--nav-bottom) - 40px)
   );
 }
 .chapterTitle {
