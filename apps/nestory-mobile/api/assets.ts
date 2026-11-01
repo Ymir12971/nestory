@@ -140,6 +140,7 @@ export function useCreateAsset() {
       // never refreshes after adding a Moment. It also has to reach
       // ['assets','months',childId], which grows a new month.
       qc.invalidateQueries({ queryKey: ['assets'] });
+      qc.invalidateQueries({ queryKey: ['stories'] }); // 见 useUpdateAsset
       qc.invalidateQueries({ queryKey: queryKeys.subscription }); // story_quota 可能变
     },
   });
@@ -152,6 +153,10 @@ export function useUpdateAsset(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(queryKeys.asset(id), data);
       qc.invalidateQueries({ queryKey: ['assets'] }); // 任意 list 都失效
+      // 服务端给该月 Story 打 momentsChanged（Stories 页蓝色 "Moments changed"
+      // 条）。Stories tab 一直挂着不会自己重读，不失效就得手动下拉才出现。
+      // 增、删、恢复同理。
+      qc.invalidateQueries({ queryKey: ['stories'] });
     },
   });
 }
@@ -162,6 +167,7 @@ export function useDeleteAsset() {
     mutationFn: ({ id, hard }: { id: string; hard?: boolean }) => deleteAsset(id, hard),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assets'] });
+      qc.invalidateQueries({ queryKey: ['stories'] }); // 见 useUpdateAsset
     },
   });
 }
@@ -170,6 +176,9 @@ export function useRestoreAsset() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: restoreAsset,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['assets'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assets'] });
+      qc.invalidateQueries({ queryKey: ['stories'] }); // 见 useUpdateAsset
+    },
   });
 }
