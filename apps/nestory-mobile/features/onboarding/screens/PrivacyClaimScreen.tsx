@@ -11,21 +11,27 @@ import { palette, theme } from '@/shared/theme';
 // Each promise is a plain icon + text row (24px icon, gap 4, list gap 24) — no
 // cards, no icon chips. The bold lead-in sits in the same text flow as the body
 // copy, in brand green.
+//
+// Every line here must stay true of the code (2026-11-03 review): photos sit in
+// a public bucket and staff may review Stories, so no "confidential"; the
+// Story prompt gets the child's first name, age and Moment text (storyAi.ts,
+// storyGen/prompt1.ts) but never photos; data goes to service providers, so
+// "never sold", not "never shared". Change the Termly privacy policy with it.
 const PROMISES: Array<{ icon: string; title: string; body: string }> = [
   {
     icon: 'lock-2-line',
-    title: 'Kept strictly confidential.',
-    body: 'Everything you enter is encrypted and belongs to you.',
+    title: 'Private to you.',
+    body: 'Your Moments are encrypted in transit and at rest. A Story only goes public when you share its link, and you can delete anything, anytime.',
   },
   {
     icon: 'error-warning-line',
     title: 'Never used to train AI.',
-    body: "Your child's data will never feed any model.",
+    body: "AI reads your notes, plus your child's first name and age, to write each monthly Story. Photos are never sent to AI, and nothing is used to train models.",
   },
   {
     icon: 'price-tag-3-line',
-    title: 'Never sold or shared.',
-    body: 'We follow the data-protection laws in your region and never sell the data to any other third-parties.',
+    title: 'Never sold.',
+    body: "We never sell your data or use it for ads. It's only handled by the services that run Nestory.",
   },
 ];
 
@@ -39,7 +45,7 @@ export function PrivacyClaimScreen() {
       <View style={styles.title}>
         <Text style={styles.heading}>
           <Text style={styles.headingBrand}>Privacy </Text>
-          is of the top importance here
+          is our top priority
         </Text>
         <Text style={styles.subheading}>
           We're about to ask a few things about your child. Here's our promise before you share
