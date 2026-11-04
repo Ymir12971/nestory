@@ -9,11 +9,17 @@ interface SharePageProps {
   params: Promise<{ token: string }>;
 }
 
+// A shared Story carries the child's name and photos; the privacy policy (§13)
+// promises it stays out of search results. Link previews still work — OG tags
+// are read by chat apps, not blocked by noindex.
+const NO_INDEX: Metadata['robots'] = { index: false, follow: false };
+
 export async function generateMetadata({ params }: SharePageProps): Promise<Metadata> {
   const { token } = await params;
   try {
     const share = await fetchPublicShare(token);
     return {
+      robots: NO_INDEX,
       title: share.og.title,
       description: share.og.description,
       openGraph: {
@@ -31,7 +37,7 @@ export async function generateMetadata({ params }: SharePageProps): Promise<Meta
     };
   } catch {
     // generateMetadata can't show a 404; the page handler below does.
-    return { title: 'Nestory' };
+    return { robots: NO_INDEX, title: 'Nestory' };
   }
 }
 
