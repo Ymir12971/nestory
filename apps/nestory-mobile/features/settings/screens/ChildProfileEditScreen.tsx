@@ -13,6 +13,7 @@ import { useChild, useSubscription, useUpdateChild, uploadPhoto } from '@/api';
 import { HeightInput, useHeightState } from '@/shared/components/HeightInput';
 import { useGoBack } from '@/shared/hooks/useGoBack';
 import { convertWeight, decimalOnly, WEIGHT_MAX } from '@/shared/lib/numericInput';
+import { PREMIUM_ENDED_PROFILES_NOTE } from '@/shared/lib/subscription';
 
 type UnitSystem = 'metric' | 'imperial';
 
@@ -86,8 +87,14 @@ export function ChildProfileEditScreen() {
           <View style={styles.freeNotice}>
             <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
             <Text style={styles.freeNoticeText}>
-              Free plan supports one active profile.{'\n'}
-              You can add and edit, but switching requires Premium.
+              {subQ.data.subscriptionStatus === 'premium_ended' ? (
+                PREMIUM_ENDED_PROFILES_NOTE
+              ) : (
+                <>
+                  Free plan supports one active profile.{'\n'}
+                  You can add and edit, but switching requires Premium.
+                </>
+              )}
             </Text>
           </View>
         </View>

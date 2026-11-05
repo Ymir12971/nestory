@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { theme, palette } from '@/shared/theme';
 import { useChildren, useSubscription } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { PREMIUM_ENDED_PROFILES_NOTE } from '@/shared/lib/subscription';
 
 function formatBirthDate(birthDate: string): string {
   const d = new Date(birthDate);
@@ -72,7 +73,9 @@ export function ChildProfileListScreen() {
           <View style={styles.notify}>
             <RemixIcon name="error-warning-line" size={16} color={theme.text.warning} />
             <Text style={styles.notifyText}>
-              Free plan supports one active profile. You can add more, but switching requires Premium.
+              {subQ.data?.subscriptionStatus === 'premium_ended'
+                ? PREMIUM_ENDED_PROFILES_NOTE
+                : 'Free plan supports one active profile. You can add more, but switching requires Premium.'}
             </Text>
           </View>
         )}

@@ -22,6 +22,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { PaywallModal } from '@/shared/components/PaywallModal';
 import { AddMomentEntrySheet } from '@/shared/components/AddMomentEntrySheet';
 import { formatAge } from '@/shared/lib/formatAge';
+import { PREMIUM_ENDED_PROFILES_NOTE } from '@/shared/lib/subscription';
 import { palette, theme } from '@/shared/theme';
 import { useAssetMonths, useAssets, useChildren, useSetActiveChild, useSubscription } from '@/api';
 
@@ -427,7 +428,7 @@ export function HomeScreen() {
             {!isPremium && (
               <Text style={styles.sheetSubtitle}>
                 {premiumEnded
-                  ? 'Premium ended. All your profiles are still here — renew to keep switching freely.'
+                  ? PREMIUM_ENDED_PROFILES_NOTE
                   : 'Free plan supports one active profile. Upgrade to switch between them.'}
               </Text>
             )}
