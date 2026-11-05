@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import type { StoryShare, PublicShare, StoryDocument } from '@nestory/types';
-import { prisma } from '../lib/prisma';
+import { prisma, whereNotDeleted } from '../lib/prisma';
 import { Errors } from '../lib/errors';
 import { parseBody, parseParams, uuidParam } from '../lib/validation';
 
@@ -94,8 +94,16 @@ export async function sharesRoutes(app: FastifyInstance) {
   app.get('/public/:token', async (req): Promise<{ data: PublicShare }> => {
     const { token } = parseParams(tokenParam, req);
 
+    // Deleting the account or the child takes its links down at once — both are
+    // soft deletes, and the rows only go when the account purge runs on day 30
+    // (a soft-deleted child waits for its account's purge). Restoring either
+    // brings the links back.
     const share = await prisma.storyShare.findFirst({
-      where:   { token, revokedAt: null },
+      where:   {
+        token,
+        revokedAt: null,
+        story: { user: whereNotDeleted, child: whereNotDeleted },
+      },
       include: { story: true },
     });
     if (!share) throw Errors.notFound('Share');

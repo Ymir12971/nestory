@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 // work for someone who has already uninstalled the app, so the email route is
 // what makes it count. Every timing below must match the code and the Termly
 // privacy policy — signed out at once, purged on day 30 (accountPurge.ts),
-// backups +60 days, transaction records 7 years. Share links are only dropped
-// by the purge (shares.ts doesn't check deletedAt), hence "once complete".
+// backups +60 days, transaction records 7 years. Share links die at once
+// (shares.ts checks the owner's deletedAt).
 export default function DeleteAccountPage() {
   return (
     <main style={s.page}>
@@ -38,7 +38,7 @@ export default function DeleteAccountPage() {
       <h2 style={s.h2}>What gets deleted</h2>
       <p style={s.p}>
         Your account, your child profiles, every Moment (photos and notes), every Story, and any
-        Story links you&apos;ve shared. Shared links stop working once the deletion is complete.
+        Story links you&apos;ve shared. Shared links stop working as soon as you ask.
       </p>
 
       <h2 style={s.h2}>When</h2>
