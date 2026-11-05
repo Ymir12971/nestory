@@ -101,6 +101,9 @@ export function HomeScreen() {
   const isPremium =
     subQ.data?.subscriptionStatus === 'premium_active' ||
     subQ.data?.subscriptionStatus === 'trial_active';
+  // R-05 Ended (SubscriptionRules v1.3): the lapsed subscriber keeps every
+  // profile switchable — only never_paid is refused (PATCH /children/active).
+  const premiumEnded = subQ.data?.subscriptionStatus === 'premium_ended';
 
   // Filter rules (H-First Memory / Normal list annotations): months shown =
   // months that HAVE Moments + the current month (always), newest first so the
@@ -414,14 +417,18 @@ export function HomeScreen() {
         </View>
       </BottomSheet>
 
-      {/* Profile Switcher — Free 770:2914 / Premium 770:2943 */}
+      {/* Profile Switcher — Free 770:2914 / Premium 770:2943. The redesign has no
+          Ended frame, so Ended reuses Free's layout with R-05's copy and
+          tappable rows. */}
       <BottomSheet visible={switcherVisible} onRequestClose={() => setSwitcherVisible(false)}>
         <View style={sheetSection.title}>
           <View style={styles.switcherTitleBlock}>
             <Text style={styles.sheetTitle}>Switch Profile</Text>
             {!isPremium && (
               <Text style={styles.sheetSubtitle}>
-                Free plan supports one active profile. Upgrade to switch between them.
+                {premiumEnded
+                  ? 'Premium ended. All your profiles are still here — renew to keep switching freely.'
+                  : 'Free plan supports one active profile. Upgrade to switch between them.'}
               </Text>
             )}
           </View>
@@ -432,8 +439,8 @@ export function HomeScreen() {
             const isActive = profile.isActive;
             // Free: non-active rows aren't tappable — the subtitle explains why,
             // and the only actions are the Upgrade CTA or dismissing the sheet
-            // (annotation). The design doesn't dim them.
-            const isLocked = !isActive && !isPremium;
+            // (annotation). The design doesn't dim them. Ended stays switchable.
+            const isLocked = !isActive && !isPremium && !premiumEnded;
             return (
               <View key={profile.id}>
                 {i > 0 && <View style={styles.profileDivider} />}
@@ -467,7 +474,7 @@ export function HomeScreen() {
         {!isPremium && (
           <View style={styles.switcherCta}>
             <Button
-              label="Upgrade to Premium"
+              label={premiumEnded ? 'Renew Premium' : 'Upgrade to Premium'}
               type="premium"
               onPress={() => {
                 setSwitcherVisible(false);
