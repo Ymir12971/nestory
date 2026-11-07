@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nestory",
     "slug": "nestory",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "nestory",
@@ -26,7 +26,7 @@
     },
     "android": {
       "package": "com.blakard.nestory",
-      "versionCode": 21,
+      "versionCode": 22,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/splash-icon.png",
         "backgroundColor": "#FEFCFA"
