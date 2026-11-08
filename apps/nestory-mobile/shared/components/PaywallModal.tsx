@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { SheetModal } from '@/shared/components/SheetModal';
 import { theme } from '@/shared/theme';
 import { track } from '@/shared/lib/analytics';
+import { PREMIUM_BENEFITS } from '@/shared/lib/subscription';
 import { usePlanPricing } from '@/features/billing/usePlanPricing';
 import { isPurchasesAvailable, purchasePlan } from '@/features/billing/purchases';
 import { purchaseErrorMessage } from '@/features/billing/purchaseErrors';
@@ -22,14 +23,6 @@ import { syncSubscriptionAfterPurchase } from '@/api';
 // `onSubscribe` now fires after the store confirms the purchase.
 
 export type PaywallCycle = 'year' | 'month';
-
-const BENEFITS = [
-  'Unlimited child profiles',
-  'Unlimited monthly Stories',
-  'Watermark-Free Sharing',
-  'Access to regenerate past Stories',
-  'Annual Recap and more features',
-];
 
 interface PaywallModalProps {
   visible: boolean;
@@ -101,7 +94,7 @@ export function PaywallModal({ visible, onSubscribe, onDismiss, source }: Paywal
           </View>
 
           <View style={styles.benefits}>
-            {BENEFITS.map((text) => (
+            {PREMIUM_BENEFITS.map((text) => (
               <View key={text} style={styles.benefit}>
                 <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
                 <Text style={styles.benefitText}>{text}</Text>

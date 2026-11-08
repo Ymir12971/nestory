@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { theme } from '@/shared/theme';
 import { useSubscription } from '@/api';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { PREMIUM_BENEFITS } from '@/shared/lib/subscription';
 
 // ST-Plan cancelled (Figma 771:3205). Shown once the platform cancellation has
 // actually landed (RevenueCat webhook flips the status) — 方案A: the app never
@@ -14,13 +15,6 @@ import { useGoBack } from '@/shared/hooks/useGoBack';
 //
 // Left-aligned title over a two-paragraph note, then the "still yours until
 // then" benefit card — not a centred success screen with a check badge.
-const BENEFITS = [
-  'Unlimited child profiles',
-  'Unlimited monthly Stories',
-  'Watermark-Free Sharing',
-  'Access to regenerate past Stories',
-  'Annual Recap and more features',
-];
 
 function formatCycleEnd(iso: string | null): string {
   if (!iso) return 'the end of your billing cycle';
@@ -53,7 +47,7 @@ export function PlanCancelledScreen() {
 
         <View style={styles.includedCard}>
           <Text style={styles.includedTitle}>STILL YOURS UNTIL THEN</Text>
-          {BENEFITS.map((benefit) => (
+          {PREMIUM_BENEFITS.map((benefit) => (
             <View key={benefit} style={styles.benefitRow}>
               <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
               <Text style={styles.benefitText}>{benefit}</Text>

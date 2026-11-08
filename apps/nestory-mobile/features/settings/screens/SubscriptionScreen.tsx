@@ -29,7 +29,7 @@ import {
 import { purchaseErrorMessage } from '@/features/billing/purchaseErrors';
 import { track } from '@/shared/lib/analytics';
 import { showToast } from '@/features/ui/toast';
-import { isOpenEndedExpiry } from '@/shared/lib/subscription';
+import { isOpenEndedExpiry, PREMIUM_BENEFITS } from '@/shared/lib/subscription';
 import { useRefreshSubscriptionOnFocus } from '@/shared/hooks/useRefreshSubscriptionOnFocus';
 import { PlanCancelledScreen } from './PlanCancelledScreen';
 
@@ -56,13 +56,6 @@ function freeSubtitle(sub: Subscription): string {
 
 // 764:3775 / 764:3844 — both variants title the page "Current Plan"
 const FREE_INCLUDES = ['One child profile', 'Two Stories', 'Watermarked Sharing'];
-const PREMIUM_BENEFITS = [
-  'Unlimited child profiles',
-  'Unlimited monthly Stories',
-  'Watermark-Free Sharing',
-  'Access to regenerate past Stories',
-  'Annual Recap and more features',
-];
 
 // ---------- ST-02A Free Plan ----------
 
@@ -266,15 +259,9 @@ function PremiumPlanContent({ sub }: { sub: Subscription }) {
       ? [{ key: 'Next billing', value: formatExpiry(sub.expiresAt) }]
       : []),
   ];
-  const benefits = sub.benefits.length > 0
-    ? sub.benefits
-    : [
-        'Unlimited child profiles',
-        'Unlimited monthly Stories',
-        'Watermark-Free Sharing',
-        'Access to regenerate past Stories',
-        'Annual Recap and more features',
-      ];
+  // Not sub.benefits: the server's list still sells Highlights and Birthday
+  // Celebrations, which the app doesn't have.
+  const benefits = PREMIUM_BENEFITS;
 
   // Two-step cancel flow (ST-02 sheets). 方案A (Justin 2026-07-16): we collect
   // the reason, then DEEP-LINK to the platform's subscription management —

@@ -7,19 +7,12 @@ import { Button } from '@/shared/components/Button';
 import { PremiumCrown } from '@/shared/components/PremiumCrown';
 import { theme, palette } from '@/shared/theme';
 import { useGoBack } from '@/shared/hooks/useGoBack';
+import { PREMIUM_BENEFITS } from '@/shared/lib/subscription';
 import { usePlanPricing } from './usePlanPricing';
 
 // global-Welcome to premium (Figma 771:3311). Shown after ANY successful
 // subscribe or renew — first time or not — then "I'm all set" returns the user
 // to wherever they started the purchase (annotation: 回到原位置).
-
-const BENEFITS = [
-  'Unlimited child profiles',
-  'Unlimited monthly Stories',
-  'Watermark-Free Sharing',
-  'Access to regenerate past Stories',
-  'Annual Recap and more features',
-];
 
 function nextBillingLabel(cycle: 'year' | 'month'): string {
   const d = new Date();
@@ -81,7 +74,7 @@ export function WelcomeToPremiumScreen() {
         {/* includedCard 771:3335 */}
         <View style={styles.includedCard}>
           <Text style={styles.includedTitle}>What's included</Text>
-          {BENEFITS.map((text) => (
+          {PREMIUM_BENEFITS.map((text) => (
             <View key={text} style={styles.benefit}>
               <RemixIcon name="vip-crown-2-line" size={20} color={theme.text.premium} />
               <Text style={styles.benefitText}>{text}</Text>

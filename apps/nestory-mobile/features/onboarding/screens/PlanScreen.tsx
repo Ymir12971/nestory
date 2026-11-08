@@ -13,6 +13,7 @@ import { purchasePlan, isPurchasesAvailable } from '@/features/billing/purchases
 import { purchaseErrorMessage } from '@/features/billing/purchaseErrors';
 import { useChildren } from '@/api';
 import { track } from '@/shared/lib/analytics';
+import { PREMIUM_BENEFITS } from '@/shared/lib/subscription';
 import { usePlanPricing } from '@/features/billing/usePlanPricing';
 
 // O-Choose plan (Figma 739:1406 yearly / 758:1219 monthly). No trial — the
@@ -20,14 +21,6 @@ import { usePlanPricing } from '@/features/billing/usePlanPricing';
 // Success → global Welcome-to-Premium page, then on to Home.
 
 type Plan = 'yearly' | 'monthly';
-
-const PREMIUM_BENEFITS = [
-  'Unlimited child profiles',
-  'Unlimited monthly Stories',
-  'Watermark-Free Sharing',
-  'Access to regenerate past Stories',
-  'Annual Recap and more features',
-];
 
 const FREE_ITEMS = ['One child profile', 'Two Stories', 'Watermarked Sharing'];
 

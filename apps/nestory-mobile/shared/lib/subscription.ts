@@ -9,6 +9,22 @@ export const PREMIUM_ENDED_PROFILES_NOTE =
   'Premium ended. All your profiles are still here — renew to keep switching freely.';
 
 /**
+ * What Premium buys — one list for the paywall, the onboarding plan picker, the
+ * subscription page, the welcome screen and the cancelled screen, so a benefit
+ * can't be sold in one place and missing in another. List only what has
+ * shipped: the stores read this as what the subscription delivers. The
+ * design's "Annual Recap and more features" is left out until Annual Recap
+ * exists, and GET /subscriptions/me's `benefits` isn't used — it still names
+ * Highlights and Birthday Celebrations.
+ */
+export const PREMIUM_BENEFITS = [
+  'Unlimited child profiles',
+  'Unlimited monthly Stories',
+  'Watermark-Free Sharing',
+  'Access to regenerate past Stories',
+] as const;
+
+/**
  * True when an expiry is too far off to be a billing date. A Premium that was
  * granted rather than bought never renews — RevenueCat stamps a lifetime
  * promotional with an expiry 200 years out — so "Renews Aug 11, 2226" is noise.
