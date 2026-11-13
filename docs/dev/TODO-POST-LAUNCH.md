@@ -30,6 +30,10 @@ Site URL 现在是 `https://nestory.love`（2026-11-08 从 localhost 改过来�
 
 ## 其他上线后事项
 
+- **Trader status（交易者身份）声明，2027-02 前必须完成**：Play Console 首页写着，所有开发者都要声明，
+  否则开发者账号和 App 会**从全球下架**，不只是欧盟。只有账号 Owner 能填，入口在首页的
+  "Declare your trader status" 或 Manage account。Blakard Tech 是公司、App 卖订阅，所以选 **Trader**。
+  声明后，公司的地址、电话、邮箱会公开显示在商店页面上，电话和邮箱要先通过验证。
 - **R8 / DEX 优化**：Play 提示 "DEX code optimization is below our threshold"（Obfuscation 2%），**2027-02 前要修**。
   修法是在 `expo-build-properties` 里加 `android.enableMinifyInReleaseBuilds: true`。
   R8 可能删掉 RevenueCat、Sentry、expo 模块靠反射用到的类，所以要单独出一个包，在真机上把购买、登录、通知测一遍。
